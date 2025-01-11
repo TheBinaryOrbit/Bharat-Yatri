@@ -65,8 +65,21 @@ const userSchema = new mongoose.Schema({
     },
     dob : {
         type: String,
+    },
+    isSubscribed : {
+        type : Boolean,
+        default : false
+    },
+    suscriptionStaredDate : {
+        type : Date,
+        default : Date.now
+    },
+    suscriptionEndDate : {
+        type : Date,
+        default : Date.now
     }
-}, { timestamps: true })
+    
+}, { timestamps: true });
 
 
 

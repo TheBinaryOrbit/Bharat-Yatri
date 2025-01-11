@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const rideSchema = new mongoose.Schema({
-    carModal : {
+    carModel : {
         type : String,
         required : true,
     },
