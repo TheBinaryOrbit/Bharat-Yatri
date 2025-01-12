@@ -65,8 +65,25 @@ const userSchema = new mongoose.Schema({
     },
     dob : {
         type: String,
+    },
+    isSubscribed : {
+        type : Boolean,
+        default : false
+    },
+    suscriptionStaredDate : {
+        type : Date,
+        default : Date.now
+    },
+    suscriptionEndDate : {
+        type : Date,
+        default : Date.now
+    },
+    userCurrentLocation : {
+        type : String,
+        default : 'delhi'
     }
-}, { timestamps: true })
+    
+}, { timestamps: true });
 
 
 

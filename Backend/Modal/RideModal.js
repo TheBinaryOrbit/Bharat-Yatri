@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const rideSchema = new mongoose.Schema({
-    carModal : {
+    carModel : {
         type : String,
         required : true,
     },
@@ -16,6 +16,24 @@ const rideSchema = new mongoose.Schema({
     description : {
         type : String,
         required : true,
+    },
+    PickupDateAndTime : {
+        type : String,     
+    },
+    customerFare : {
+        type : String,
+    },
+    commissionFee : {
+        type : String,
+    },
+    tripType : {
+        type : String,
+        enum : ['One-Way' , 'Round-Trip']
+    },
+    rideType : {
+        type :String,
+        required : true,
+        enum : ['Duty' , 'Exchange' , 'Available']
     },
     createdBy : {
         type : mongoose.Schema.Types.ObjectId,
