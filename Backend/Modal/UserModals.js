@@ -77,6 +77,10 @@ const userSchema = new mongoose.Schema({
     suscriptionEndDate : {
         type : Date,
         default : Date.now
+    },
+    userCurrentLocation : {
+        type : String,
+        default : 'delhi'
     }
     
 }, { timestamps: true });

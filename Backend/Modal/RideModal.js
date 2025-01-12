@@ -17,6 +17,24 @@ const rideSchema = new mongoose.Schema({
         type : String,
         required : true,
     },
+    PickupDateAndTime : {
+        type : String,     
+    },
+    customerFare : {
+        type : String,
+    },
+    commissionFee : {
+        type : String,
+    },
+    tripType : {
+        type : String,
+        enum : ['One-Way' , 'Round-Trip']
+    },
+    rideType : {
+        type :String,
+        required : true,
+        enum : ['Duty' , 'Exchange' , 'Available']
+    },
     createdBy : {
         type : mongoose.Schema.Types.ObjectId,
         ref : 'user',

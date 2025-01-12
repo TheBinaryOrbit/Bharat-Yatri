@@ -159,7 +159,6 @@ export const handleUpdateUser  =async (req,res)=>{
     }
 }
 
-
 // admin controllers 
 
 export const getAllRides=async (req,res)=>{
