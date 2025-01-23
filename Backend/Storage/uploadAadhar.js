@@ -7,8 +7,9 @@ const Storage = multer.diskStorage({
         cb(null , './public/aadhar');
     },
     filename : function(req,file , cb){
+        const name  = file.originalname.split('.')[0]
         const ext = path.extname(file.originalname)
-        cb(null , `${Date.now()}${ext}`);
+        cb(null , `${name}${Date.now()}${ext}`);
     }
 })
 

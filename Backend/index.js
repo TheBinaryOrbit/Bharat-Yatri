@@ -5,6 +5,12 @@ import { userRouter } from './Routers/UserRouter.js'
 import { rideRouter } from './Routers/RideRouter.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
+
+
+// test
+import { sendnotification } from './Notification/notification.js'
+// sendnotification("Muradnagar" ,"hello" );
+
 const app = express()
 
 // connecting databases 
@@ -28,6 +34,7 @@ app.use('/api/ride' , rideRouter)
 
 // testing the backend by the '/' route
 app.get('/' , (req , res)=>{
+    console.log(req)
     res.end('Happy Server Started Sucessfully')
 })
 
