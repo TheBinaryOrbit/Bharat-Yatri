@@ -1,4 +1,5 @@
 import { ride } from "../Modal/RideModal.js";
+import { sendnotification } from "../Notification/notification.js";
 
 export const addride = async (req, res) => {
     try {
@@ -11,13 +12,11 @@ export const addride = async (req, res) => {
             if (!PickupDateAndTime || !customerFare || !commissionFee || !tripType) return res.status(400).json({ "error": "All Fields Are required" });
             const result = await ride.create({ carModel, from, to, description, createdBy, rideType,PickupDateAndTime ,customerFare , commissionFee , tripType });
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
-
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
         }
         else {
             const result = await ride.create({ carModel, from, to, description, createdBy, rideType, });
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
-
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
         }
     } catch (e) {

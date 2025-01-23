@@ -6,6 +6,6 @@ export const rideRouter = express.Router();
 
 rideRouter.post('/addride' , addride);
 rideRouter.get('/getallrides' , getAllrides);
-rideRouter.get('/getownrides/:id' , getOwnrides)
-rideRouter.patch('/updateride/:id' , hanldeUpdateRide)
-rideRouter.delete('/deleteride/:id' , hanldeDeleteRide)
+rideRouter.get('/getownrides/:id' , getOwnrides);
+rideRouter.patch('/updateride/:id' , hanldeUpdateRide);
+rideRouter.delete('/deleteride/:id' , hanldeDeleteRide);

@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    aadhaarPhoto : {
+        type : String,
+    },
+    dlPhoto : {
+        type : String,
+    },
     aadhaarNumber: {
         type: String,
         unique: true,
@@ -81,10 +87,12 @@ const userSchema = new mongoose.Schema({
     userCurrentLocation : {
         type : String,
         default : 'delhi'
+    },
+    fcmtoken : {
+        type :  String,
     }
-    
 }, { timestamps: true });
 
 
 
-export const  user = mongoose.model('user' , userSchema)
+export const user = mongoose.model('user' , userSchema)

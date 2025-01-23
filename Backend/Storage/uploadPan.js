@@ -3,13 +3,14 @@ import path from 'path'
 
 
 const Storage = multer.diskStorage({
-    destination : function(req,file , cb){
-        cb(null , './public/pan');
+    destination: function (req, file, cb) {
+        cb(null, './public/pan');
     },
-    filename : function(req,file , cb){
+    filename: function (req, file, cb) {
+        const name = file.originalname.split('.')[0]
         const ext = path.extname(file.originalname)
-        cb(null , `${Date.now()}${ext}`);
+        cb(null, `${name}${Date.now()}${ext}`);
     }
 })
 
-export const uploadPan =  multer({ storage : Storage })
+export const uploaddl = multer({ storage: Storage })
