@@ -9,7 +9,9 @@ import { fileURLToPath } from 'url'
 
 // test
 import { sendnotification } from './Notification/notification.js'
-// sendnotification("Muradnagar" ,"hello" );
+import { handleBuySuscription } from './Controller/Suscription/suscription.js'
+
+// test 
 
 const app = express()
 
@@ -22,6 +24,16 @@ Connectdatabase(URL)
 // routes
 app.use(express.json());
 app.use(express.urlencoded({extended : true}));
+// app.post('/buysusc' , handleBuySuscription);
+app.get('/sentnotification' , (req , res)=>{
+    try {
+        sendnotification();
+        return res.end("sent");
+    } catch (error) {
+        res.send(error);
+    }
+
+})
 
 // statics serving of publuc folder
 const __filename = fileURLToPath(import.meta.url)

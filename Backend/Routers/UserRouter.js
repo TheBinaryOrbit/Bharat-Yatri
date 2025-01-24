@@ -1,8 +1,8 @@
 import express from 'express';
-import { GetOtp, verifyOtp, handleAddAgent, handleAddRider, handleGetUser, handleUpdateUser } from '../Controller/UserController.js';
+import { GetOtp, verifyOtp, handleAddAgent, handleAddRider, handleGetUser, handleUpdateUser } from '../Controller/UserConroller/UserController.js';
 //admin router
-import { getAllAgents , getAllRides ,  Verifyuser } from '../Controller/UserController.js';
-import { handleUploadAadhar, handleUploadPan } from '../Controller/UploadPhoto.js';
+import { getAllAgents , getAllRides ,  Verifyuser } from '../Controller/AdminController/Admincontroller.js';
+import { handleUploadAadhar, handleUploadPan } from '../Controller/UploadPhotoController/UploadPhoto.js';
 import { uploadAadhar } from "../Storage/uploadAadhar.js"
 import { uploaddl } from '../Storage/uploadPan.js';
 

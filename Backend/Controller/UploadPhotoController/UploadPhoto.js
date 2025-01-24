@@ -1,4 +1,4 @@
-import { user } from "../Modal/UserModals.js";
+import { user } from "../../Modal/UserModals.js";
 
 
 
