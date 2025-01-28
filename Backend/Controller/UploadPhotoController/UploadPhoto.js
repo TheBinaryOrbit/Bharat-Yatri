@@ -1,5 +1,4 @@
-import { user } from "../Modal/UserModals.js";
-
+import { user } from "../../Modal/UserModals.js";
 
 
 export const handleUploadAadhar = async (req , res)=>{

@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
 
-// creating the schema with field name , phonenumber , aadhaar number , driving licence number , verified or not
-
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -43,9 +41,20 @@ const userSchema = new mongoose.Schema({
         default: false
     },
     suscriptionType: {
-        type: String,
-        enum: ['Premium', 'Standard', 'Starter', 'Trial', 'None'],
-        default: 'None'
+       type : mongoose.Schema.Types.ObjectId,
+       ref : 'suscription'
+    },
+    isSubscribed : {
+        type : Boolean,
+        default : false
+    },
+    suscriptionStaredDate : {
+        type : Date,
+        default : Date.now
+    },
+    suscriptionEndDate : {
+        type : Date,
+        default : Date.now
     },
     freeTrailEliglibity: {
         type: Boolean,
@@ -71,18 +80,6 @@ const userSchema = new mongoose.Schema({
     },
     dob : {
         type: String,
-    },
-    isSubscribed : {
-        type : Boolean,
-        default : false
-    },
-    suscriptionStaredDate : {
-        type : Date,
-        default : Date.now
-    },
-    suscriptionEndDate : {
-        type : Date,
-        default : Date.now
     },
     userCurrentLocation : {
         type : String,

@@ -1,22 +1,34 @@
-import { ride } from "../Modal/RideModal.js";
-import { sendnotification } from "../Notification/notification.js";
+import { ride } from "../../Modal/RideModal.js";
+import { sendnotification } from "../../Notification/notification.js";
 
 export const addride = async (req, res) => {
     try {
         console.log(req.body)
-        const { carModel, from, to, description, createdBy, rideType } = req.body;
+        const { carModel, from, to, description, createdBy, rideType  } = req.body;
         if (!carModel || !from || !to || !description || !createdBy || !rideType) return res.status(400).json({ "error": "All Fields Are required" });
 
         if (rideType == 'Duty') {
             const { PickupDateAndTime, customerFare, commissionFee, tripType } = req.body;
             if (!PickupDateAndTime || !customerFare || !commissionFee || !tripType) return res.status(400).json({ "error": "All Fields Are required" });
-            const result = await ride.create({ carModel, from, to, description, createdBy, rideType,PickupDateAndTime ,customerFare , commissionFee , tripType });
+            const result = await ride.create({ carModel, from, to, description, createdBy, rideType ,PickupDateAndTime ,customerFare , commissionFee , tripType });
+
+            console.log(result);
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
+
+            // Sending notification
+            sendnotification(from , {carModel , from , to , description} , createdBy)
+
+            // sending response
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
         }
         else {
-            const result = await ride.create({ carModel, from, to, description, createdBy, rideType, });
+            const result = await ride.create({ carModel, from, to, description, createdBy, rideType});
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
+
+            // Sending notification
+            sendnotification(from , {carModel , from , to , description ,rideType } , createdBy);
+
+            // sending response
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
         }
     } catch (e) {
@@ -27,7 +39,7 @@ export const addride = async (req, res) => {
 
 export const getAllrides = async (req, res) => {
     try {
-        let result = await ride.find({}).populate('createdBy', { 'name': 1, 'phoneNumber': 1, 'email': 1, "userType": 1 }).sort({ createdAt: -1 });
+        let result = await ride.find({status : 'Pending'}).populate('createdBy', { 'name': 1, 'phoneNumber': 1, 'email': 1, "userType": 1 }).sort({ createdAt: -1 });
 
         result = result.map((ride) => {
             return {
