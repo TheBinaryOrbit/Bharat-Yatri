@@ -1,7 +1,5 @@
 import mongoose from "mongoose";
 
-// creating the schema with field name , phonenumber , aadhaar number , driving licence number , verified or not
-
 const userSchema = new mongoose.Schema({
     name: {
         type: String,

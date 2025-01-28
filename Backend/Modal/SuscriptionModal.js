@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 
-const suscriptionSchema = new mongoose.Schema({
-    suscriptionType : {
+const SubscriptionSchema = new mongoose.Schema({
+    subscriptionType : {
         type : String,
+        enum : ['Premium' , 'Standard' , 'Basic' , 'Trial'] ,
         required : true
     },
     price : {
@@ -26,4 +27,4 @@ const suscriptionSchema = new mongoose.Schema({
 });
 
 
-export const suscription = mongoose.model('suscription' , suscriptionSchema);
+export const subscription = mongoose.model('subscription' , SubscriptionSchema);

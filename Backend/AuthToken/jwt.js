@@ -3,10 +3,11 @@ import 'dotenv/config'
 const KEY = process.env.JWT_KEY
 
 // generating the jwt token 
-export const generateToken = (phone, id)=>{
+export const generateToken = (phone, id , userType)=>{
     return jwt.sign({
         phone: phone, 
-        id : id
+        id : id,
+        userType : userType
     } , KEY , {expiresIn :'7d'})
 }
 

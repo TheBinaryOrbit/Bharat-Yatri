@@ -44,7 +44,7 @@ export const verifyOtp = async (req, res) => {
 
 
         if(req.body.OTP != '1234') return res.status(400).json({ "error": "Invalid OTP" });
-
+        
         try {
             const number = phoneNumber.split(' ')[1]
             console.log(number)
@@ -54,7 +54,7 @@ export const verifyOtp = async (req, res) => {
             console.log(result);
 
             if (result == null) return res.status(404).json({ "error": "User Not Register" })
-            const token = generateToken(result.phoneNumber, result.id);
+            const token = generateToken(result.phoneNumber, result.id , result.userType);
             return res.status(200).json({
                 id: result._id,
                 name: result.name,

@@ -38,6 +38,11 @@ const rideSchema = new mongoose.Schema({
     createdBy : {
         type : mongoose.Schema.Types.ObjectId,
         ref : 'user',
+    },
+    status : {
+        type : String,
+        enum : [ 'Completed' , 'Pending'],
+        default : 'Pending'
     }
 },{timestamps : true})
 

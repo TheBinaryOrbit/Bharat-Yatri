@@ -1,28 +1,27 @@
-
-import { json } from "express";
 import { firebaseadmin } from "../Firebase/firebase.js";
 import { user } from "../Modal/UserModals.js";
 
 
-export const sendnotification = async (location, notification) => {
-    // const userarray = getUserByLocation(location)
-    const userarray = ["ckTbz9wNTfu892rNXDmU5N:APA91bEsMmMqK286zSW_Yvq0LjbRb4K0Ens_CTl9diDV2C2nwLCE3IDt586mlerC_bGz6ErgTD1EwQG_PAgD1p2AvuhxUmTVYnPEDoGA_ThBNxE9xWapbyA"]
+export const sendnotification = async (location, notification , createdBy) => {
+    const userarray =await getUserByLocation(location , createdBy)
+    console.log(userarray)
+    // const userarray = ["ckTbz9wNTfu892rNXDmU5N:APA91bEsMmMqK286zSW_Yvq0LjbRb4K0Ens_CTl9diDV2C2nwLCE3IDt586mlerC_bGz6ErgTD1EwQG_PAgD1p2AvuhxUmTVYnPEDoGA_ThBNxE9xWapbyA"]
+    console.log(notification)
     const message = {
         notification: {
-            title: "new ride",
-            body: "hello from backend"
+            title: "Hello Rider",
+            body: "New Ride added"
         },
         data: {
             message: JSON.stringify({
-                carModel: "sedan",
-                from: "ghaziabad",
-                to: "ranchi",
-                description: "notification gaya??"
+                carModel: notification.carModel,
+                from: notification.from,
+                to: notification.to,
+                description: notification.description
             })
         },
         tokens: userarray
     };
-    // return
     try {
         const response = await firebaseadmin.messaging().sendEachForMulticast(message);
         console.log(response.responses);
@@ -34,10 +33,15 @@ export const sendnotification = async (location, notification) => {
 }
 
 
-const getUserByLocation = async (location) => {
-    const result = await user.find({}, { _id: 1, fcmtoken: 1 });
-    const userarray = result.map((data) => {
-        return data.fcmtoken
+const getUserByLocation = async (location , createdBy) => {
+    const result = await user.find({ fcmtoken :{ $exists : true , $ne: null}}, { _id: 1, fcmtoken: 1 });
+
+    const userarray = result.filter((data)=>{
+        return data._id != createdBy;
     })
-    return userarray;
+
+    const array = userarray.map((data) => {
+        return data.fcmtoken;
+    });
+    return array;
 }

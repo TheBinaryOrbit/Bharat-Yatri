@@ -1,7 +1,6 @@
 import { user } from "../../Modal/UserModals.js";
 
 
-
 export const handleUploadAadhar = async (req , res)=>{
     try {
         const id = req.params.id;
