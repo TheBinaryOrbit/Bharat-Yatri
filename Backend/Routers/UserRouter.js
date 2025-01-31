@@ -10,12 +10,15 @@ export const userRouter = express.Router();
 
 userRouter.post('/getotp', GetOtp);
 userRouter.post('/verifyotp', verifyOtp);
+
 userRouter.post('/addagent' , handleAddAgent);
 userRouter.post('/addrider', handleAddRider);
-userRouter.get('/getuser/:id' , handleGetUser);
-userRouter.patch('/updateuser/:id' , handleUpdateUser)
 
 userRouter.post('/uploadaadhar/:id' ,uploadAadhar.single('image') , handleUploadAadhar)
-userRouter.post('/uploadpan/:id' , uploaddl.single('image'),handleUploadPan)
+userRouter.post('/uploaddl/:id' , uploaddl.single('image'),handleUploadPan)
+
+
+userRouter.get('/getuser/:id' , handleGetUser);
+userRouter.patch('/updateuser/:id' , handleUpdateUser)
 
 

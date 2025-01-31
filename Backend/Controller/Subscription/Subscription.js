@@ -63,7 +63,7 @@ export const handleAddSubscription = async (req, res) => {
     try {
         if (!req.body || !req.body.subscriptionType || !req.body.price || !req.body.description || !req.body.benefits || !req.body.timePeriod) return res.status(400).json({ "error": "All Fields Are Requires" });
 
-        const benefits = JSON.parse(benefits)
+        const benefits = JSON.stringify(req.body.benefits)
         const result = await subscription.create({
             subscriptionType: req.body.subscriptionType,
             price: req.body.price,
@@ -84,7 +84,7 @@ export const handleAddSubscription = async (req, res) => {
 export const handleUpdateSubscription = async (req, res) => {
     try {
         const id = req.params.id;
-        if (Object.keys(myObj).length == 0) return res.status(400).json({ "error": "Update Fields Are Required" });
+        if (Object.keys(req.body).length == 0) return res.status(400).json({ "error": "Update Fields Are Required" });
 
         const result = await subscription.findByIdAndUpdate(id, req.body, { new: true });
 
@@ -118,10 +118,23 @@ export const handleGetSubscription = async (req, res) => {
     try {
         let result = await subscription.find({});
 
-        if (!result) return res.status(500).json({ "error": "Error in Getting Rides" });
+        if (!result) return res.status(500).json({ "error": "Error in Getting Subscription" });
         return res.status(200).json(result);
     } catch (e) {
         console.log(e)
-        return res.status(500).json({ "error": "Error in Getting Rides" });
+        return res.status(500).json({ "error": "Error in Getting Subscription" });
+    }
+}
+
+export const handleSpecficGetSubscription = async (req, res) => {
+    try {
+        const id = req.params.id
+        let result = await subscription.findById(id);
+
+        if (!result) return res.status(500).json({ "error": "Error in Getting Subscription" });
+        return res.status(200).json(result);
+    } catch (e) {
+        console.log(e)
+        return res.status(500).json({ "error": "Error in Getting Subscription" });
     }
 }
