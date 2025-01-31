@@ -4,29 +4,29 @@ import { sendnotification } from "../../Notification/notification.js";
 export const addride = async (req, res) => {
     try {
         console.log(req.body)
-        const { carModel, from, to, description, createdBy, rideType  } = req.body;
+        const { carModel, from, to, description, createdBy, rideType } = req.body;
         if (!carModel || !from || !to || !description || !createdBy || !rideType) return res.status(400).json({ "error": "All Fields Are required" });
 
         if (rideType == 'Duty') {
             const { PickupDateAndTime, customerFare, commissionFee, tripType } = req.body;
             if (!PickupDateAndTime || !customerFare || !commissionFee || !tripType) return res.status(400).json({ "error": "All Fields Are required" });
-            const result = await ride.create({ carModel, from, to, description, createdBy, rideType ,PickupDateAndTime ,customerFare , commissionFee , tripType });
+            const result = await ride.create({ carModel, from, to, description, createdBy, rideType, PickupDateAndTime, customerFare, commissionFee, tripType });
 
             console.log(result);
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
 
             // Sending notification
-            sendnotification(from , {carModel , from , to , description} , createdBy)
+            sendnotification(from, { carModel, from, to, description }, createdBy)
 
             // sending response
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
         }
         else {
-            const result = await ride.create({ carModel, from, to, description, createdBy, rideType});
+            const result = await ride.create({ carModel, from, to, description, createdBy, rideType });
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
 
             // Sending notification
-            sendnotification(from , {carModel , from , to , description ,rideType } , createdBy);
+            sendnotification(from, { carModel, from, to, description, rideType }, createdBy);
 
             // sending response
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
@@ -39,17 +39,78 @@ export const addride = async (req, res) => {
 
 export const getAllrides = async (req, res) => {
     try {
-        let result = await ride.find({status : 'Pending'}).populate('createdBy', { 'name': 1, 'phoneNumber': 1, 'email': 1, "userType": 1 }).sort({ createdAt: -1 });
+        let matchCondition = {};
 
-        result = result.map((ride) => {
-            return {
-                ...ride.toObject(),
-                createdAt: ride.createdAt.toLocaleString(),
-                updatedAt: ride.updatedAt.toLocaleString()
+        if (req.query.status && req.query.status !== 'all') {
+            matchCondition.status = req.query.status;
+        }
+
+        const result = await ride.aggregate([
+            {
+                $match: {
+                    $and : [
+                        matchCondition ,
+                        {rideType : req.query.ridetype}
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'createdBy',
+                    foreignField: '_id',
+                    as: 'createdByDetails'
+                }
+            },
+            {
+                $unwind: "$createdByDetails"
+            },
+            {
+                $project: {
+                    _id: 1,
+                    createdAt: 1,
+                    status: 1,
+                    to : 1,
+                    from : 1,
+                    description :  1,
+                    PickupDateAndTime : 1,
+                    customerFare  :1,
+                    commissionFee: 1,
+                    tripType : 1,
+                    carModel : 1,   
+                    "createdByDetails.name": 1,
+                    "createdByDetails.phoneNumber": 1,
+                    "createdByDetails.email": 1,
+                    "createdByDetails.userType": 1,
+                    "createdByDetails._id" : 1
+                }
+            },
+            {
+                $sort: { createdAt: -1 }
+            },
+            {
+                $facet: {
+                    metadata: [{ $count: "totalRides" }],
+                    data: [
+                        { $skip: (+req.query.page - 1) * (+req.query.limit) },
+                        { $limit: +req.query.limit }
+                    ]
+                }
             }
-        })
+        ]);
+
+        const rides = result[0].data;
+        const totalrides = result[0].metadata.length > 0 ? result[0].metadata[0].totalRides : 0;
+
+        // rides = rides.map((ride) => {
+        //     return {
+        //         ...ride.toObject(),
+        //         createdAt: ride.createdAt.toLocaleString(),
+        //         updatedAt: ride.updatedAt.toLocaleString()
+        //     }
+        // })
         if (!result) return res.status(500).json({ "error": "Error in Getting Rides" });
-        return res.status(200).json(result);
+        return res.status(200).json({   totalrides , rides});
     } catch (e) {
         console.log(e)
         return res.status(500).json({ "error": "Error in Getting Rides" });

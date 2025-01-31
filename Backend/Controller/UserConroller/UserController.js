@@ -12,8 +12,10 @@ export const GetOtp = async (req, res) => {
 
         try {
             const number = phoneNumber.split(' ')[1]
-            const response = await axios.get(`https://2factor.in/API/V1/${apikey}/SMS/+91${number}/AUTOGEN3`);
+            if(number.length != 10) return res.status(400).json({"error" : "Number Must Be of 10 digit"})
+            const response = await  axios.get(`https://2factor.in/API/V1/${apikey}/SMS/+91${number}/AUTOGEN3`);
 
+            // console.log(response);
             if (response.status == 200) {
                 return res.status(200).json({
                     "message": "OTP Sent Sucessfully",
@@ -21,15 +23,15 @@ export const GetOtp = async (req, res) => {
                 });
             }
 
-            return res.status(400).json({ "error": "Bad request" });
+            return res.status(503).json({ "error": "OTP Server Gateway Time Out" });
 
         } catch (e) {
             console.log(e);
-            return res.status(500).json({ 'error': "OTP server Error" })
+            return res.status(500).json({ 'error': "OTP Server Error" })
         }
     } catch (e) {
         console.log(e);
-        return res.status(500).json({ 'error': "Somthing Went Wrong" })
+        return res.status(500).json({ 'error': "Internal Server Error" })
     }
 }
 
@@ -78,7 +80,6 @@ export const handleAddAgent = async (req, res) => {
         const { name, agencyName, phoneNumber, email, aadhaarNumber, dlNumber, pincode, address, state, city } = req.body
         if (!name || !agencyName || !phoneNumber || !email || !aadhaarNumber || !dlNumber || !pincode || !address || !state || !city) return res.status(400).json({ "error": "All fields are required" });
 
-        console.log(req.body)
         const result = await user.create({ name, agencyName, phoneNumber, email, aadhaarNumber, dlNumber, pincode, address, state, city, userType: 'AGENT' });
         if (!result) return res.status(500).json({ "error": "Error  in creating User" });
 
@@ -126,7 +127,7 @@ export const handleAddRider = async (req, res) => {
 
 export const handleGetUser = async (req, res) => {
     try {
-        let result = await user.find({ _id: req.params.id } , { freeTrailEliglibity : 0 , createdAt : 0 , updatedAt : 0});
+        let result = await user.find({ _id: req.params.id } , { createdAt : 0 , updatedAt : 0 , fcmtoken :0 , userCurrentLocation : 0 ,  __v : 0});
         result = [
             {
                 ...result[0].toObject(),

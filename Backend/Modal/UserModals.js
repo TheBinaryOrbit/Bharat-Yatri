@@ -42,7 +42,8 @@ const userSchema = new mongoose.Schema({
     },
     suscriptionType: {
        type : mongoose.Schema.Types.ObjectId,
-       ref : 'suscription'
+       ref : 'subscription',
+       default : '679c1b61c9d16375aeea4469'
     },
     isSubscribed : {
         type : Boolean,

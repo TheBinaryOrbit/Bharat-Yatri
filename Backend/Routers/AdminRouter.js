@@ -1,10 +1,12 @@
 import express from 'express'
 import { checkadmin } from '../Middleware/auth.js';
-import { getAllAgents , getAllRides ,  Verifyuser } from '../Controller/AdminController/Admincontroller.js';
+import {  getAllUser,  handleGetUserByAdmin,  handleLogin,  Verifyuser , getstats } from '../Controller/AdminController/Admincontroller.js';
 
 
 export const AdminRouter = express.Router();
 
-AdminRouter.get('/getallagent' , checkadmin , getAllAgents);
-AdminRouter.get('/getallriders' , checkadmin , getAllRides);
-AdminRouter.patch('/verifyuser/:id' , checkadmin , Verifyuser)
+AdminRouter.get('/getallusers' , checkadmin , getAllUser);
+AdminRouter.get('/getspecificuser/:id' , checkadmin , handleGetUserByAdmin)
+AdminRouter.patch('/verifyuser/:id' , checkadmin , Verifyuser);
+AdminRouter.post('/adminlogin' , handleLogin );
+AdminRouter.get('/getstats' , checkadmin , getstats)
