@@ -7,7 +7,18 @@ export interface auth {
       phoneNumber : string,
       userType : string,
       email : string
-    }
+    },
+    authpermission :[
+      {
+        name : string,
+        child : [
+          {
+            name : string,
+            icon : string
+          }
+        ]
+      }
+    ]
   }
 
 export interface user  {

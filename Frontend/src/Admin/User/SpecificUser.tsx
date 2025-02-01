@@ -160,7 +160,7 @@ const SpecificUser = () => {
                   Date of Birth
                 </th>
                 <td scope="col" className="px-6 py-3 border border-gray-500">
-                  {data?.dob}
+                  {data?.dob || 'N/A'}
                 </td>
                 <th scope="col" className="px-6 py-3 border border-gray-500">
                   Suscription Type
@@ -187,7 +187,7 @@ const SpecificUser = () => {
                   Agency Name
                 </th>
                 <td scope="col" className="px-6 py-3 border border-gray-500">
-                  {data.agencyName}
+                  {data?.agencyName || 'N/A'}
                 </td>
               </tr>
               <tr className='border border-gray-500'>
@@ -196,7 +196,7 @@ const SpecificUser = () => {
                 </th>
                 <td scope="col" className="px-6 py-3 border border-gray-500">
                   {
-                    data?.state
+                    data?.state || 'N/A'
                   }
                 </td>
                 <th scope="col" className="px-6 py-3 border border-gray-500">
@@ -204,7 +204,7 @@ const SpecificUser = () => {
                 </th>
                 <td scope="col" className="px-6 py-3 border border-gray-500">
                   {
-                    data?.city
+                    data?.city || 'N/A'
                   }
                 </td>
               </tr>
@@ -213,13 +213,13 @@ const SpecificUser = () => {
                   Pincode
                 </th>
                 <td scope="col" className="px-6 py-3 border border-gray-500">
-                  {data?.pincode}
+                  {data?.pincode || 'N/A'}
                 </td>
                 <th scope="col" className="px-6 py-3 border border-gray-500">
                   Address
                 </th>
                 <td scope="col" className="px-6 py-3 border border-gray-500">
-                  {data?.address}
+                  {data?.address || 'N/A'}
                 </td>
               </tr>
               {

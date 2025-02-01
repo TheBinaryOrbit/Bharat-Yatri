@@ -1,81 +1,71 @@
 import { user } from "../../Modal/UserModals.js";
 import { ride } from "../../Modal/RideModal.js";
+import { permission } from "../../Modal/permission.js";
 import { generateToken } from "../../AuthToken/jwt.js";
 
 export const getAllUser = async (req, res) => {
     try {
-        console.log(req.query)
-        let result = []
-        if (req.query.options == 'all') {
-            result = await user.aggregate([
-                {
-                    $match: req.query.usertype ? { userType: req.query.usertype } : {}
-                },
-                {
-                    $facet: {
-                        metadata: [{ $count: "totalUsers" }],  // Count total users
-                        data: [
-                            { $project: { _id: 1, phoneNumber: 1, name: 1, isVerified: 1, isSubscribed: 1, userType: 1 } },
-                            { $skip: (+req.query.page - 1) * (+req.query.limit) },
-                            { $limit: +req.query.limit },
-                            { $sort: { createdAt: -1 } }
-                        ]
-                    }
-                }
-            ]);
-        }
-        else {
-            result = await user.aggregate([
-                {
-                    $match: req.query.usertype
-                        ? {
-                            $and: [
-                                { isVerified: req.query.options === 'Verified' },
-                                { userType: req.query.usertype }
-                            ]
-                        }
-                        : {
-                            isVerified: req.query.options === 'Verified'
-                        }
-                },
-                {
-                    $facet: {
-                        metadata: [{ $count: "totalUsers" }],  // Count total users
-                        data: [
-                            { $project: { _id: 1, phoneNumber: 1, name: 1, isVerified: 1, isSubscribed: 1, userType: 1, } },
-                            { $skip: (+req.query.page - 1) * (+req.query.limit) },
-                            { $limit: +req.query.limit },
-                            { $sort: { createdAt: -1 } }
-                        ]
-                    }
-                }
-            ]);
+        console.log(req.query);
+        let result = [];
+
+        // Construct match query
+        let matchQuery = {};
+
+        if (req.query.usertype) {
+            matchQuery.userType = req.query.usertype;
         }
 
+        if (req.query.options === 'Verified') {
+            matchQuery.isVerified = true;
+        }
+
+        if (req.query.options === 'UnVerified') {
+            matchQuery.isVerified = false;
+        }
+
+        if (req.query.name) {
+            matchQuery.name = { $regex: req.query.name, $options: 'i' };
+        }
+
+        result = await user.aggregate([
+            { $match: matchQuery },
+            {
+                $facet: {
+                    metadata: [{ $count: "totalUsers" }], 
+                    data: [
+                        { $project: { _id: 1, phoneNumber: 1, name: 1, isVerified: 1, isSubscribed: 1, userType: 1 } },
+                        { $sort: { createdAt: -1 } },
+                        { $skip: (+req.query.page - 1) * (+req.query.limit) },
+                        { $limit: +req.query.limit }
+                    ]
+                }
+            }
+        ]);
 
         const users = result[0].data;
         const totalUsers = result[0].metadata.length > 0 ? result[0].metadata[0].totalUsers : 0;
 
-        if (!users) return res.status(500).json({ "error": "Error in Getting Users" })
+        if (!users) return res.status(500).json({ "error": "Error in Getting Users" });
         return res.status(200).json({
             totalUsers: totalUsers,
             users: users
         });
     } catch (e) {
-        console.log(e)
+        console.log(e);
         return res.status(500).json({ "error": "Error in Getting User" });
     }
+};
 
-}
 
 export const Verifyuser = async (req, res) => {
     try {
         const id = req.params.id
-        const result = await user.findByIdAndUpdate(id, { $set: { isVerified: true } } , {new : true})
+        const result = await user.findByIdAndUpdate(id, { $set: { isVerified: true } }, { new: true })
 
         if (!result) return res.status(404).json({ "error": "User Not Found" });
-        return res.status(200).json({ "Message": "User Verified Sucessfully" ,
-            user : result
+        return res.status(200).json({
+            "Message": "User Verified Sucessfully",
+            user: result
         });
     } catch (e) {
         console.log(e)
@@ -121,19 +111,19 @@ export const handleLogin = async (req, res) => {
 
             const result = await user.findOne({ phoneNumber: number });
 
-            console.log(result);
-
             if (result == null) return res.status(404).json({ "error": "User Not Register" });
 
             if (result.userType != 'ADMIN') return res.status(403).json({ "error": "Not an Admin" });
+            const pr = await permission.find({})
             const token = generateToken(result.phoneNumber, result.id, result.userType);
             return res.status(200).json({
                 id: result._id,
-                email : result.email,
+                email: result.email,
                 name: result.name,
                 phoneNumber: result.phoneNumber,
                 token: token,
-                userType: result.userType
+                userType: result.userType,
+                permission: pr
             })
 
         } catch (e) {

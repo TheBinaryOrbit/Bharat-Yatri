@@ -49,7 +49,6 @@ const Login = () => {
 
 
   const handleLogin = async () => {
-    console.log("je")
     setIsLoading(true);
     if (!otp || otp.length != 4 || !phoneNumber) {
       setIsLoading(false);
@@ -71,7 +70,8 @@ const Login = () => {
           phoneNumber: response.data.phoneNumber,
           userType: response.data.userType,
           email: response.data.email
-        }
+        },
+        authpermission : response.data.permission
       }
 
       localStorage.setItem('auth', JSON.stringify(auth));
@@ -102,7 +102,7 @@ const Login = () => {
           <div className='flex  justify-between gap-5 items-center border border-gray-500 rounded-2xl px-2 mb-4'>
             <div className="flex items-center gap-5">
               <FaPhoneAlt size={20} />
-              <input type="text" name='Name' className='h-12 outline-none rounded-2xl' placeholder='Phone Numbaer' onChange={(e) => setPhoneNumber(e.target.value)} />
+              <input type="text" name='Name' className='h-12 outline-none rounded-2xl' placeholder='Phone Number' onChange={(e) => setPhoneNumber(e.target.value)} />
             </div>
             {
               sessionId
@@ -117,8 +117,8 @@ const Login = () => {
             <FaUnlock size={20} />
             <input type="text" name='Name' className='h-12 outline-none rounded-2xl' placeholder='OTP' onChange={(e) => setOtp(e.target.value)} />
           </div>
-          <div className='flex  justify-center gap-5 items-center  rounded-2xl px-2 mb-6 cursor-pointer text-white bg-blue-500 hover:bg-blue-600'>
-            <button className="h-12 cursor-pointer font-bold  duration-300 outline-none rounded-2xl" onClick={isLoading ? undefined : handleLogin}>Sing in</button>
+          <div className='flex  justify-center gap-5 items-center  rounded-2xl px-2 mb-6 cursor-pointer text-white bg-blue-500 hover:bg-blue-600' onClick={isLoading ? undefined : handleLogin}>
+            <button className="h-12 cursor-pointer font-bold  duration-300 outline-none rounded-2xl" >Sing in</button>
           </div>
         </div>
       </div>
