@@ -125,7 +125,7 @@ const Subscription = () => {
                                             onClick={() => openModal(sub)}
                                             className="bg-gray-800 text-white hover:bg-gray-700 font-semibold py-2 px-6 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 w-full cursor-pointer"
                                         >
-                                            Update Price
+                                            Update
                                         </button>
                                     </div>
                                 </div>

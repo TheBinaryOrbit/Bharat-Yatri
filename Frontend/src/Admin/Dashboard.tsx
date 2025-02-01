@@ -101,7 +101,7 @@ const Dashboard = () => {
 
           <h1 className="text-2xl mb-4 font-bold text-gray-700  capitalize">Subscription Overview</h1>
           <div className="w-full h-fit bg-white rounded-xl shadow-lg flex md:flex-row flex-col justify-between items-center p-6">
-            {/* Percentage View */}
+            {/* Chart View */}
             <div className="md:w-1/2 w-full md:h-full h-[50%]  flex justify-center items-center">
               <Chart
                 chartType="PieChart"

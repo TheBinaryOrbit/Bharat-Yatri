@@ -1,87 +1,24 @@
 import { useState } from 'react';
 import { BiMenuAltRight } from 'react-icons/bi';
-import { FiHome, FiUsers, FiUserCheck, FiUserX, FiBriefcase, FiClock, FiRepeat, FiTag } from "react-icons/fi";
+import * as icon from "react-icons/fi";
 import { IoLogOutOutline } from "react-icons/io5";
 import { NavLink, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify';
+import { auth } from '../../lib/types';
 
-const menu = [
-    {
-        name: "Dashboard",
-        child: [
-            {
-                name: "Dashboard",
-                route: "dashboard",
-                icon: <FiHome />
-            },
-        ]
-    },
-    {
-        name: "User",
-        child: [
-            {
-                name: "All user",
-                route: "user/allusers",
-                icon: <FiUsers />
-            },
-            {
-                name: "Rider",
-                route: "user/riders",
-                icon: <FiUserCheck />
-            },
-            {
-                name: "Agents",
-                route: "user/agents",
-                icon: <FiBriefcase />
-            },
-            {
-                name: "Un-Verified User",
-                route: "user/unverified",
-                icon: <FiUserX />
-            },
-        ]
-    },
-    {
-        name: "Rides",
-        child: [
-            {
-                name: "Duty",
-                route: "ride/duty",
-                icon: <FiClock />
-            },
-            {
-                name: "Available",
-                route: "ride/available",
-                icon: <FiUsers />
-            },
-            {
-                name: "Exchange",
-                route: "ride/exchange",
-                icon: <FiRepeat />
-            }
-        ]
-    },
-    {
-        name: "Subscription",
-        child: [
-            {
-                name: "Subscription",
-                route: "subscription",
-                icon: <FiTag />
-            }
-        ]
-    },
-];
+
 
 const Sidebar = () => {
     const navigate = useNavigate()
     const [isOpen, setIsOpen] = useState(false);
+    const auth: auth | null = JSON.parse(localStorage.getItem('auth'));
+    const menu = auth?.authpermission;
 
     const toggleSidebar = () => {
         setIsOpen(!isOpen);
     };
 
-    const handleLogout = ()=>{
+    const handleLogout = () => {
         localStorage.removeItem('auth');
         toast.success("Logout SucessFully");
         navigate('/')
@@ -103,27 +40,30 @@ const Sidebar = () => {
             >
                 <div className="w-full">
                     {
-                        menu.map((item, index) => (
+                        menu?.map((item, index) => (
                             <>
                                 <div key={index} className="w-full h-8 px-3 flex items-center pl-0">
                                     <h6 className="text-gray-500 text-md font-semibold">{item.name}</h6>
                                 </div>
                                 <ul className="flex flex-col gap-2">
                                     {
-                                        item.child.map((child, i) => (
-                                            <li key={i}>
+                                        item.child.map(( child : any , i)=>{
+                                            const IconComponent : any = icon[child.icon]; 
+                                            return (
+                                                <li key={i}>
                                                 <NavLink to={`/admin/${child.route}`}>
                                                     <div className={`flex-col p-3 hover:bg-blue-100 duration-300 rounded-lg ml-2`} onClick={toggleSidebar}>
                                                         <div className="h-5 flex gap-3">
                                                             <div className="relative">
-                                                                <p className='text-sm translate-y-1'>{child.icon}</p>
+                                                            <p className='text-sm translate-y-[1.5px]'>{IconComponent && <IconComponent />}</p>
                                                             </div>
                                                             <h2 className="text-gray-500 text-sm font-medium">{child.name}</h2>
                                                         </div>
                                                     </div>
                                                 </NavLink>
                                             </li>
-                                        ))
+                                            )
+                                        })
                                     }
                                 </ul>
                             </>
@@ -135,14 +75,14 @@ const Sidebar = () => {
                     </div>
                     <ul className="flex flex-col gap-2">
                         <li>
-                                <div className={`flex-col p-3 hover:bg-blue-100 duration-300 rounded-lg ml-2 cursor-pointer`}>
-                                    <div className="h-5 flex gap-3">
-                                        <div className="relative">
-                                            <p className='text-sm translate-y-1'><IoLogOutOutline /></p>
-                                        </div>
-                                        <h2 className="text-gray-500 text-sm font-medium" onClick={handleLogout}>Logout</h2>
+                            <div className={`flex-col p-3 hover:bg-blue-100 duration-300 rounded-lg ml-2 cursor-pointer`} onClick={handleLogout}>
+                                <div className="h-5 flex gap-3">
+                                    <div className="relative">
+                                        <p className='text-sm translate-y-1'><IoLogOutOutline /></p>
                                     </div>
+                                    <h2 className="text-gray-500 text-sm font-medium">Logout</h2>
                                 </div>
+                            </div>
                         </li>
                     </ul>
                 </div>

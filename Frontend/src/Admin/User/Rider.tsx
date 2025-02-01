@@ -5,8 +5,8 @@ import URL from "../../lib/url";
 import { auth, user } from "../../lib/types";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
+import { FaFileExport, FaSearch } from "react-icons/fa";
 import exportToExcel from "../ExcleExport/ExportToExcle";
-import { FaFileExport } from "react-icons/fa";
 
 const Rider = () => {
     const [page, setPage] = useState(1);
@@ -15,26 +15,39 @@ const Rider = () => {
     const [data, setData] = useState([])
     const [totaluser, setTotalUser] = useState(0)
     const navigate = useNavigate()
+    const [name , setName] = useState<string>('')
+
+    const fetchData = async () => {
+        const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+        const token: string | undefined = auth?.authToken
+        try {
+            const res = await axios.get(`${URL}/api/admin/getallusers?options=${option}&page=${page}&limit=${limit}&usertype=RIDER&name=${name}`, {
+                headers: {
+                    "Authorization": "Bearer " + token
+                }
+            })
+            setData(res.data.users);
+            setTotalUser(res.data.totalUsers);
+        } catch (error: any) {
+            console.log(error);
+            return toast.error(error.response.data.error)
+        }
+    }
+
 
     useEffect(() => {
-        const fetchData = async () => {
-            const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
-            const token: string | undefined = auth?.authToken
-            try {
-              const res = await axios.get(`${URL}/api/admin/getallusers?options=${option}&page=${page}&limit=${limit}&usertype=RIDER`, {
-                    headers: {
-                        "Authorization": "Bearer " + token
-                    }
-                })
-                setData(res.data.users);
-                setTotalUser(res.data.totalUsers);
-            } catch (error: any) {
-                console.log(error);
-                return toast.error(error.response.data.error)
-            }
-        }
         fetchData()
     }, [page, limit, option])
+
+    const handlesearchByEnter = (e : any)=>{
+        if(e.key == "Enter"){
+            fetchData()
+        }
+    }
+
+    const handleSearch = ()=>{
+        fetchData()
+    }
 
     return (
         <div className='w-full h-auto flex flex-col lg:flex-row mt-[10vh]' >
@@ -60,7 +73,11 @@ const Rider = () => {
                             </select>
                         </div>
                         <div className='flex gap-4'>
-                            <button className="px-4 py-2 border border-gray-800 flex justify-center items-center gap-2 rounded-lg cursor-pointer font-medium"  onClick={()=> exportToExcel(data)}><FaFileExport className="translate-y-[1px]"/>Export</button>
+                            <div className="flex items-center gap-5 border border-gray-800 px-4 rounded-xl">
+                                <input type="text" name='name' className='outline-none' placeholder='Search By Name' onChange={(e) => setName(e.target.value)} onKeyDown={(e) => handlesearchByEnter(e)} />
+                                <FaSearch className="cursor-pointer" size={20} onClick={handleSearch} />
+                            </div>
+                            <button className="px-4 py-2 border border-gray-800 flex justify-center items-center gap-2 rounded-lg cursor-pointer font-medium" onClick={() => exportToExcel(data)}><FaFileExport className="translate-y-[1px]" />Export</button>
                         </div>
                     </div>
 
@@ -85,7 +102,7 @@ const Rider = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    data.map((user : user, i) => (
+                                    data.map((user: user, i) => (
                                         <tr
                                             key={user._id}
                                             className={`border-b text-left ${i % 2 === 0 ? "bg-gray-100" : "bg-white"}`}
@@ -134,14 +151,14 @@ const Rider = () => {
                                                 Previous
                                             </button>
                                             <span className="text-gray-600 font-medium">
-                                                Page {page} of {Math.ceil((+totaluser) /(+limit))}
+                                                Page {page} of {Math.ceil((+totaluser) / (+limit))}
                                             </span>
                                             <button
-                                                className={`px-4 py-2 rounded-md border border-blue-500 text-blue-600 transition ${page >= Math.ceil((+totaluser) /(+limit))
-                                                        ? "opacity-50 cursor-not-allowed"
-                                                        : "hover:bg-blue-100"
+                                                className={`px-4 py-2 rounded-md border border-blue-500 text-blue-600 transition ${page >= Math.ceil((+totaluser) / (+limit))
+                                                    ? "opacity-50 cursor-not-allowed"
+                                                    : "hover:bg-blue-100"
                                                     }`}
-                                                disabled={page >= Math.ceil((+totaluser )/(+limit))}
+                                                disabled={page >= Math.ceil((+totaluser) / (+limit))}
                                                 onClick={() => setPage(page + 1)}
                                             >
                                                 Next

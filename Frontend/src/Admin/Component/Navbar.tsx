@@ -1,4 +1,4 @@
-import { auth } from "../lib/types"
+import { auth } from "../../lib/types"
 const Navbar = () => {
   const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
   const user = auth?.authInfo
