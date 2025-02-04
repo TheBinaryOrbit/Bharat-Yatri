@@ -4,9 +4,9 @@ import { user } from "../Modal/UserModals.js";
 
 export const sendnotification = async (location, notification , createdBy) => {
     const userarray =await getUserByLocation(location , createdBy)
-    console.log(userarray)
+    // console.log(userarray)
     // const userarray = ["ckTbz9wNTfu892rNXDmU5N:APA91bEsMmMqK286zSW_Yvq0LjbRb4K0Ens_CTl9diDV2C2nwLCE3IDt586mlerC_bGz6ErgTD1EwQG_PAgD1p2AvuhxUmTVYnPEDoGA_ThBNxE9xWapbyA"]
-    console.log(notification)
+    // console.log(notification)
     const message = {
         notification: {
             title: "Hello Rider",
@@ -24,7 +24,8 @@ export const sendnotification = async (location, notification , createdBy) => {
     };
     try {
         const response = await firebaseadmin.messaging().sendEachForMulticast(message);
-        console.log(response.responses);
+        // console.log(response.responses);
+        console.log("Message send sucessfully");
         return "message send sucessfully"
     } catch (error) {
         console.log(error)

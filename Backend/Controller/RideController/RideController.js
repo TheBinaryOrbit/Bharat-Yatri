@@ -3,7 +3,6 @@ import { sendnotification } from "../../Notification/notification.js";
 
 export const addride = async (req, res) => {
     try {
-        console.log(req.body)
         const { carModel, from, to, description, createdBy, rideType } = req.body;
         if (!carModel || !from || !to || !description || !createdBy || !rideType) return res.status(400).json({ "error": "All Fields Are required" });
 
@@ -39,8 +38,9 @@ export const addride = async (req, res) => {
 
 export const getAllrides = async (req, res) => {
     try {
+        console.log(req)
+        console.log(req.query)
         let matchCondition = {};
-
         if (req.query.status && req.query.status !== 'all') {
             matchCondition.status = req.query.status;
         }
@@ -77,7 +77,8 @@ export const getAllrides = async (req, res) => {
                     customerFare  :1,
                     commissionFee: 1,
                     tripType : 1,
-                    carModel : 1,   
+                    carModel : 1,
+                    rideType : 1,   
                     "createdByDetails.name": 1,
                     "createdByDetails.phoneNumber": 1,
                     "createdByDetails.email": 1,
@@ -99,16 +100,15 @@ export const getAllrides = async (req, res) => {
             }
         ]);
 
-        const rides = result[0].data;
+        let rides = result[0].data;
         const totalrides = result[0].metadata.length > 0 ? result[0].metadata[0].totalRides : 0;
-
-        // rides = rides.map((ride) => {
-        //     return {
-        //         ...ride.toObject(),
-        //         createdAt: ride.createdAt.toLocaleString(),
-        //         updatedAt: ride.updatedAt.toLocaleString()
-        //     }
-        // })
+        rides = rides.map((ride) => {
+            return {
+                ...ride,
+                createdAt: ride.createdAt.toLocaleString()
+            }
+        });
+        console.log({   totalrides , rides})
         if (!result) return res.status(500).json({ "error": "Error in Getting Rides" });
         return res.status(200).json({   totalrides , rides});
     } catch (e) {

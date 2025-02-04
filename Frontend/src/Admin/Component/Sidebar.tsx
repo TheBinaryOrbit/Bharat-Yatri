@@ -35,7 +35,7 @@ const Sidebar = () => {
                 />
             </div>
             <div
-                className={`fixed top-0 left-0 h-[100vh] w-60 bg-white mt-[10vh]  p-4 flex-col z-40 transition-transform duration-300  overflow-y-scroll scrolbar
+                className={`fixed top-0 left-0 h-[100vh] w-60 bg-white mt-[8vh]  p-4 flex-col z-40 transition-transform duration-300  overflow-y-scroll scrolbar
                 ${isOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}
             >
                 <div className="w-full">

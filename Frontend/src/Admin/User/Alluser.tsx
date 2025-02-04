@@ -51,7 +51,7 @@ const AllUser = () => {
     }
 
     return (
-        <div className='w-full h-auto flex flex-col lg:flex-row mt-[10vh]' >
+        <div className='w-full h-auto flex flex-col lg:flex-row mt-[8vh]' >
             <div className='w-full lg:w-64 h-auto lg:h-[100vh] bg-gray-100 flex justify-center items-center p-4'>
             </div>
             <div className='w-full flex-1 bg-gray-100'>
