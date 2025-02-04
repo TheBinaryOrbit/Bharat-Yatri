@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { FaEye } from "react-icons/fa";
-import { CiEdit } from "react-icons/ci";
 import URL from "../../lib/url";
 import { auth, subscription } from "../../lib/types";
 import { toast } from "react-toastify";
@@ -44,7 +42,8 @@ const Subscription = () => {
     const handleUpdateSubscription = async () => {
         if (currentSubscription) {
             try {
-                const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+                const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
                 const token: string | undefined = auth?.authToken
                 const updatedSub = {
                     ...currentSubscription,
@@ -60,8 +59,8 @@ const Subscription = () => {
                 });
                 toast.success("Subscription updated successfully!");
                 setShowModal(false);
-                setData((prevData) =>
-                    prevData.map((sub) =>
+                setData((prevData : any) =>
+                    prevData.map((sub : any) =>
                         sub._id === currentSubscription._id ? updatedSub : sub
                     )
                 );

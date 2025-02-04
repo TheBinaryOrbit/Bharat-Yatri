@@ -6,7 +6,8 @@ import { useEffect } from "react"
 
 const AdminOutlet = () => {
   const navigate = useNavigate()
-  const auth: auth | null = JSON.parse(localStorage.getItem('auth')) 
+  const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData) 
   useEffect(()=>{
     if(!auth?.authToken ||  !auth.authInfo ){
       navigate('/')

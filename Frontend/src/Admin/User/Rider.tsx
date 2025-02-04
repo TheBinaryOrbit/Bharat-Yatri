@@ -18,7 +18,8 @@ const Rider = () => {
     const [name , setName] = useState<string>('')
 
     const fetchData = async () => {
-        const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+        const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
         const token: string | undefined = auth?.authToken
         try {
             const res = await axios.get(`${URL}/api/admin/getallusers?options=${option}&page=${page}&limit=${limit}&usertype=RIDER&name=${name}`, {

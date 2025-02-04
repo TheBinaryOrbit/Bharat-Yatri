@@ -45,6 +45,7 @@ app.use('/api/admin' , AdminRouter);
 
 // testing the backend by the '/' route
 app.get('/' , (req , res)=>{
+    console.log("get")
     res.end('Happy Server Started Sucessfully')
 })
 

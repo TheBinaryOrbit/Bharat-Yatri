@@ -3,16 +3,27 @@ import axios from "axios";
 import URL from "../lib/url";
 import { auth, statc } from "../lib/types";
 import { toast } from "react-toastify";
-import { useNavigate } from "react-router-dom";
 import { Chart } from "react-google-charts";
 
 const Dashboard = () => {
-  const navigate = useNavigate()
-  const [data, setData] = useState<statc>({});
+  const [data, setData] = useState<statc>({
+    totalAgents : "",
+    totalRiders : "",
+    totalUsers : "",
+    totalVerifiedUsers : "",
+    subscriptionPercentage : {
+      premium : "",
+      standard : "",
+      basic : "",
+      trial : "",
+      none : ""
+    }
+  });
 
   useEffect(() => {
     const fetchData = async () => {
-      const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+      const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
       const token: string | undefined = auth?.authToken
       try {
         const res = await axios.get(`${URL}/api/admin/getstats`, {
@@ -27,30 +38,8 @@ const Dashboard = () => {
       }
     }
     fetchData()
-  }, [])
+  }, []);
 
-
-  const chartData = [
-    ['Subscription Type', 'Percentage'],
-    ['Premium Plan Users', data.subscriptionPercentage?.premium || 0],
-    ['Standard Plan', data.subscriptionPercentage?.standard || 0],
-    ['Basic Plan Users', data.subscriptionPercentage?.basic || 0],
-    ['Free Trial Users', data.subscriptionPercentage?.trial || 0],
-    ['Not Subscribed Users', data.subscriptionPercentage?.none || 0],
-  ];
-
-  const chartOptions = {
-    title: 'User Subscription Distribution',
-    pieSliceText: 'percentage',
-    is3D: true,
-    slices: {
-      0: { offset: 0.1, color: '#4285F4' }, // Premium Plan
-      1: { offset: 0.1, color: '#34A853' }, // Standard Plan
-      2: { offset: 0.1, color: '#FBBC05' }, // Basic Plan
-      3: { offset: 0.1, color: '#EA4335' }, // Free Trial
-      4: { offset: 0.1, color: '#FF4081' }, // Not Subscribed
-    },
-  };
   return (
     <div className='w-full h-auto flex flex-col lg:flex-row mt-[8vh]' >
       <div className='w-full lg:w-64 h-auto lg:h-[100vh] bg-gray-100 flex justify-center items-center p-4'>

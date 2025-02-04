@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
+import { type } from "os";
 
 const permissionSchema = new mongoose.Schema({
+    priority :{
+        type : Number,
+        required : true
+    },
     name:{
         type : String,
         required : true

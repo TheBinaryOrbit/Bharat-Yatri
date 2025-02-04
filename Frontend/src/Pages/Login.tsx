@@ -15,7 +15,8 @@ const Login = () => {
   const [sessionId, setSessionId] = useState('');
   const [otp, setOtp] = useState('');
 
-  const auth: auth | null = JSON.parse(localStorage.getItem('auth'));
+  const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
   useEffect(() => {
     if (auth) {
       navigate('/admin/dashboard');

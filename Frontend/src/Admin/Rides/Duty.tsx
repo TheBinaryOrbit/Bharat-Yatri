@@ -17,7 +17,8 @@ const Duty = () => {
 
     useEffect(() => {
         const fetchData = async () => {
-            const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+            const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
             const token: string | undefined = auth?.authToken
             try {
                 const res = await axios.get(`${URL}/api/ride/getallrides?status=${status}&page=${page}&limit=${limit}&ridetype=Duty`, {
@@ -68,8 +69,8 @@ const Duty = () => {
                         <table className="min-w-full text-sm text-gray-700">
                             <thead className="bg-blue-600 text-white text-left text-base font-semibold">
                                 <tr>
-                                    <th className="py-3 px-6">To</th>
-                                    <th className="py-3 px-6">From</th>                                    
+                                    <th className="py-3 px-6">From</th>
+                                    <th className="py-3 px-6">To</th>                                    
                                     <th className="py-3 px-6">Car Model</th>                                    
                                     <th className="py-3 px-6">Pickup Date & Time</th>
                                     <th className="py-3 px-6">Customer Fare</th>
@@ -90,8 +91,8 @@ const Duty = () => {
                                             key={ride._id}
                                             className={`border-b text-left ${i % 2 === 0 ? "bg-gray-100" : "bg-white"}`}
                                         >
-                                            <td className="py-4 px-6">{ride.to}</td>
                                             <td className="py-4 px-6 font-medium">{ride.from}</td>
+                                            <td className="py-4 px-6">{ride.to}</td>
                                             <td className="py-4 px-6">{ride.carModel}</td>
                                             <td className="py-4 px-6">{ride.PickupDateAndTime}</td>
                                             <td className="py-4 px-6">{ride.customerFare}</td>

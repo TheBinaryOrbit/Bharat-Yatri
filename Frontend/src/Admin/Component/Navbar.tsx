@@ -1,7 +1,8 @@
 import { auth } from "../../lib/types"
 import img from '../../assets/logo.png'
 const Navbar = () => {
-  const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+  const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
   const user = auth?.authInfo
   return (
     <div className='w-full h-[8vh] py-2 bg-white fixed top-0 left-0 px-10 shadow flex items-center justify-between z-40'>
