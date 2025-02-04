@@ -1,11 +1,12 @@
 import { auth } from "../../lib/types"
+import img from '../../assets/logo.png'
 const Navbar = () => {
   const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
   const user = auth?.authInfo
   return (
-    <div className='w-full h-[10vh] py-2 bg-white fixed top-0 left-0 px-10 shadow flex items-center justify-between z-40'>
+    <div className='w-full h-[8vh] py-2 bg-white fixed top-0 left-0 px-10 shadow flex items-center justify-between z-40'>
       <div>
-        <h1>Bharat yatri logo</h1>
+        <img src={img} alt="" className="w-36" />
       </div>
       <div className='justify-end gap-2 items-center md:flex hidden'>
         <div className=' w-12 h-12 rounded-full'>

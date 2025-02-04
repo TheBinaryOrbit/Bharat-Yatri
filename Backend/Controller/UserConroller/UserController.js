@@ -5,7 +5,7 @@ import { generateToken } from "../../AuthToken/jwt.js";
 export const GetOtp = async (req, res) => {
     try {
         const apikey = process.env.OTP_API
-        console.log(req.body)
+
         const { phoneNumber } = req.body
 
         if (!phoneNumber) return res.status(400).json({ "error": "Phone number is required" });
@@ -38,7 +38,6 @@ export const GetOtp = async (req, res) => {
 export const verifyOtp = async (req, res) => {
     const { phoneNumber, OTP, SessionId } = req.body
     if (!phoneNumber || !OTP || !SessionId) return res.status(400).json({ "error": "All Fields Are Required" });
-    console.log(req.body)
     try {
         const apikey = process.env.OTP_API
         // // const response = await axios.get(`https://2factor.in/API/V1/${apikey}/SMS/VERIFY/${SessionId}/${OTP}`);
@@ -49,11 +48,10 @@ export const verifyOtp = async (req, res) => {
         
         try {
             const number = phoneNumber.split(' ')[1]
-            console.log(number)
+    
 
             const result = await user.findOne({ phoneNumber: number });
 
-            console.log(result);
 
             if (result == null) return res.status(404).json({ "error": "User Not Register" })
             const token = generateToken(result.phoneNumber, result.id , result.userType);
@@ -104,7 +102,6 @@ export const handleAddRider = async (req, res) => {
         const { name, email, phoneNumber, aadhaarNumber, dlNumber, dob } = req.body
         if (!name || !email || !phoneNumber || !dob || !aadhaarNumber || !dlNumber) return res.status(400).json({ "error": "All fields are required" });
 
-        console.log(req.body)
 
         const result = await user.create({ name, email, phoneNumber, aadhaarNumber, dlNumber, dob, userType: 'RIDER' });
         if (!result) return res.status(500).json({ "error": "Error in creating User" });
@@ -159,8 +156,3 @@ export const handleUpdateUser  =async (req,res)=>{
         return res.status(500).json({ "error": "Error In updating User" });
     }
 }
-
-
-
-
-// admin controllers

@@ -4,7 +4,6 @@ import { user } from "../../Modal/UserModals.js";
 
 export const handleBuySubscription = async (req, res) => {
     try {
-        console.log(req.body);
         const { SubscriptionId, UserId } = req.body;
 
         // wrong parameters and invalid body

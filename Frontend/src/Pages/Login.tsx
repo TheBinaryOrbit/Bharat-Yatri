@@ -97,7 +97,7 @@ const Login = () => {
       <div className='w-[40%] h-full bg-white flex justify-center items-center'>
         <div className='w-[500px] h-[500px]  p-5'>
           <h1 className="text-3xl font-bold mb-1">Sign in</h1>
-          <p className="text-xl font-medium mb-12">Welcome back</p>
+          <p className="text-xl font-medium mb-12">Welcome Admin</p>
           <h1 className="mb-2 mx-1 font-medium">Phone Number</h1>
           <div className='flex  justify-between gap-5 items-center border border-gray-500 rounded-2xl px-2 mb-4'>
             <div className="flex items-center gap-5">

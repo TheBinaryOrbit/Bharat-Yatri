@@ -5,7 +5,6 @@ import { generateToken } from "../../AuthToken/jwt.js";
 
 export const getAllUser = async (req, res) => {
     try {
-        console.log(req.query);
         let result = [];
 
         // Construct match query
@@ -96,7 +95,6 @@ export const handleGetUserByAdmin = async (req, res) => {
 export const handleLogin = async (req, res) => {
     const { phoneNumber, OTP, SessionId } = req.body
     if (!phoneNumber || !OTP || !SessionId) return res.status(400).json({ "error": "All Fields Are Required" });
-    console.log(req.body)
     try {
         const apikey = process.env.OTP_API
         // // const response = await axios.get(`https://2factor.in/API/V1/${apikey}/SMS/VERIFY/${SessionId}/${OTP}`);
@@ -107,7 +105,6 @@ export const handleLogin = async (req, res) => {
 
         try {
             const number = phoneNumber.split(' ')[1]
-            console.log(number)
 
             const result = await user.findOne({ phoneNumber: number });
 
