@@ -28,7 +28,7 @@ const Sidebar = () => {
     return (
         <>
             {/* Toggle Button for Mobile */}
-            <div className="fixed top-6 right-5 z-50 md:hidden">
+            <div className="fixed top-4 right-5 z-50 md:hidden">
                 <BiMenuAltRight
                     size={36}
                     className={`cursor-pointer  rounded-r-xl  text-gray-700 flex`}

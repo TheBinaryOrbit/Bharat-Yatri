@@ -4,7 +4,8 @@ import { FaPhoneAlt, FaUnlock } from "react-icons/fa";
 import { auth } from "../lib/types";
 import URL from "../lib/url";
 import { toast } from "react-toastify";
-import img from '../assets/auth1.png'
+import img from '../assets/loginlogo.png'
+import car from '../assets/suv.png'
 import { useNavigate } from "react-router-dom";
 
 const Login = () => {
@@ -91,39 +92,66 @@ const Login = () => {
     }
   }
   return (
-    <div className='w-[100vw] h-[100vh]  flex justify-between items-center gap-10'>
-      <div className='w-[60%] h-full object-cover'>
-        <img src={img} alt="auth image" className="w-full h-full object-cover " />
-      </div>
-      <div className='w-[40%] h-full bg-white flex justify-center items-center'>
-        <div className='w-[500px] h-[500px]  p-5'>
-          <h1 className="text-3xl font-bold mb-1">Sign in</h1>
-          <p className="text-xl font-medium mb-12">Welcome Admin</p>
-          <h1 className="mb-2 mx-1 font-medium">Phone Number</h1>
-          <div className='flex  justify-between gap-5 items-center border border-gray-500 rounded-2xl px-2 mb-4'>
-            <div className="flex items-center gap-5">
-              <FaPhoneAlt size={20} />
-              <input type="text" name='Name' className='h-12 outline-none rounded-2xl' placeholder='Phone Number' onChange={(e) => setPhoneNumber(e.target.value)} />
-            </div>
-            {
-              sessionId
-                ?
-                ""
-                :
-                <button className="bg-blue-500 hover:bg-blue-600 duration-300 text-white font-bold cursor-pointer px-4 py-2 rounded-3xl shadow-2xl" onClick={otpLoading ? undefined : handlGetOtp}>Get OTP</button>
-            }
-          </div>
-          <h1 className="mb-2 mx-1 font-medium">OTP</h1>
-          <div className='flex  justify-start gap-5 items-center border border-gray-500 rounded-2xl px-2 mb-12'>
-            <FaUnlock size={20} />
-            <input type="text" name='Name' className='h-12 outline-none rounded-2xl' placeholder='OTP' onChange={(e) => setOtp(e.target.value)} />
-          </div>
-          <div className='flex  justify-center gap-5 items-center  rounded-2xl px-2 mb-6 cursor-pointer text-white bg-blue-500 hover:bg-blue-600' onClick={isLoading ? undefined : handleLogin}>
-            <button className="h-12 cursor-pointer font-bold  duration-300 outline-none rounded-2xl" >Sing in</button>
-          </div>
-        </div>
+    <div className='w-[100vw] h-[100vh] flex justify-between items-center gap-10 lg:overflow-hidden lg:flex-row-reverse flex-col'>
+    {/* Image Section - Hidden on screens smaller than md */}
+    <div className='hidden md:flex lg:w-[60%] lg:h-full object-cover justify-between lg:items-center lg:flex-row-reverse'>
+      <div className="lg:w-[50%] lg:h-full bg-[#eb6e00] relative">
+        <img src={car} alt="auth" className="object-cover absolute lg:top-[50%] lg:left-[-50%] translate-y-[-50%] scale-75 lg:scale-150" />
       </div>
     </div>
+
+    {/* Form Section */}
+    <div className='lg:w-[40%] w-full h-full bg-white flex justify-center lg:items-start items-center p-5'>
+      <div className='w-full max-w-[500px] p-5'>
+        <img src={img} alt="logo" className="w-36 object-cover my-3 lg:my-10" />
+        <h1 className="text-3xl font-bold mb-1">Sign in</h1>
+        <p className="text-xl font-medium mb-6 lg:mb-12">Welcome Admin</p>
+
+        <label className="mb-2 mx-1 font-medium block">Phone Number</label>
+        <div className='flex justify-between gap-3 items-center border border-gray-500 rounded-2xl px-3 mb-4'>
+          <div className="flex items-center gap-3">
+            <FaPhoneAlt size={20} />
+            <input 
+              type="text" 
+              name='phone' 
+              className='h-12 outline-none rounded-2xl w-full' 
+              placeholder='Phone Number' 
+              onChange={(e) => setPhoneNumber(e.target.value)} 
+            />
+          </div>
+          {
+            !sessionId && (
+              <button 
+                className="bg-[#eb6e00] hover:bg-[#eb6e00df]  duration-300 text-white font-bold px-4 py-2 rounded-3xl shadow-2xl text-nowrap" 
+                onClick={otpLoading ? undefined : handlGetOtp}
+              >
+                Get OTP
+              </button>
+            )
+          }
+        </div>
+
+        <label className="mb-2 mx-1 font-medium block">OTP</label>
+        <div className='flex items-center gap-3 border border-gray-500 rounded-2xl px-3 mb-6'>
+          <FaUnlock size={20} />
+          <input 
+            type="text" 
+            name='otp' 
+            className='h-12 outline-none rounded-2xl w-full' 
+            placeholder='OTP' 
+            onChange={(e) => setOtp(e.target.value)} 
+          />
+        </div>
+
+        <button 
+          className='w-full flex justify-center items-center text-white bg-[#eb6e00] hover:bg-[#eb6e00df] rounded-2xl py-3 font-bold duration-300' 
+          onClick={isLoading ? undefined : handleLogin}
+        >
+          Sign In
+        </button>
+      </div>
+    </div>
+  </div>
   )
 }
 
