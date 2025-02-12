@@ -3,10 +3,9 @@ import { user } from "../Modal/UserModals.js";
 
 
 export const sendnotification = async (location, notification , createdBy) => {
-    const userarray =await getUserByLocation(location , createdBy)
-    // console.log(userarray)
-    // const userarray = ["ckTbz9wNTfu892rNXDmU5N:APA91bEsMmMqK286zSW_Yvq0LjbRb4K0Ens_CTl9diDV2C2nwLCE3IDt586mlerC_bGz6ErgTD1EwQG_PAgD1p2AvuhxUmTVYnPEDoGA_ThBNxE9xWapbyA"]
-    // console.log(notification)
+    
+    const userarray = ["fSBFp21hRzC__MfxpHiEfA:APA91bH0PFmOcisABnNnbSe5-qM8erOpuPW0N7MvzEeNsaY_2hPUxJG2regZ-XEccKLRBre8usk7cXjQz8kXwqAk5NwdJk_9Z9TDreO_ywfBI2Pjw1Y2yOc"];
+
     const message = {
         notification: {
             title: "Hello Rider",

@@ -4,6 +4,7 @@ import { generateToken } from "../../AuthToken/jwt.js";
 
 export const GetOtp = async (req, res) => {
     try {
+        console.log(req.body);
         const apikey = process.env.OTP_API
 
         const { phoneNumber } = req.body

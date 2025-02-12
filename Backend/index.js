@@ -8,6 +8,7 @@ import { AdminRouter } from './Routers/AdminRouter.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import cors from 'cors'
+import { sendnotification } from './Notification/notification.js'
 
 
 
@@ -36,6 +37,12 @@ app.use(express.urlencoded({extended : true}));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname =  path.dirname(__filename);
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Temporary send notification 
+app.get('/getnotification' , (req,res)=>{
+    sendnotification("delhi" , {carModel : "sedan" , from : "Ghaziabad" , to : "Jaipur" ,description : "Nothig" } , "none")
+    res.end("sent");
+});
 
 // routes
 app.use('/api/user' , userRouter)
