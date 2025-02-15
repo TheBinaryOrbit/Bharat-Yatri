@@ -5,13 +5,14 @@ import { IoLogOutOutline } from "react-icons/io5";
 import { NavLink, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify';
 import { auth } from '../../lib/types';
-
+import { IconType } from 'react-icons/lib';
 
 
 const Sidebar = () => {
     const navigate = useNavigate()
     const [isOpen, setIsOpen] = useState(false);
-    const auth: auth | null = JSON.parse(localStorage.getItem('auth'));
+    const storedData  : any = localStorage.getItem('auth')
+    const auth : auth = JSON.parse(storedData)
     const menu = auth?.authpermission;
 
     const toggleSidebar = () => {
@@ -27,7 +28,7 @@ const Sidebar = () => {
     return (
         <>
             {/* Toggle Button for Mobile */}
-            <div className="fixed top-6 right-5 z-50 md:hidden">
+            <div className="fixed top-4 right-5 z-50 md:hidden">
                 <BiMenuAltRight
                     size={36}
                     className={`cursor-pointer  rounded-r-xl  text-gray-700 flex`}
@@ -48,7 +49,7 @@ const Sidebar = () => {
                                 <ul className="flex flex-col gap-2">
                                     {
                                         item.child.map(( child : any , i)=>{
-                                            const IconComponent : any = icon[child.icon]; 
+                                            const IconComponent: IconType | undefined = child.icon in icon ? icon[child.icon as keyof typeof icon] : undefined;
                                             return (
                                                 <li key={i}>
                                                 <NavLink to={`/admin/${child.route}`}>

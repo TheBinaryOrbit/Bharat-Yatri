@@ -71,39 +71,39 @@ export interface exchnage  {
 
 
 export interface userdetails {
-  aadhaarNumber : string,
-  dlNumber : string,
-  email : string,
-  freeTrailEliglibity : boolean,
-  isSubscribed : boolean,
-  isVerified : boolean,
-  name : string,
-  phoneNumber : string,
-  suscriptionEndDate  : string,
-  suscriptionStaredDate : string,
-  suscriptionType : {
-    _id : string,
-    subscriptionType : string,
-    price : string,
-    description : string
+  aadhaarNumber ?: string,
+  dlNumber ?: string,
+  email ?: string,
+  freeTrailEliglibity ?: boolean,
+  isSubscribed ?: boolean,
+  isVerified ?: boolean,
+  name ?: string,
+  phoneNumber ?: string,
+  suscriptionEndDate  ?: string,
+  suscriptionStaredDate ?: string,
+  suscriptionType ?: {
+    _id ?: string,
+    subscriptionType ?: string,
+    price ?: string,
+    description ?: string
   },
-  userCurrentLocation : string,
-  userType : string,
-  agencyName : string ,
-  pincode : string,
-  address : string,
-  state : string,
-  city : string,
-  dob : string,
-  aadhaarPhoto : string,
-  dlPhoto : string
+  userCurrentLocation ?: string,
+  userType ?: string,
+  agencyName ?: string ,
+  pincode ?: string,
+  address ?: string,
+  state ?: string,
+  city ?: string,
+  dob ?: string,
+  aadhaarPhoto ?: string,
+  dlPhoto ?: string
 }
 
 export interface statc {
   totalUsers : string,
-  totalRiders: string,
-  totalAgents: string,
-  totalVerifiedUsers: string,
+  totalRiders : string,
+  totalAgents : string,
+  totalVerifiedUsers : string,
   subscriptionPercentage: {
       premium : string,
       standard: string,
@@ -111,10 +111,10 @@ export interface statc {
       trial: string,
       none: string,
   },
-  totalRides: string,
-  totalDutyRides: string,
-  totalAvailableRides: string,
-  totalExchangeRides: string
+  totalRides?: string,
+  totalDutyRides?: string,
+  totalAvailableRides?: string,
+  totalExchangeRides?: string
 }
 
 export interface subscription{

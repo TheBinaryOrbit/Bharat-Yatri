@@ -111,7 +111,7 @@ export const handleLogin = async (req, res) => {
             if (result == null) return res.status(404).json({ "error": "User Not Register" });
 
             if (result.userType != 'ADMIN') return res.status(403).json({ "error": "Not an Admin" });
-            const pr = await permission.find({})
+            const pr = await permission.find({}).sort({ "priority": 1})
             const token = generateToken(result.phoneNumber, result.id, result.userType);
             return res.status(200).json({
                 id: result._id,

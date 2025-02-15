@@ -5,6 +5,8 @@ import { auth, userdetails } from "../../lib/types";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
 
+
+
 const SpecificUser = () => {
   const [isLoading, setIsLoading] = useState(false);
   const params = useParams();
@@ -12,10 +14,10 @@ const SpecificUser = () => {
   const navigate = useNavigate()
   const [data, setData] = useState<userdetails>({});
 
-
   const handleVerify = async () => {
     setIsLoading(true)
-    const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+    const storedData  : any = localStorage.getItem('auth')
+    const auth : auth = JSON.parse(storedData)
     const token: string | undefined = auth?.authToken
     try {
       const res = await axios.patch(`${URL}/api/admin/verifyuser/${id}`,{} ,{
@@ -40,7 +42,8 @@ const SpecificUser = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const auth: auth | null = JSON.parse(localStorage.getItem('auth'))
+      const storedData  : any = localStorage.getItem('auth')
+  const auth : auth = JSON.parse(storedData)
       const token: string | undefined = auth?.authToken
       try {
         const res = await axios.get(`${URL}/api/admin/getspecificuser/${id}`, {
@@ -228,7 +231,7 @@ const SpecificUser = () => {
                   :
                   <tr className='border border-gray-500'>
                     <td scope="col" colSpan={4} className="px-6 py-3 border border-gray-500 text-right">
-                      <button className="bg-green-500 hover:bg-green-600 duration-300 px-4 py-2 rounded-2xl cursor-pointer shadow-2xl font-bold text-white" onClick={handleVerify}>Mark As Verified</button>
+                      <button className="bg-green-500 hover:bg-green-600 duration-300 px-4 py-2 rounded-2xl cursor-pointer shadow-2xl font-bold text-white" onClick={() => isLoading ? "" : handleVerify}>Mark As Verified</button>
                     </td>
                   </tr>
               }
