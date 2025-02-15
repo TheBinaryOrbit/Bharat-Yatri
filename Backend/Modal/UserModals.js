@@ -88,6 +88,10 @@ const userSchema = new mongoose.Schema({
     },
     fcmtoken : {
         type :  String,
+    },
+    sentNotification :{
+        type : Boolean,
+        default: true
     }
 }, { timestamps: true });
 

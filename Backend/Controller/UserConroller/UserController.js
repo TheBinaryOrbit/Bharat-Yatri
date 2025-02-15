@@ -12,7 +12,7 @@ export const GetOtp = async (req, res) => {
         if (!phoneNumber) return res.status(400).json({ "error": "Phone number is required" });
 
         try {
-            const number = phoneNumber.split(' ')[1]
+            const number = phoneNumber
             if(number.length != 10) return res.status(400).json({"error" : "Number Must Be of 10 digit"})
             const response = await  axios.get(`https://2factor.in/API/V1/${apikey}/SMS/+91${number}/AUTOGEN3`);
 
@@ -48,9 +48,8 @@ export const verifyOtp = async (req, res) => {
         if(req.body.OTP != '1234') return res.status(400).json({ "error": "Invalid OTP" });
         
         try {
-            const number = phoneNumber.split(' ')[1]
+            const number = phoneNumber
     
-
             const result = await user.findOne({ phoneNumber: number });
 
 
@@ -125,7 +124,7 @@ export const handleAddRider = async (req, res) => {
 
 export const handleGetUser = async (req, res) => {
     try {
-        let result = await user.find({ _id: req.params.id } , { createdAt : 0 , updatedAt : 0 , fcmtoken :0 , userCurrentLocation : 0 ,  __v : 0});
+        let result = await user.find({ _id: req.params.id } , { createdAt : 0 , updatedAt : 0 , fcmtoken :0 , userCurrentLocation : 0 ,  __v : 0}).populate('suscriptionType');
         result = [
             {
                 ...result[0].toObject(),
