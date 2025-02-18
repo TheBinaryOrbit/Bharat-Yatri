@@ -67,7 +67,7 @@ const Available = () => {
 
                     <div className="rounded-xl overflow-x-scroll scrolbar border border-gray-300 shadow-md bg-white">
                         <table className="min-w-full text-sm text-gray-700">
-                            <thead className="bg-blue-600 text-white text-left text-base font-semibold">
+                            <thead className="bg-[#fb651e] text-white text-left text-base font-semibold">
                                 <tr>
                                     <th className="py-3 px-6">From</th>
                                     <th className="py-3 px-6">To</th>
@@ -112,7 +112,7 @@ const Available = () => {
                                     <td className="py-4 px-6 text-center" colSpan={7}>
                                         <div className="flex justify-between items-center">
                                             <button
-                                                className={`px-4 py-2 rounded-md border border-blue-500 text-blue-600 transition ${page === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-100"
+                                                className={`px-4 py-2 rounded-md border border-blue-500 text-[#fb651e] transition ${page === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-100"
                                                     }`}
                                                 disabled={page === 1}
                                                 onClick={() => setPage(page - 1)}
@@ -123,7 +123,7 @@ const Available = () => {
                                                 Page {page} of {Math.ceil((+totalRides) / (+limit))}
                                             </span>
                                             <button
-                                                className={`px-4 py-2 rounded-md border border-blue-500 text-blue-600 transition ${page >= Math.ceil((+totalRides) / (+limit))
+                                                className={`px-4 py-2 rounded-md border border-blue-500 text-[#fb651e] transition ${page >= Math.ceil((+totalRides) / (+limit))
                                                     ? "opacity-50 cursor-not-allowed"
                                                     : "hover:bg-blue-100"
                                                     }`}

@@ -32,7 +32,7 @@ const Login = () => {
     }
     try {
       const response = await axios.post(`${URL}/api/user/getotp`, {
-        phoneNumber: `+91 ${phoneNumber}`
+        phoneNumber: `${phoneNumber}`
       });
 
       if (response.status == 200) {
@@ -58,7 +58,7 @@ const Login = () => {
     }
     try {
       const response: any = await axios.post(`${URL}/api/admin/adminlogin`, {
-        phoneNumber: `+91 ${phoneNumber}`,
+        phoneNumber: `${phoneNumber}`,
         OTP: otp,
         SessionId: sessionId
       })

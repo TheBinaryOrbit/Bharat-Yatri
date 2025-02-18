@@ -3,15 +3,14 @@ import { sendnotification } from "../../Notification/notification.js";
 
 export const addride = async (req, res) => {
     try {
-        const { carModel, from, to, description, createdBy, rideType } = req.body;
-        if (!carModel || !from || !to || !description || !createdBy || !rideType) return res.status(400).json({ "error": "All Fields Are required" });
+        const { carModel, from, to, description, createdBy, rideType ,carrier } = req.body;
+        if (!carModel || !from || !to || !description || !createdBy || !rideType || !carrier ) return res.status(400).json({ "error": "All Fields Are required" });
 
         if (rideType == 'Duty') {
             const { PickupDateAndTime, customerFare, commissionFee, tripType } = req.body;
             if (!PickupDateAndTime || !customerFare || !commissionFee || !tripType) return res.status(400).json({ "error": "All Fields Are required" });
             const result = await ride.create({ carModel, from, to, description, createdBy, rideType, PickupDateAndTime, customerFare, commissionFee, tripType });
 
-            console.log(result);
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
 
             // Sending notification
@@ -37,9 +36,7 @@ export const addride = async (req, res) => {
 }
 
 export const getAllrides = async (req, res) => {
-    try {
-        console.log(req)
-        console.log(req.query)
+    try {   
         let matchCondition = {};
         if (req.query.status && req.query.status !== 'all') {
             matchCondition.status = req.query.status;
@@ -78,7 +75,8 @@ export const getAllrides = async (req, res) => {
                     commissionFee: 1,
                     tripType : 1,
                     carModel : 1,
-                    rideType : 1,   
+                    rideType : 1,
+                    carrier  :1,   
                     "createdByDetails.name": 1,
                     "createdByDetails.phoneNumber": 1,
                     "createdByDetails.email": 1,
@@ -105,10 +103,11 @@ export const getAllrides = async (req, res) => {
         rides = rides.map((ride) => {
             return {
                 ...ride,
-                createdAt: ride.createdAt.toLocaleString()
+                createdAt: ride.createdAt.toLocaleString("en-Us", {timeZone: 'Asia/Kolkata'})
             }
         });
-        console.log({   totalrides , rides})
+
+
         if (!result) return res.status(500).json({ "error": "Error in Getting Rides" });
         return res.status(200).json({   totalrides , rides});
     } catch (e) {

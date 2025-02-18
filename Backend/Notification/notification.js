@@ -23,7 +23,6 @@ export const sendnotification = async (location, notification , createdBy) => {
     };
     try {
         const response = await firebaseadmin.messaging().sendEachForMulticast(message);
-        // console.log(response.responses);
         console.log("Message send sucessfully");
         return "message send sucessfully"
     } catch (error) {

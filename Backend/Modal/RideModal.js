@@ -43,8 +43,13 @@ const rideSchema = new mongoose.Schema({
         type : String,
         enum : [ 'Completed' , 'Pending'],
         default : 'Pending'
-    }
-},{timestamps : true})
+    },
+    carrier : {
+        type : String,
+        enum : ['With Carrier' , 'Without Carrier'],
+        required : true,
+    },
+},{timestamps : true});
 
 
 export const ride = mongoose.model('ride' , rideSchema);
