@@ -13,4 +13,4 @@ const Storage = multer.diskStorage({
     }
 })
 
-export const uploadAadhar =  multer({ storage : Storage })
+export const uploadAadhar =  multer({ storage : Storage });

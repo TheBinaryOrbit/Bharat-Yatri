@@ -179,7 +179,7 @@ const Subscription = () => {
                         <div className="flex justify-end mt-4">
                             <button
                                 onClick={handleUpdateSubscription}
-                                className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                                className="bg-[#fb651e] text-white px-4 py-2 rounded-lg"
                             >
                                 Save Changes
                             </button>

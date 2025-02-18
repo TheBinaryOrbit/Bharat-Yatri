@@ -2,6 +2,9 @@ import { user } from "../../Modal/UserModals.js";
 import { ride } from "../../Modal/RideModal.js";
 import { permission } from "../../Modal/permission.js";
 import { generateToken } from "../../AuthToken/jwt.js";
+import mongoose from "mongoose";
+const ObjectId =  mongoose.Types.ObjectId;
+
 
 export const getAllUser = async (req, res) => {
     try {
@@ -100,11 +103,10 @@ export const handleLogin = async (req, res) => {
         // // const response = await axios.get(`https://2factor.in/API/V1/${apikey}/SMS/VERIFY/${SessionId}/${OTP}`);
         // if (response.status == 400) return res.status(400).json({ "error": "Invalid OTP" });
 
-
         if (req.body.OTP != '1234') return res.status(400).json({ "error": "Invalid OTP" });
 
         try {
-            const number = phoneNumber.split(' ')[1]
+            const number = phoneNumber
 
             const result = await user.findOne({ phoneNumber: number });
 
@@ -136,7 +138,6 @@ export const handleLogin = async (req, res) => {
 
 export const getstats = async (req, res) => {
     try {
-
         const userStats = await user.aggregate([
             {
                 $group: {
@@ -145,11 +146,11 @@ export const getstats = async (req, res) => {
                     totalRiders: { $sum: { $cond: [{ $eq: ["$userType", "RIDER"] }, 1, 0] } },
                     totalAgents: { $sum: { $cond: [{ $eq: ["$userType", "AGENT"] }, 1, 0] } },
                     totalVerifiedUsers: { $sum: { $cond: [{ $eq: ["$isVerified", true] }, 1, 0] } },
-                    premiumUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", "679c1aaac9d16375aeea4461"] }, 1, 0] } },
-                    standardUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", "679c1ab8c9d16375aeea4463"] }, 1, 0] } },
-                    basicUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", "679c1ac2c9d16375aeea4465"] }, 1, 0] } },
-                    trialUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", "679c1acac9d16375aeea4467"] }, 1, 0] } },
-                    noneUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", "679c1b61c9d16375aeea4469"] }, 1, 0] } }
+                    premiumUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", new ObjectId('679c1aaac9d16375aeea4461')] }, 1, 0] } },
+                    standardUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", new ObjectId('679c1ab8c9d16375aeea4463')] }, 1, 0] } },
+                    basicUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", new ObjectId('679c1ac2c9d16375aeea4465')] }, 1, 0] } },
+                    trialUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", new ObjectId('679c1acac9d16375aeea4467')] }, 1, 0] } },
+                    noneUsers: { $sum: { $cond: [{ $eq: ["$suscriptionType", new ObjectId('679c1b61c9d16375aeea4469')] }, 1, 0] } }
                 }
             }
         ]);

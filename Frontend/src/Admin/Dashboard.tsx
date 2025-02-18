@@ -7,23 +7,23 @@ import { Chart } from "react-google-charts";
 
 const Dashboard = () => {
   const [data, setData] = useState<statc>({
-    totalAgents : "",
-    totalRiders : "",
-    totalUsers : "",
-    totalVerifiedUsers : "",
-    subscriptionPercentage : {
-      premium : "",
-      standard : "",
-      basic : "",
-      trial : "",
-      none : ""
+    totalAgents: "",
+    totalRiders: "",
+    totalUsers: "",
+    totalVerifiedUsers: "",
+    subscriptionPercentage: {
+      premium: "",
+      standard: "",
+      basic: "",
+      trial: "",
+      none: ""
     }
   });
 
   useEffect(() => {
     const fetchData = async () => {
-      const storedData  : any = localStorage.getItem('auth')
-  const auth : auth = JSON.parse(storedData)
+      const storedData: any = localStorage.getItem('auth')
+      const auth: auth = JSON.parse(storedData)
       const token: string | undefined = auth?.authToken
       try {
         const res = await axios.get(`${URL}/api/admin/getstats`, {
@@ -50,41 +50,41 @@ const Dashboard = () => {
 
           <h1 className="text-2xl mb-4 font-bold text-gray-700  capitalize">User Overview</h1>
           <div className='w-full flex flex-wrap items-center justify-between gap-5 mb-10'>
-            <div className='w-full sm:w-64 h-24 bg-gradient-to-r from-red-500 to-red-400 rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300'>
-              <h1 className='text-xl font-bold text-white tracking-[1px]'>Total User</h1>
+            <div className='w-full sm:w-60 h-24 bg-[#fb651e] rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300'>
+              <h1 className='text-lg font-bold text-white tracking-[1px]'>Total User</h1>
               <h1 className='text-2xl font-bold text-white'>{data.totalUsers}</h1>
             </div>
-            <div className='w-full sm:w-64 h-24 bg-gradient-to-r from-pink-500 to-pink-400 rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300' >
-              <h1 className='text-xl font-bold text-white tracking-[1px]'>Total Agents</h1>
+            <div className='w-full sm:w-60 h-24 bg-[#fb651e] rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300' >
+              <h1 className='text-lg font-bold text-white tracking-[1px]'>Total Agents</h1>
               <h1 className='text-2xl font-bold text-white'>{data.totalAgents}</h1>
             </div>
-            <div className='w-full sm:w-64 h-24 bg-gradient-to-r from-green-500 to-green-400 rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300'>
-              <h1 className='text-xl font-bold text-white tracking-[1px]'>Today Riders</h1>
+            <div className='w-full sm:w-60 h-24 bg-[#fb651e] rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300'>
+              <h1 className='text-lg font-bold text-white tracking-[1px]'>Today Riders</h1>
               <h1 className='text-2xl font-bold text-white'>{data.totalRiders}</h1>
             </div>
-            <div className='w-full sm:w-64 h-24 bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300'>
-              <h1 className='text-xl font-bold text-white tracking-[1px]'>Total Verified Users</h1>
+            <div className='w-full sm:w-60 h-24 bg-[#fb651e] rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300'>
+              <h1 className='text-lg font-bold text-white tracking-[1px]'>Total Verified Users</h1>
               <h1 className='text-2xl font-bold text-white'>{data.totalVerifiedUsers}</h1>
             </div>
           </div>
 
           <h1 className="text-2xl mb-4 font-bold text-gray-700  capitalize">Rides Overview</h1>
           <div className='w-full flex flex-wrap items-center justify-between gap-5 mb-10'>
-            <div className='w-full sm:w-64 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-red-400'>
-              <h1 className='text-xl font-bold text-red-400 tracking-[1px]'>Total Rides</h1>
-              <h1 className='text-2xl font-bold text-red-400'>{data.totalRides}</h1>
+            <div className='w-full sm:w-60 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-[#f5f5ee]'>
+              <h1 className='text-lg font-bold text-[#fb651e] tracking-[1px]'>Total Rides</h1>
+              <h1 className='text-2xl font-bold text-[#fb651e]'>{data.totalRides}</h1>
             </div>
-            <div className='w-full sm:w-64 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-pink-400'>
-              <h1 className='text-xl font-bold text-pink-500 tracking-[1px]'>Total Duty Rides</h1>
-              <h1 className='text-2xl font-bold text-pink-400'>{data.totalDutyRides}</h1>
+            <div className='w-full sm:w-60 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-[#f5f5ee]'>
+              <h1 className='text-lg font-bold text-[#fb651e] tracking-[1px]'>Total Duty Rides</h1>
+              <h1 className='text-2xl font-bold text-[#fb651e]'>{data.totalDutyRides}</h1>
             </div>
-            <div className='w-full sm:w-64 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-green-400'>
-              <h1 className='text-xl font-bold text-green-400 tracking-[1px]'>Total Exchange Ride</h1>
-              <h1 className='text-2xl font-bold text-green-400'>{data.totalExchangeRides}</h1>
+            <div className='w-full sm:w-60 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-[#f5f5ee]'>
+              <h1 className='text-lg font-bold text-[#fb651e] tracking-[1px]'>Total Exchange Ride</h1>
+              <h1 className='text-2xl font-bold text-[#fb651e]'>{data.totalExchangeRides}</h1>
             </div>
-            <div className='w-full sm:w-64 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-yellow-400'>
-              <h1 className='text-xl font-bold text-yellow-400 tracking-[1px]'>Total Available Ride</h1>
-              <h1 className='text-2xl font-bold text-yellow-400'>{data.totalAvailableRides}</h1>
+            <div className='w-full sm:w-60 h-24 bg-white rounded-md flex flex-col justify-center items-start p-5 shadow-md cursor-pointer hover:scale-105 duration-300 border-2 border-[#f5f5ee]'>
+              <h1 className='text-lg font-bold text-[#fb651e] tracking-[1px]'>Total Available Ride</h1>
+              <h1 className='text-2xl font-bold text-[#fb651e]'>{data.totalAvailableRides}</h1>
             </div>
           </div>
 
@@ -106,12 +106,12 @@ const Dashboard = () => {
                   pieSliceText: "percentage",
                   is3D: true,
                   slices: {
-                    0: { offset: 0.1, color: '#4285F4' }, 
-                    1: { offset: 0.1, color: '#34A853' }, 
-                    2: { offset: 0.1, color: '#FBBC05' }, 
-                    3: { offset: 0.1, color: '#EA4335' }, 
-                    4: { offset: 0.1, color: '#FF4081' }, 
-                  },
+                    0: { offset: 0.1, color: '#f1c40f' },  // Golden Yellow, complements both colors
+                    1: { offset: 0.1, color: '#2980b9' },  // Soft Blue, contrasts gently with both
+                    2: { offset: 0.1, color: '#16a085' },  // Teal, a nice contrast with orange
+                    3: { offset: 0.1, color: '#d35400' },  // Burnt Orange, works well with the given orange
+                    4: { offset: 0.1, color: '#8e44ad' },  // Soft Purple, adds balance with subtlety
+                  }
                 }}
                 width={"100%"}
                 height={"300px"}
@@ -121,11 +121,11 @@ const Dashboard = () => {
             {/* Percentage View */}
             <div className="md:w-1/2 w-full md:h-full h-[50%]   flex-col items-center p-5">
               {[
-                { name: "Premium Plan Users", percentage: `${data.subscriptionPercentage?.premium}`, color: "bg-blue-400" },
-                { name: "Standard Plan", percentage: `${data.subscriptionPercentage?.standard}`, color: "bg-green-400" },
-                { name: "Basic Plan Users", percentage: `${data.subscriptionPercentage?.basic}`, color: "bg-yellow-400" },
-                { name: "Free Trial Users", percentage: `${data.subscriptionPercentage?.trial}`, color: "bg-red-400" },
-                { name: "Not Subscribed Users", percentage: `${data.subscriptionPercentage?.none}`, color: "bg-pink-400" },
+                { name: "Premium Plan Users", percentage: `${data.subscriptionPercentage?.premium}`, color: "bg-[#f1c40f]" },
+                { name: "Standard Plan", percentage: `${data.subscriptionPercentage?.standard}`, color: "bg-[#2980b9]" },
+                { name: "Basic Plan Users", percentage: `${data.subscriptionPercentage?.basic}`, color: "bg-[#16a085]" },
+                { name: "Free Trial Users", percentage: `${data.subscriptionPercentage?.trial}`, color: "bg-[#d35400]" },
+                { name: "Not Subscribed Users", percentage: `${data.subscriptionPercentage?.none}`, color: "bg-[#8e44ad]" },
               ].map((plan, index) => (
                 <div key={index} className="mb-4 w-full">
                   <h1 className="text-lg font-semibold tracking-wide text-gray-700 mb-2">

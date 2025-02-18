@@ -85,7 +85,7 @@ const Agents = () => {
 
                     <div className="rounded-xl overflow-hidden border border-gray-300 shadow-md bg-white">
                         <table className="min-w-full text-sm text-gray-700">
-                            <thead className="bg-blue-600 text-white text-left text-base font-semibold">
+                            <thead className="bg-[#fb651e] text-white text-left text-base font-semibold">
                                 <tr>
                                     <th className="py-3 px-6">Name</th>
                                     <th className="py-3 px-6">Phone Number</th>
@@ -129,7 +129,7 @@ const Agents = () => {
                                             </td>
                                             <td className="py-4 px-6">
                                                 <button
-                                                    className="bg-blue-600 hover:bg-blue-700 p-2 rounded-md transition duration-200 shadow-md"
+                                                    className="bg-[#fb651e] hover:bg-[#fb641ec8] cursor-pointer p-2 rounded-md transition duration-200 shadow-md"
                                                     onClick={() => navigate(`/admin/specificuser/${user._id}`)}
                                                 >
                                                     <FaEye className="text-white" />
@@ -144,7 +144,7 @@ const Agents = () => {
                                     <td className="py-4 px-6 text-center" colSpan={6}>
                                         <div className="flex justify-between items-center">
                                             <button
-                                                className={`px-4 py-2 rounded-md border border-blue-500 text-blue-600 transition ${page === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-100"
+                                                className={`px-4 py-2 rounded-md border border-blue-500 text-[#fb651e] transition ${page === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-100"
                                                     }`}
                                                 disabled={page === 1}
                                                 onClick={() => setPage(page - 1)}
@@ -155,7 +155,7 @@ const Agents = () => {
                                                 Page {page} of {Math.ceil((+totaluser) / (+limit))}
                                             </span>
                                             <button
-                                                className={`px-4 py-2 rounded-md border border-blue-500 text-blue-600 transition ${page >= Math.ceil((+totaluser) / (+limit))
+                                                className={`px-4 py-2 rounded-md border border-blue-500 text-[#fb651e] transition ${page >= Math.ceil((+totaluser) / (+limit))
                                                     ? "opacity-50 cursor-not-allowed"
                                                     : "hover:bg-blue-100"
                                                     }`}
