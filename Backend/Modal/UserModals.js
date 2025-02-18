@@ -30,6 +30,14 @@ const userSchema = new mongoose.Schema({
         unique: true,
         required: true
     },
+    profilePhoto : {
+        type : String,
+        default : 'defalut.jpg'
+    },
+    NumberPlate : {
+        type : String,
+        default : 'defalut.jpg'
+    },
     userType: {
         type: String,
         required: true,
@@ -43,7 +51,7 @@ const userSchema = new mongoose.Schema({
     suscriptionType: {
        type : mongoose.Schema.Types.ObjectId,
        ref : 'subscription',
-       default : '679c1b61c9d16375aeea4469'
+       default : "679c1b61c9d16375aeea4469"
     },
     isSubscribed : {
         type : Boolean,

@@ -15,6 +15,7 @@ const SpecificUser = () => {
   const [data, setData] = useState<userdetails>({});
 
   const handleVerify = async () => {
+    console.log("hello");
     setIsLoading(true)
     const storedData  : any = localStorage.getItem('auth')
     const auth : auth = JSON.parse(storedData)
@@ -51,10 +52,9 @@ const SpecificUser = () => {
             "Authorization": "Bearer " + token
           }
         })
-
         console.log(res.data)
         setData(res.data);
-        console.log(res.data.suscriptionType.subscriptionType)
+
       } catch (error: any) {
         console.log(error);
         return toast.error(error.response.data.error)
@@ -231,7 +231,7 @@ const SpecificUser = () => {
                   :
                   <tr className='border border-gray-500'>
                     <td scope="col" colSpan={4} className="px-6 py-3 border border-gray-500 text-right">
-                      <button className="bg-green-500 hover:bg-green-600 duration-300 px-4 py-2 rounded-2xl cursor-pointer shadow-2xl font-bold text-white" onClick={() => isLoading ? "" : handleVerify}>Mark As Verified</button>
+                      <button className="bg-green-500 hover:bg-green-600 duration-300 px-4 py-2 rounded-2xl cursor-pointer shadow-2xl font-bold text-white" onClick={() => isLoading ? "" : handleVerify() }>Mark As Verified</button>
                     </td>
                   </tr>
               }
@@ -239,11 +239,11 @@ const SpecificUser = () => {
           </div>
           <div className="w-full h-fit bg-white shadow-2xs rounded-xl  overflow-x-scroll scrolbar flex justify-between items-center p-6 gap-10">
             <div className="w-1/2 h-full">
-              <img src={`${URL}/aadhar/${data?.aadhaarPhoto}`} alt="Aadhar Photo" className="rounded-lg mb-2" />
+              <img src={`${URL}/${data?.aadhaarPhoto}`} alt="Aadhar Photo" className="rounded-lg mb-2" />
               <h1 className="text-xl text-center mb-4 font-bold text-gray-700 capitalize">Aadhar Photo</h1>
             </div>
             <div className="w-1/2 h-full ">
-              <img src={`${URL}/dl/${data?.dlPhoto}`} alt="DL Photo" className="rounded-lg mb-2" />
+              <img src={`${URL}/${data?.dlPhoto}`} alt="DL Photo" className="rounded-lg mb-2" />
               <h1 className="text-xl text-center font-bold mb-4 text-gray-700 capitalize">DL Photo</h1>
             </div>
           </div>

@@ -1,13 +1,12 @@
 import { user } from "../../Modal/UserModals.js";
 
-
 export const handleUploadAadhar = async (req , res)=>{
     try {
         const id = req.params.id;
 
         if(id.length != 24 ) return res.status(400).json({"error":"Id must be of 24 digit"});
 
-        const result = await  user.findByIdAndUpdate( id, {aadhaarPhoto : req.file.filename} , {new : true});
+        const result = await  user.findByIdAndUpdate( id, {aadhaarPhoto : `aadhar/${req.file.filename}`} , {new : true});
 
         if(!result) return res.status(404).json({"error":"user not found"});
 
@@ -18,18 +17,53 @@ export const handleUploadAadhar = async (req , res)=>{
     }
 }
 
-
 export const handleUploadPan = async (req , res)=>{
     try {
         const id = req.params.id;
 
         if(id.length != 24 ) return res.status(400).json({"error":"Id must be of 24 digit"});
 
-        const result = await  user.findByIdAndUpdate( id, { dlPhoto : req.file.filename} , {new : true});
+        const result = await  user.findByIdAndUpdate( id, { dlPhoto : `dl/${req.file.filename}`} , {new : true});
 
         if(!result) return res.status(404).json({"error":"user not found"});
 
         return res.status(200).json({"message":"dl uploded sucessfully"});
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({"error":"internal server error"});
+    } 
+}
+
+
+export const handleUploadPhoto = async (req , res)=>{
+    try {
+        const id = req.params.id;
+
+        if(id.length != 24 ) return res.status(400).json({"error":"Id must be of 24 digit"});
+
+        const result = await  user.findByIdAndUpdate( id, { profilePhoto : `profile/${req.file.filename}`} , {new : true});
+
+        if(!result) return res.status(404).json({"error":"user not found"});
+
+        return res.status(200).json({"message":"Profile Photo uploded sucessfully"});
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({"error":"internal server error"});
+    } 
+}
+
+
+export const handleUploadNumberPlate = async (req , res)=>{
+    try {
+        const id = req.params.id;
+
+        if(id.length != 24 ) return res.status(400).json({"error":"Id must be of 24 digit"});
+
+        const result = await  user.findByIdAndUpdate( id, { NumberPlate : `numberplate/${req.file.filename}`} , {new : true});
+
+        if(!result) return res.status(404).json({"error":"user not found"});
+
+        return res.status(200).json({"message":"NumberPlate uploded sucessfully"});
     } catch (error) {
         console.log(error);
         return res.status(500).json({"error":"internal server error"});

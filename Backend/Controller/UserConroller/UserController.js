@@ -4,9 +4,8 @@ import { generateToken } from "../../AuthToken/jwt.js";
 
 export const GetOtp = async (req, res) => {
     try {
-        console.log(req.body);
         const apikey = process.env.OTP_API
-
+        
         const { phoneNumber } = req.body
 
         if (!phoneNumber) return res.status(400).json({ "error": "Phone number is required" });
@@ -16,7 +15,7 @@ export const GetOtp = async (req, res) => {
             if(number.length != 10) return res.status(400).json({"error" : "Number Must Be of 10 digit"})
             const response = await  axios.get(`https://2factor.in/API/V1/${apikey}/SMS/+91${number}/AUTOGEN3`);
 
-            // console.log(response);
+
             if (response.status == 200) {
                 return res.status(200).json({
                     "message": "OTP Sent Sucessfully",
