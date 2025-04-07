@@ -13,6 +13,8 @@ import Duty from './Admin/Rides/Duty'
 import Available from './Admin/Rides/Available'
 import Exchange from './Admin/Rides/Exchange'
 import Subscription from './Admin/Subscription/Subscription'
+import AddRide from './Admin/Rides/AddRide'
+import AddDuty from './Admin/Rides/AddDuty'
 function App() {
   return (
     <Router>
@@ -29,6 +31,8 @@ function App() {
           <Route path='/admin/ride/duty' element={<Duty />} />
           <Route path='/admin/ride/available' element={<Available />} />
           <Route path='/admin/ride/exchange' element={<Exchange />} />
+          <Route path='/admin/ride/addride' element={<AddRide />} />
+          <Route path='/admin/ride/addduty' element={<AddDuty />} />
           <Route path='/admin/subscription' element={<Subscription />} />
         </Route>
       </Routes>

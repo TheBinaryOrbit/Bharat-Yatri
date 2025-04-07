@@ -15,7 +15,7 @@ const rideSchema = new mongoose.Schema({
     },
     description : {
         type : String,
-        required : true,
+        default : "NO Description"
     },
     PickupDateAndTime : {
         type : String,     
@@ -25,6 +25,7 @@ const rideSchema = new mongoose.Schema({
     },
     commissionFee : {
         type : String,
+        default : "Not mentioned"
     },
     tripType : {
         type : String,
@@ -46,8 +47,8 @@ const rideSchema = new mongoose.Schema({
     },
     carrier : {
         type : String,
-        enum : ['With Carrier' , 'Without Carrier'],
-        required : true,
+        enum : ['With Carrier' , 'Without Carrier' , "Not Mentioned"],
+        default : "Not Mentioned",
     },
 },{timestamps : true});
 

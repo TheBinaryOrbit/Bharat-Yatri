@@ -1,5 +1,16 @@
 import mongoose from "mongoose";
 
+const photoschema = new mongoose.Schema({
+    imageUrl : {
+        type : String,
+        default : null
+    },
+    verificationStatus : {
+        type : Boolean,
+        default :false
+    }
+})
+
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
@@ -14,12 +25,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    aadhaarPhoto : {
-        type : String,
-    },
-    dlPhoto : {
-        type : String,
-    },
     aadhaarNumber: {
         type: String,
         unique: true,
@@ -30,14 +35,10 @@ const userSchema = new mongoose.Schema({
         unique: true,
         required: true
     },
-    profilePhoto : {
-        type : String,
-        default : 'defalut.jpg'
-    },
-    NumberPlate : {
-        type : String,
-        default : 'defalut.jpg'
-    },
+    aadhaarPhoto : photoschema,
+    dlPhoto : photoschema,
+    profilePhoto : photoschema,
+    NumberPlate : photoschema,
     userType: {
         type: String,
         required: true,

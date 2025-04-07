@@ -3,13 +3,16 @@ import { sendnotification } from "../../Notification/notification.js";
 
 export const addride = async (req, res) => {
     try {
-        const { carModel, from, to, description, createdBy, rideType ,carrier } = req.body;
-        if (!carModel || !from || !to || !description || !createdBy || !rideType || !carrier ) return res.status(400).json({ "error": "All Fields Are required" });
+        const { carModel, from, to, description, createdBy, rideType , carrier } = req.body;
+
+        console.log(req.body);
+
+        if (!carModel || !from || !to  || !createdBy || !rideType  ) return res.status(400).json({ "error": "All Fields Are required" });
 
         if (rideType == 'Duty') {
             const { PickupDateAndTime, customerFare, commissionFee, tripType } = req.body;
-            if (!PickupDateAndTime || !customerFare || !commissionFee || !tripType) return res.status(400).json({ "error": "All Fields Are required" });
-            const result = await ride.create({ carModel, from, to, description, createdBy, rideType, PickupDateAndTime, customerFare, commissionFee, tripType });
+            if (!PickupDateAndTime || !customerFare || !tripType) return res.status(400).json({ "error": "All Fields Are required" });
+            const result = await ride.create({ carModel, from, to, createdBy, rideType, PickupDateAndTime, customerFare, commissionFee, tripType ,  carrier  : !carrier ?  "Not Mentioned" : carrier  , description :  !description ? "No Description" : description });
 
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
 
@@ -20,7 +23,7 @@ export const addride = async (req, res) => {
             return res.status(201).json({ "message": "Ride Added Sucessfully" });
         }
         else {
-            const result = await ride.create({ carModel, from, to, description, createdBy, rideType });
+            const result = await ride.create({ carModel, from, to, description, createdBy, rideType , carrier  : !carrier ?  "Not Mentioned" : carrier , description :  !description ? "No Description" : description });
             if (!result) return res.status(400).json({ "error": "Something Went Wrong" });
 
             // Sending notification
@@ -42,12 +45,19 @@ export const getAllrides = async (req, res) => {
             matchCondition.status = req.query.status;
         }
 
+
+        if (req.query.ridetype && req.query.ridetype !== 'all') {
+            matchCondition.rideType = req.query.ridetype;
+        }
+
+
+        console.log(matchCondition)
+
         const result = await ride.aggregate([
             {
                 $match: {
                     $and : [
-                        matchCondition ,
-                        {rideType : req.query.ridetype}
+                        matchCondition
                     ]
                 }
             },
