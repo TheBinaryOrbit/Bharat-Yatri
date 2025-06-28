@@ -155,3 +155,5 @@ export const handleUpdateUser  =async (req,res)=>{
         return res.status(500).json({ "error": "Error In updating User" });
     }
 }
+
+

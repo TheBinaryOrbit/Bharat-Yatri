@@ -3,7 +3,7 @@ import { ride } from "../../Modal/RideModal.js";
 import { permission } from "../../Modal/permission.js";
 import { generateToken } from "../../AuthToken/jwt.js";
 import mongoose from "mongoose";
-const ObjectId =  mongoose.Types.ObjectId;
+const ObjectId = mongoose.Types.ObjectId;
 
 
 export const getAllUser = async (req, res) => {
@@ -33,7 +33,7 @@ export const getAllUser = async (req, res) => {
             { $match: matchQuery },
             {
                 $facet: {
-                    metadata: [{ $count: "totalUsers" }], 
+                    metadata: [{ $count: "totalUsers" }],
                     data: [
                         { $project: { _id: 1, phoneNumber: 1, name: 1, isVerified: 1, isSubscribed: 1, userType: 1 } },
                         { $sort: { createdAt: -1 } },
@@ -62,7 +62,7 @@ export const getAllUser = async (req, res) => {
 export const Verifyuser = async (req, res) => {
     try {
         const id = req.params.id
-        const result = await user.findByIdAndUpdate(id, { $set: { isVerified: true } }, { new: true })
+        const result = await user.findByIdAndUpdate(id, { $set: { isVerified: true } }, { new: true });
 
         if (!result) return res.status(404).json({ "error": "User Not Found" });
         return res.status(200).json({
@@ -74,6 +74,40 @@ export const Verifyuser = async (req, res) => {
         return res.status(500).json({ "error": "Unable to Verify User" })
     }
 }
+
+export const handleUpdatePhotoStatus = async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        let result = {};
+
+        if (req.body.property === "profilePhoto") {
+            result = await user.findByIdAndUpdate(id, { $set: { "profilePhoto.verificationStatus": true } }, { new: true });
+        }
+        if (req.body.property === "aadhaarPhoto") {
+            result = await user.findByIdAndUpdate(id, { $set: { "aadhaarPhoto.verificationStatus": true } }, { new: true });
+        }
+        if (req.body.property === "dlPhoto") {
+            result = await user.findByIdAndUpdate(id, { $set: { "dlPhoto.verificationStatus": true } }, { new: true });
+        }
+        if (req.body.property === "NumberPlate") {
+            result = await user.findByIdAndUpdate(id, { $set: { "NumberPlate.verificationStatus": true } }, { new: true });
+        }
+
+
+        if (!result) return res.status(404).json({ "error": "User Not Found" });
+        return res.status(200).json({
+            "Message": "User Photo Sucessfully",
+            user: result
+        });
+    } catch (e) {
+        console.log(e)
+        return res.status(500).json({ "error": "Unable to Verify User" })
+    }
+}
+
+
+
 
 
 export const handleGetUserByAdmin = async (req, res) => {
@@ -113,7 +147,7 @@ export const handleLogin = async (req, res) => {
             if (result == null) return res.status(404).json({ "error": "User Not Register" });
 
             if (result.userType != 'ADMIN') return res.status(403).json({ "error": "Not an Admin" });
-            const pr = await permission.find({}).sort({ "priority": 1})
+            const pr = await permission.find({}).sort({ "priority": 1 })
             const token = generateToken(result.phoneNumber, result.id, result.userType);
             return res.status(200).json({
                 id: result._id,
