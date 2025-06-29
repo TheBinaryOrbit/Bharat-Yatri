@@ -1,3 +1,4 @@
+import { response } from "express";
 import { User } from "../Model/UserModel.js";
 import { sendOTP, verifyOTPWithPhoneNumber } from "../utils/OTP.js";
 
@@ -296,6 +297,44 @@ export const offUserAlerts = async (req, res) => {
             user: updatedUser
         });
 
+    } catch (error) {
+        console.error("Update Alerts Error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+}
+
+
+export const checkUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await User.findById(id);
+        const [vehicleCount, driverCount] = await Promise.all([
+            Vehicle.countDocuments({ userId: id }),
+            Driver.countDocuments({ userId: id })
+        ]);
+
+        const responseData = {
+            isPorfileCompleted : true,
+            isVehicleAdded : true,
+            isDriverAdded : true
+        }
+
+        if(!user.name || !user.phoneNumber || !user.city || !user.email || !user.companyName || !user.userType || !user.aadharNumber || !user.drivingLicenceNumber){
+            responseData.isPorfileCompleted == false
+        }
+
+        if(vehicleCount == 0){
+            responseData.isVehicleAdded = false
+        }
+
+        if(driverCount == 0){
+            responseData.isDriverAdded = false
+        }
+
+        return res.status(200).json({
+            message : "User Checked Sucessfully",
+            responseData
+        });
     } catch (error) {
         console.error("Update Alerts Error:", error);
         return res.status(500).json({ error: "Internal Server Error" });

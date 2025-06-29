@@ -39,7 +39,7 @@ export const deleteFreeVehicle = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deleted = await FreeVehicle.findByIdAndDelete(id);
+    const deleted = await FreeVehicle.findByIdAndDelete(id)
 
     if (!deleted) {
       return res.status(404).json({ error: "Ride not found." });
@@ -60,7 +60,7 @@ export const markFreeVehicleAsCompleted = async (req, res) => {
       id,
       { isCompleted: true },
       { new: true }
-    );
+    ).populate('bookedBy');
 
     if (!ride) {
       return res.status(404).json({ error: "Ride not found." });
@@ -81,7 +81,7 @@ export const getFreeVehiclesByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const rides = await FreeVehicle.find({ bookedBy: userId });
+    const rides = await FreeVehicle.find({ bookedBy: userId }).populate('bookedBy');
 
     return res.status(200).json({ rides });
   } catch (error) {
@@ -108,7 +108,7 @@ export const getAvailableFreeRides = async (req, res) => {
       isCompleted: false,
       vehicleStartTime: { $lte: currentTime },
       vehicleEndTime: { $gte: currentTime }
-    });
+    }).populate('bookedBy');
 
     return res.status(200).json({
       message: `Rides available at ${currentTime}`,
