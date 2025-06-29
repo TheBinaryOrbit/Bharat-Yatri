@@ -5,7 +5,7 @@ import { sendOTP, verifyOTPWithPhoneNumber } from "../utils/OTP.js";
 export const GetOTP = async (req, res) => {
     try {
         const { phoneNumber } = req.body;
-
+        console.log("Get OTP :" + phoneNumber);
         if (!phoneNumber) {
             return res.status(400).json({ error: "Phone number is required." });
         }
@@ -31,17 +31,22 @@ export const verifyOTP = async (req, res) => {
     try {
         const { phoneNumber, OTP, sessionId, fcmToken } = req.body;
 
+        console.log(req.body);
+
         if (!phoneNumber || !OTP || !sessionId) {
             return res.status(400).json({ error: "All fields are required: phoneNumber, OTP, and sessionId." });
         }
 
+        // console.log(phoneNumber);
         const OTPStatus = await verifyOTPWithPhoneNumber(phoneNumber, OTP, sessionId);
 
-        if (!OTPStatus || !OTPStatus.status) {
+        if (!OTPStatus) {
             return res.status(400).json({ error: "Invalid or expired OTP." });
         }
 
         const user = await User.findOne({ phoneNumber });
+
+        console.log(user);
 
         if (!user) {
             return res.status(200).json({
@@ -50,7 +55,7 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-
+        /*
         await User.findOneAndUpdate(
             { phoneNumber: phoneNumber },
             {
@@ -60,6 +65,7 @@ export const verifyOTP = async (req, res) => {
             },
             { new: true, runValidators: true }
         )
+        */
 
         return res.status(200).json({
             message: "OTP verified successfully.",
@@ -148,6 +154,9 @@ export const updateUser = async (req, res) => {
         if (userType) updateData.userType = userType;
         if (aadharNumber) updateData.aadharNumber = aadharNumber;
         if (drivingLicenceNumber) updateData.drivingLicenceNumber = drivingLicenceNumber;
+
+
+        console.log(updateData);
 
         const updatedUser = await User.findByIdAndUpdate(id, updateData, {
             new: true,

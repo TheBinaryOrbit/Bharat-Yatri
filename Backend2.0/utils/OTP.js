@@ -7,7 +7,8 @@ export const sendOTP =async (phoneNumber)=>{
 
 
 export const verifyOTPWithPhoneNumber = async (phoneNumber, OTP, sessionId)=>{
-    if(otp == 1234){
+    console.log(OTP)
+    if(OTP == '1234'){
         return true
     }
     else {

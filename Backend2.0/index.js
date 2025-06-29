@@ -6,11 +6,16 @@ import cors from 'cors'
 import { Connectdatabase } from './Database/Dbconnection.js'
 import { BankDetailsRouter } from './Routers/BankDetailsRouter.js'
 import { DriverRouter } from './Routers/DriverRouter.js'
-import { FreeVehicleRouter } from './Routers/FreeVehicleController.js'
+import { FreeVehicleRouter } from './Routers/FreeVehicleRouter.js'
 import { SubscriptionRouter } from './Routers/SubscriptionRouter.js'
 import { UpiRouter } from './Routers/UpiRouter.js'
 import { UserRouter } from './Routers/UserRouter.js'
 import { VehicleRouter } from './Routers/VehicleRouter.js'
+import { BookingRouter } from './Routers/BookingRouter.js'
+import { SubscriptionPurchaseRouter } from './Routers/SubscriptionPurchaseRouter.js'
+
+import { createServer } from 'http'
+import { initSocket } from './Socket/chatSocket.js'
 
 
 
@@ -22,6 +27,9 @@ const app = express();
 // connecting databases 
 Connectdatabase(URL);
 
+
+export const server = createServer(app)
+initSocket(server);
 // Cross-origin
 const corsOption = {
     "origin": "*",
@@ -44,8 +52,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // all routes
 app.use('/api/v2/bank' , BankDetailsRouter)
+app.use('/api/v2/booking' , BookingRouter)
 app.use('/api/v2/driver' , DriverRouter)
 app.use('/api/v2/freeerides' , FreeVehicleRouter)
+app.use('/api/v2/subscriptionpurchase' , SubscriptionPurchaseRouter)
 app.use('/api/v2/subscription' , SubscriptionRouter)
 app.use('/api/v2/upi' , UpiRouter) 
 app.use('/api/v2/user' , UserRouter)
@@ -58,6 +68,6 @@ app.get('/', (req, res) => {
 
 
 // listing server at PORT i.e in .env file
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server Started As ${PORT}`);
 })

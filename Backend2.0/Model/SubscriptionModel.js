@@ -17,6 +17,10 @@ const SubscriptionSchema = new mongoose.Schema({
     required: true,
     trim: true
     // Stored as a single comma-separated string (e.g., "24/7 Support,Priority Access,Free Upgrades")
+  },
+  timePeriod :{
+    type : Number,
+    required : true,
   }
 }, {
   timestamps: true

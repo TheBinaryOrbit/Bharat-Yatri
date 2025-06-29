@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import VehicleType from "../utils/VehicleType";
+import VehicleType from "../utils/VehicleType.js";
 
 const BookingSchema = new mongoose.Schema({
   vehicleType: {

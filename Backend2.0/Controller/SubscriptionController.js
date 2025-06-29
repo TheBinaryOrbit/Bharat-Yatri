@@ -2,9 +2,9 @@ import { Subscription } from "../Model/SubscriptionModel.js";
 
 export const addSubscription = async (req, res) => {
   try {
-    const { title, price, benefits } = req.body;
+    const { title, price, benefits , timePeriod } = req.body;
 
-    if (!title || !price || !benefits) {
+    if (!title || !price || !benefits ) {
       return res.status(400).json({ error: "All fields are required." });
     }
 
@@ -12,6 +12,7 @@ export const addSubscription = async (req, res) => {
       title,
       price,
       benefits,
+      timePeriod
     });
 
     return res.status(201).json({
@@ -24,8 +25,6 @@ export const addSubscription = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
-
 
 export const deleteSubscription = async (req, res) => {
   try {
@@ -44,7 +43,6 @@ export const deleteSubscription = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 
 export const getAllSubscriptions = async (req, res) => {
   try {

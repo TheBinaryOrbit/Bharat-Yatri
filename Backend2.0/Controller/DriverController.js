@@ -1,11 +1,16 @@
 import { Driver } from "../Model/DriverModel.js";
 import { uploadDriverFiles } from "../Storage/DriverStorage.js";
 import { deleteImageFile } from "../utils/DeleteFiles.js";
+import multer from "multer";
 
 export const addDriver = (req, res) => {
   uploadDriverFiles(req, res, async (err) => {
     try {
+      console.log(req.body);
+
       if (err instanceof multer.MulterError || err) {
+        
+        console.log(err)
         return res.status(400).json({ error: err.message });
       }
 

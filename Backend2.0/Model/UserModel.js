@@ -50,7 +50,7 @@ const UserSchema = new mongoose.Schema({
     unique: true,
     sparse: true,
     uppercase: true,
-    match: [/^[A-Z]{2}\d{13}$/, "Please enter a valid Driving Licence number"]
+    // match: [/^[A-Z]{2}\d{13}$/, "Please enter a valid Driving Licence number"]
   },
 
   // Verification details
