@@ -16,6 +16,7 @@ import { SubscriptionPurchaseRouter } from './Routers/SubscriptionPurchaseRouter
 
 import { createServer } from 'http'
 import { initSocket } from './Socket/chatSocket.js'
+import { MessageRouter } from './Routers/MessageRouter.js'
 
 
 
@@ -60,6 +61,7 @@ app.use('/api/v2/subscription' , SubscriptionRouter)
 app.use('/api/v2/upi' , UpiRouter) 
 app.use('/api/v2/user' , UserRouter)
 app.use('/api/v2/vehicle' , VehicleRouter)
+app.use('/api/v2/message' , MessageRouter)
 
 app.get('/', (req, res) => {
     console.log("get")

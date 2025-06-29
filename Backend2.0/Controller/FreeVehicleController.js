@@ -2,6 +2,9 @@ import { FreeVehicle } from "../Model/FreeVehicleModel.js";
 
 export const addFreeVehicle = async (req, res) => {
   try {
+
+    console.log(req.body);
+    
     const {
       vehicleType,
       vehicleStartTime,
@@ -94,24 +97,38 @@ export const getFreeVehiclesByUser = async (req, res) => {
 export const getAvailableFreeRides = async (req, res) => {
   try {
     // Get current Indian Standard Time (IST)
-    const nowIST = new Date().toLocaleString("en-US", {
-      timeZone: "Asia/Kolkata",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 
-    // Format: "04:23 PM"
-    const currentTime = nowIST;
+    const hours = nowIST.getHours().toString().padStart(2, '0');   // e.g., "00"
+    const minutes = nowIST.getMinutes().toString().padStart(2, '0'); // e.g., "28"
+
+    const currentTime = `${hours}:${minutes}`; // e.g., "00:28"
+
+    console.log("Current Time (IST, 24hr):", currentTime);
+
+    // Get today's IST start and end
+    const startOfTodayIST = new Date(nowIST);
+    startOfTodayIST.setHours(0, 0, 0, 0);
+
+    const endOfTodayIST = new Date(nowIST);
+    endOfTodayIST.setHours(23, 59, 59, 999);
+
 
     const rides = await FreeVehicle.find({
       isCompleted: false,
       vehicleStartTime: { $lte: currentTime },
-      vehicleEndTime: { $gte: currentTime }
-    }).populate('bookedBy');
+      vehicleEndTime: { $gte: currentTime },
+      createdAt: {
+        $gte: startOfTodayIST,
+        $lte: endOfTodayIST,
+      }
+    }).populate('bookedBy', 'name phoneNumber email _id');
+
+
 
     return res.status(200).json({
-      message: `Rides available at ${currentTime}`,
+      message: `Rides available at ${currentTime} and ${startOfTodayIST}`,
       rides
     });
   } catch (error) {

@@ -7,21 +7,30 @@ const BookingSchema = new mongoose.Schema({
     required: true,
     trim: true,
     enum: VehicleType,
-    uppercase : true
+    uppercase: true
   },
   pickUpDate: {
     type: Date,
     required: true,
     validate: {
-      validator: (value) => value >= new Date(),
-      message: "Pick-up date cannot be in the past"
+      validator: (value) => {
+        const inputDate = new Date(value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        return inputDate >= yesterday;
+      },
+      message: "Pick-up date must be today or one previous day only"
     }
   },
   pickUpTime: {
     type: String,
     required: true,
     trim: true,
-    match: [/^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i, "Invalid time format (e.g., 10:30 AM)"]
+    match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid start time format (e.g., 09:00, 23:45)"]
   },
   pickUpLocation: {
     type: String,
@@ -88,4 +97,4 @@ const BookingSchema = new mongoose.Schema({
 });
 
 
-export const booking = mongoose.model('booking' , BookingSchema);
+export const booking = mongoose.model('booking', BookingSchema);

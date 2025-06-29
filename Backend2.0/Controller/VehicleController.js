@@ -3,6 +3,8 @@ import { uploadVehicleFiles } from "../Storage/VehicleStorage.js";
 import { deleteImageFile } from "../utils/DeleteFiles.js";
 
 export const addVehicle = (req, res) => {
+  console.log(req.body);
+  
   uploadVehicleFiles(req, res, async (err) => {
     try {
       if (err) {

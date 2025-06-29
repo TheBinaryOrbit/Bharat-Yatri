@@ -13,13 +13,13 @@ const FreeVehicleSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    match: [/^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i, "Invalid start time format (e.g., 09:00 AM)"]
+    match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid start time format (e.g., 09:00, 23:45)"]
   },
   vehicleEndTime: {
     type: String,
     required: true,
     trim: true,
-    match: [/^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM)$/i, "Invalid end time format (e.g., 06:00 PM)"]
+    match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid start time format (e.g., 09:00, 23:45)"]
   },
   vehicleLocation: {
     type: String,

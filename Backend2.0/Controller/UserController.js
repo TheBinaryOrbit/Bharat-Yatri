@@ -303,7 +303,6 @@ export const offUserAlerts = async (req, res) => {
     }
 }
 
-
 export const checkUser = async (req, res) => {
     try {
         const { id } = req.params;

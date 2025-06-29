@@ -2,6 +2,7 @@ import { booking } from "../Model/BookingModel.js";
 
 export const addBooking = async (req, res) => {
     try {
+      console.log(req.body)
         const {
             vehicleType,
             pickUpDate,
@@ -64,7 +65,6 @@ export const addBooking = async (req, res) => {
     }
 };
 
-
 export const deleteBooking = async (req, res) => {
   try {
     const { id } = req.params;
@@ -81,7 +81,6 @@ export const deleteBooking = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
-
 
 export const getBookingsByUser = async (req, res) => {
   try {

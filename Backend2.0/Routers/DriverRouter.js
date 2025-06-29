@@ -5,4 +5,4 @@ export const DriverRouter = express.Router();
 
 DriverRouter.post('/add' , addDriver);
 DriverRouter.delete('/delete/:id' , deleteDriver);
-DriverRouter.get('/getmydrivers' , getDriverByUserId);
+DriverRouter.get('/getmydrivers/:userId' , getDriverByUserId);
