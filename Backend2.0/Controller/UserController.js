@@ -1,6 +1,10 @@
 import { response } from "express";
 import { User } from "../Model/UserModel.js";
 import { sendOTP, verifyOTPWithPhoneNumber } from "../utils/OTP.js";
+import { Vehicle } from '../Model/VehicleModel.js'
+import { Driver } from '../Model/DriverModel.js'
+
+
 
 // Send OTP Controller
 export const GetOTP = async (req, res) => {
@@ -56,7 +60,7 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-        /*
+        
         await User.findOneAndUpdate(
             { phoneNumber: phoneNumber },
             {
@@ -66,7 +70,7 @@ export const verifyOTP = async (req, res) => {
             },
             { new: true, runValidators: true }
         )
-        */
+        
 
         return res.status(200).json({
             message: "OTP verified successfully.",
@@ -226,27 +230,26 @@ export const getUserById = async (req, res) => {
 export const onUserAlerts = async (req, res) => {
     try {
         const { id } = req.params;
-        const { carAlertFor, cityAlertFor } = req.body;
+        const { vehicles, cityAlertFor } = req.body;
 
+        console.log("Received data:", req.body);
         if (!id) {
             return res.status(400).json({ error: "ID is required." });
         }
 
-        // Convert carAlertFor string to array or null
-        let carArray = null;
-        if (typeof carAlertFor === "string" && carAlertFor.trim() !== "") {
-            carArray = carAlertFor.split(",").map(car => car.trim()).filter(Boolean);
-        }
+        
 
         // cityAlertFor to null if empty
         const city = cityAlertFor?.trim() || null;
+
+        const uppercaseVehicles = vehicles.map(vehicle => String(vehicle).trim().toUpperCase());
 
         const updatedUser = await User.findOneAndUpdate(
             { _id: id },
             {
                 $set: {
-                    carAleartFor: carArray,
-                    cityAleartFor: city,
+                    carAleartFor: uppercaseVehicles,
+                    cityAlertFor: city,
                     isSendNotification: true,
                 }
             },
@@ -259,6 +262,8 @@ export const onUserAlerts = async (req, res) => {
         if (!updatedUser) {
             return res.status(404).json({ error: "User not found with this phone number." });
         }
+
+        console.log("Updated User:", updatedUser);
 
         return res.status(200).json({
             message: "User alert preferences updated successfully.",

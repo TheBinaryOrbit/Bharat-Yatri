@@ -30,7 +30,7 @@ const BookingSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid start time format (e.g., 09:00, 23:45)"]
+    // match: [/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid start time format (e.g., 09:00, 23:45)"]
   },
   pickUpLocation: {
     type: String,
@@ -89,7 +89,15 @@ const BookingSchema = new mongoose.Schema({
   },
   recivedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'user'
+    ref: 'user',
+    default : null
+  },
+
+  // status info 
+  status : {
+    type : String,
+    enum : ['PENDING' , 'ASSIGNED' , 'PICKEDUP' , 'COMPLETED' , 'CANCELLED'],
+    default : 'PENDING'
   }
 
 }, {

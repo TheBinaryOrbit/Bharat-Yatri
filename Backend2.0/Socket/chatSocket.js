@@ -3,7 +3,7 @@ import { Message } from "../Model/MessageModel.js";
 import { Vehicle } from "../Model/VehicleModel.js";
 import { Driver } from "../Model/DriverModel.js";
 import { User } from "../Model/UserModel.js";
-import mongoose from "mongoose";
+import { sendChatNotification } from "../Notification/chatNotification.js";
 
 const users = {}
 
@@ -39,20 +39,27 @@ export function initSocket(server) {
         socket.on("private_message", async ({ sender, receiver, content, images = [] }) => {
             try {
                 // Create the message (with optional images)
+
                 const message = await Message.create({ sender, receiver, content, images });
+                // Emit to receiver: chat list item update
+                const user = await User.findById(sender).select("name email");
 
                 // Check if receiver is online
                 const receiverSocket = users[receiver];
+                const senderSocket = users[sender];
+
+                console.log("Receiver socket:", senderSocket);
+                
+
 
                 if (receiverSocket) {
+                    console.log(receiverSocket);
                     // Mark as delivered
                     await Message.findByIdAndUpdate(message._id, { delivered: true });
 
                     // Emit to receiver: chat thread (if open)
                     io.to(receiverSocket).emit("new_message", message);
 
-                    // Emit to receiver: chat list item update
-                    const user = await User.findById(sender).select("name email");
 
                     const latestChatItem = {
                         senderId: sender,
@@ -65,8 +72,12 @@ export function initSocket(server) {
                         }
                     };
 
+        
+                    
+
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
                 } else {
+                    sendChatNotification(user.name, receiver, content);
                     console.log("Receiver offline. Message saved.");
                 }
             } catch (err) {
@@ -77,9 +88,11 @@ export function initSocket(server) {
         socket.on("startchat", async ({ sender, receiver, driverId, vehicleId }) => {
             try {
 
-                if (!mongoose.Types.ObjectId.isValid(sender) || !mongoose.Types.ObjectId.isValid(receiver)) {
-                    return;
-                }
+                console.log("startchat", sender, receiver, driverId, vehicleId);
+
+                // if (!mongoose.Types.ObjectId.isValid(sender) || !mongoose.Types.ObjectId.isValid(receiver)) {
+                //     return;
+                // }
 
                 const images = [];
 
@@ -95,8 +108,9 @@ export function initSocket(server) {
                 images.push(...vehicle.vehicleImages)
 
 
+                console.log(images);
                 // Create and save the message
-                const message = await Message.create({ sender, receiver, content: `Namaste ${receiverDetails.name}, main is ride mein interested hoon, Driver Name : ${driver.name}`, images });
+                const message = await Message.create({ sender, receiver, content: `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`, images });
 
                 // Check if receiver is online
                 const receiverSocket = users[receiver];
@@ -106,19 +120,18 @@ export function initSocket(server) {
                     // Mark the message as delivered
                     await Message.findByIdAndUpdate(message._id, { delivered: true });
 
-                    // Fetch sender details for the chat list card
-                    const user = await User.findById(sender).select("name email");
+                    
 
                     // Construct the single chat item object
                     const latestChatItem = {
                         senderId: sender,
-                        message: `Namaste ${receiverDetails.name}, main is ride mein interested hoon, Driver Name : ${driver.name}`,
+                        message: `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`,
                         images: images,
                         timestamp: message.timestamp,
                         sender: {
-                            _id: user._id,
-                            name: user.name,
-                            email: user.email
+                            _id: senderDetails._id,
+                            name: senderDetails.name,
+                            email: senderDetails.email
                         }
                     };
 
@@ -126,6 +139,7 @@ export function initSocket(server) {
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
 
                 } else {
+                    sendChatNotification(senderDetails.name, receiver, `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`)   ;
                     console.log("Receiver offline. Message saved.");
                 }
             } catch (err) {

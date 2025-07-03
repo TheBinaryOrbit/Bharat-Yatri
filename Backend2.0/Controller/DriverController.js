@@ -34,9 +34,9 @@ export const addDriver = (req, res) => {
         city,
         dlNumber,
         userId,
-        driverImage: req.files.driverImage[0].filename,
-        dlFront: req.files.dlFront[0].filename,
-        dlBack: req.files.dlBack[0].filename
+        driverImage: `/driverimages/${req.files.driverImage[0].filename}`,
+        dlFront: `/drivinglicence/${req.files.dlFront[0].filename}`,
+        dlBack: `/drivinglicence/${req.files.dlBack[0].filename}`
       });
 
       return res.status(201).json({

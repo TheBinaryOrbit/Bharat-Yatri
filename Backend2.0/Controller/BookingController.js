@@ -1,8 +1,9 @@
 import { booking } from "../Model/BookingModel.js";
+import { sendnotification } from "../Notification/notification.js";
 
 export const addBooking = async (req, res) => {
     try {
-      console.log(req.body)
+
         const {
             vehicleType,
             pickUpDate,
@@ -55,6 +56,8 @@ export const addBooking = async (req, res) => {
 
         const newBooking = await booking.create(data);
 
+        sendnotification(vehicleType, newBooking, bookedBy);
+
         return res.status(201).json({
             message: "Booking created successfully.",
             booking: newBooking
@@ -86,7 +89,26 @@ export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.find({ bookedBy: userId });
+    const bookings = await booking.find({ bookedBy: userId }).populate('bookedBy', 'name phoneNumber email _id');
+
+    return res.status(200).json({ bookings });
+  } catch (error) {
+    console.error("Get Bookings by User Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
+export const getRecivedBookingsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const bookings = await booking.find({ recivedBy: userId }).populate('bookedBy', 'name phoneNumber email _id') ;
+
+    if (!bookings || bookings.length === 0) {
+      return res.status(404).json({ error: "No bookings found for this user." });
+    }
+
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -98,9 +120,10 @@ export const getBookingsByUser = async (req, res) => {
 export const getAllBookings = async (req, res) => {
   try {
     const bookings = await booking.find({
-      isCompleted: false,
-      recivedBy: null
-    }).sort({ createdAt: -1 });
+      status : 'PENDING',
+      recivedBy : null
+    }).sort({ createdAt: -1 }).populate('bookedBy' ,'name phoneNumber email _id');
+
 
     return res.status(200).json({
       message: "Unassigned and incomplete bookings fetched.",

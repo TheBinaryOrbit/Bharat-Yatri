@@ -3,11 +3,12 @@ import { uploadVehicleFiles } from "../Storage/VehicleStorage.js";
 import { deleteImageFile } from "../utils/DeleteFiles.js";
 
 export const addVehicle = (req, res) => {
-  console.log(req.body);
-  
+
   uploadVehicleFiles(req, res, async (err) => {
     try {
+      console.log(req.body);
       if (err) {
+        console.log(err);
         return res.status(400).json({ error: err.message });
       }
 
@@ -33,9 +34,9 @@ export const addVehicle = (req, res) => {
         registrationNumber,
         yearOfManufacture,
         insuranceExpDate,
-        insuranceImage: req.files.insuranceImage[0].filename,
-        rcImage: req.files.rcImage ? req.files.rcImage[0].filename : null,
-        vehicleImages: req.files.vehicleImages.map(f => f.filename),
+        insuranceImage: `/vehicle/insurance/${req.files.insuranceImage[0].filename}`,
+        rcImage: req.files.rcImage ? `/vehicle/rc/${req.files.rcImage[0].filename}` : null,
+        vehicleImages: req.files.vehicleImages.map(f => `/vehicle/images/${f.filename}`),
         userId
       });
 

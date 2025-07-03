@@ -3,8 +3,18 @@ import { Message } from "../Model/MessageModel.js";
 
 export const getMyChats = async (req, res) => {
     try {
+
         const { userId } = req.params;
+        console.log("Received userId:", userId);
         const myId = new mongoose.Types.ObjectId(userId);
+
+
+        console.log("Fetching chats for user:", myId);
+
+        // Validate userId
+        if (!mongoose.Types.ObjectId.isValid(myId)) {
+            return res.status(400).json({ error: "Invalid user ID." });
+        }
 
         // Mark all messages sent TO me as delivered
         await Message.updateMany(
@@ -87,9 +97,15 @@ export const getChatBetweenUsers = async (req, res) => {
   try {
     const { userId1, userId2 } = req.params;
 
-    
+    console.log("Received userId:", userId1, userId2);
     const id1 = new mongoose.Types.ObjectId(userId1);
     const id2 = new mongoose.Types.ObjectId(userId2);
+
+    console.log("Fetching chat between users:", id1, "and", id2);
+    // Validate user IDs
+    if (!mongoose.Types.ObjectId.isValid(id1) || !mongoose.Types.ObjectId.isValid(id2)) {
+      return res.status(400).json({ error: "Invalid user IDs." });
+    }
 
     const chatMessages = await Message.find({
       $or: [
