@@ -1,4 +1,3 @@
-import { response } from "express";
 import { User } from "../Model/UserModel.js";
 import { sendOTP, verifyOTPWithPhoneNumber } from "../utils/OTP.js";
 import { Vehicle } from '../Model/VehicleModel.js'
