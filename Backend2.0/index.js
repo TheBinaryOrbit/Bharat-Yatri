@@ -66,7 +66,7 @@ app.use('/api/v2/message' , MessageRouter)
 
 app.get('/', (req, res) => {
     console.log("get")
-    res.end('Happy Server Started Sucessfully')
+    res.end('Har Har Mahadev')
 })
 
 
