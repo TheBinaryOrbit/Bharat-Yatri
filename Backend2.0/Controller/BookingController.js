@@ -263,6 +263,18 @@ export const requestCommissionUpdate = async (req, res) => {
       delivered: false,
     });
 
+    const latestChatItem = {
+      senderId: message.sender,
+      message: message.content,
+      timestamp: message.timestamp,
+      bookingId: message.bookingId,
+      sender: {
+        _id: receiver._id,
+        name: receiver.name,
+        email: receiver.email
+      }
+    };
+
     const io = getSocket();
     if (io) {
       const receiverSocket = users[recivedUserId];
@@ -276,21 +288,11 @@ export const requestCommissionUpdate = async (req, res) => {
         delivered: true,
         timestamp: message.timestamp
       });
-      const latestChatItem = {
-        senderId: message.sender,
-        message: message.content,
-        timestamp: message.timestamp,
-        bookingId: message.bookingId,
-        sender: {
-          _id: receiver._id,
-          name: receiver.name,
-          email: receiver.email
-        }
-      };
+
       io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
     }
 
-    
+
     await booking.findByIdAndUpdate(id, {
       upiId: upiId,
       paymentLinkId: paymentDetails.id,
@@ -301,7 +303,8 @@ export const requestCommissionUpdate = async (req, res) => {
 
     return res.status(200).json({
       message: "Commission request created successfully.",
-      paymentLink: paymentDetails.short_url
+      paymentLink: paymentDetails.short_url,
+      latestChatItem : latestChatItem
     });
   } catch (error) {
     console.error("Request Commission Update Error:", error);
@@ -331,7 +334,7 @@ export const recivebooking = async (req, res) => {
       return res.status(400).json({ error: "Payment not completed for this booking." });
     }
 
-    const updatedBooking = await booking.findByIdAndUpdate(id, { recivedBy }, { new: true });
+    const updatedBooking = await booking.findByIdAndUpdate(id, { recivedBy , status : 'ASSIGNED' }, { new: true });
 
     if (!updatedBooking) {
       return res.status(404).json({ error: "Booking not found." });
