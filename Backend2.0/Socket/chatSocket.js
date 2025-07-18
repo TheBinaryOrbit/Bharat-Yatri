@@ -5,10 +5,12 @@ import { Driver } from "../Model/DriverModel.js";
 import { User } from "../Model/UserModel.js";
 import { sendChatNotification } from "../Notification/chatNotification.js";
 
-const users = {}
+export const users = {}
 
+let io = null;
 export function initSocket(server) {
-    const io = new Server(server, {
+
+    io = new Server(server, {
         cors: {
             origin: "*",
             credentials: true,
@@ -224,4 +226,12 @@ export function initSocket(server) {
         });
 
     })
+}
+
+
+export const getSocket = () => {
+    if (!io) {
+        throw new Error("Socket.io not initialized. Call initSocket(server) first.");
+    }
+    return io;
 }

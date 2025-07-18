@@ -1,6 +1,17 @@
 import { booking } from "../Model/BookingModel.js";
 import { sendnotification } from "../Notification/notification.js";
 import { generateShortBookingId } from '../utils/BookingIdGenerator.js';
+import Razorpay from "razorpay";
+import { User } from "../Model/UserModel.js";
+import { users } from "../Socket/chatSocket.js";
+import { getSocket } from "../Socket/chatSocket.js";
+import { Message } from "../Model/MessageModel.js";
+
+// razorypay payment integration
+const razorpay = new Razorpay({
+  key_id: process.env.key_id,
+  key_secret: process.env.key_secret,
+});
 
 export const addBooking = async (req, res) => {
   try {
@@ -191,3 +202,147 @@ export const findBookingById = async (req, res) => {
   }
 }
 
+// update booking status
+export const updateBookingStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    if (!status || !['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status provided." });
+    }
+
+    const updatedBooking = await booking.findByIdAndUpdate(id, { status }, { new: true });
+
+    if (!updatedBooking) {
+      return res.status(404).json({ error: "Booking not found." });
+    }
+
+    return res.status(200).json({
+      message: "Booking status updated successfully.",
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error("Update Booking Status Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+// request commission to update booking amount
+export const requestCommissionUpdate = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recivedUserId, upiId } = req.body;
+
+    const bookingDetails = await booking.findById(id);
+
+    if (!bookingDetails.commissionAmount || !bookingDetails.bookingAmount) {
+      return res.status(404).json({ error: "Booking should have updated the commission and booking amounts." });
+    }
+
+
+
+
+    const receiver = await User.findById(recivedUserId).select("name email");
+
+    const paymentDetails = await razorpay.paymentLink.create({
+      amount: bookingDetails.commissionAmount * 100, // in paise,
+      currency: "INR",
+      description: `Commission for Ride #${bookingDetails.bookingId}`,
+      customer: {
+        name: receiver.name,
+        email: receiver.email
+      }
+    });
+
+    const message = await Message.create({
+      bookingId: id,
+      sender: bookingDetails.bookedBy,
+      receiver: recivedUserId,
+      content: paymentDetails.short_url,
+      delivered: false,
+    });
+
+    const io = getSocket();
+    if (io) {
+      const receiverSocket = users[recivedUserId];
+      io.to(receiverSocket).emit("new_message", {
+        _id: message._id,
+        sender: message.sender,
+        receiver: message.receiver,
+        content: message.content,
+        images: message.images,
+        bookingId: message.bookingId,
+        delivered: true,
+        timestamp: message.timestamp
+      });
+      const latestChatItem = {
+        senderId: message.sender,
+        message: message.content,
+        timestamp: message.timestamp,
+        bookingId: message.bookingId,
+        sender: {
+          _id: receiver._id,
+          name: receiver.name,
+          email: receiver.email
+        }
+      };
+      io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
+    }
+
+    
+    await booking.findByIdAndUpdate(id, {
+      upiId: upiId,
+      paymentLinkId: paymentDetails.id,
+      paymentRequestedTo: recivedUserId
+    }, { new: true });
+
+    console.log("Payment Link Created:", paymentDetails);
+
+    return res.status(200).json({
+      message: "Commission request created successfully.",
+      paymentLink: paymentDetails.short_url
+    });
+  } catch (error) {
+    console.error("Request Commission Update Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+}
+
+
+
+export const recivebooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { recivedBy } = req.body;
+
+    if (!recivedBy) {
+      return res.status(400).json({ error: "Receiver ID is required." });
+    }
+    const bookingDetails = await booking.findById(id);
+
+    if (bookingDetails.paymentRequestedTo.toString() !== recivedBy) {
+      return res.status(400).json({ error: "This booking is not assigned to you." });
+    }
+
+    const paymentDetails = await razorpay.paymentLink.fetch(bookingDetails.paymentLinkId);
+
+    if (paymentDetails.status !== 'paid') {
+      return res.status(400).json({ error: "Payment not completed for this booking." });
+    }
+
+    const updatedBooking = await booking.findByIdAndUpdate(id, { recivedBy }, { new: true });
+
+    if (!updatedBooking) {
+      return res.status(404).json({ error: "Booking not found." });
+    }
+
+    return res.status(200).json({
+      message: "Booking assigned successfully.",
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error("Assign Ride Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+}

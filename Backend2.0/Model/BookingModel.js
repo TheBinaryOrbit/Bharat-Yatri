@@ -98,13 +98,26 @@ const BookingSchema = new mongoose.Schema({
     default : null
   },
 
-  // status info 
   status : {
     type : String,
     enum : ['PENDING' , 'ASSIGNED' , 'PICKEDUP' , 'COMPLETED' , 'CANCELLED'],
     default : 'PENDING'
-  }
+  },
 
+  upiId : {
+    type: String,
+    trim: true,
+    match: [/^\w+@\w+$/, 'Invalid UPI ID format']
+  },
+  paymentLinkId: {
+    type: String,
+    trim: true,
+  },
+  paymentRequestedTo : {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
+    default: null
+  }
 }, {
   timestamps: true
 });
