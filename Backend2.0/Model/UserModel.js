@@ -53,6 +53,12 @@ const UserSchema = new mongoose.Schema({
     // match: [/^[A-Z]{2}\d{13}$/, "Please enter a valid Driving Licence number"]
   },
 
+  userImage : {
+    type: String,
+    trim: true,
+    default: "/userimages/default.png"
+  },
+
   // Verification details
   isSubscribed: {
     type: Boolean,

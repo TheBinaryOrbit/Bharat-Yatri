@@ -1,5 +1,5 @@
 import express from 'express';
-import { checkUser, createUser, GetOTP, getUserById, offUserAlerts, onUserAlerts, updateUser, verifyOTP } from '../Controller/UserController.js';
+import { checkUser, createUser, GetOTP, getUserById, offUserAlerts, onUserAlerts, updateUser, uploadUserPhoto, verifyOTP } from '../Controller/UserController.js';
 
 export const UserRouter = express.Router();
 
@@ -16,3 +16,5 @@ UserRouter.patch('/aleart/off/:id' , offUserAlerts );
 
 
 UserRouter.get('/checkuser/:id' , checkUser);
+
+UserRouter.post('/upload/:id', uploadUserPhoto);

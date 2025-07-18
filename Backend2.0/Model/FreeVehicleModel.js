@@ -9,6 +9,12 @@ const FreeVehicleSchema = new mongoose.Schema({
     enum: VehicleType,
     uppercase : true
   },
+  vehicleStartDate: {
+    type: String,
+  },
+  vehicleEndDate: {
+    type: String,
+  },
   vehicleStartTime: {
     type: String,
     required: true,
@@ -45,6 +51,7 @@ const FreeVehicleSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
+
 
 
 export const FreeVehicle = mongoose.model('freevehicle' , FreeVehicleSchema)

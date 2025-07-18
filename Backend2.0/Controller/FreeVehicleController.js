@@ -1,12 +1,12 @@
 import { FreeVehicle } from "../Model/FreeVehicleModel.js";
+import convertTo24Hour from "../utils/TimeConverter.js";
 
 export const addFreeVehicle = async (req, res) => {
   try {
-
-    console.log(req.body);
-    
     const {
       vehicleType,
+      vehicleStartDate,
+      vehicleEndDate,
       vehicleStartTime,
       vehicleEndTime,
       vehicleLocation,
@@ -14,14 +14,25 @@ export const addFreeVehicle = async (req, res) => {
       bookedBy
     } = req.body;
 
-    if (!vehicleType || !vehicleStartTime || !vehicleEndTime || !vehicleLocation || !bookedBy) {
+    console.log("📝 Add FreeVehicle Payload:", req.body);
+
+    if (
+      !vehicleType || !vehicleStartDate || !vehicleEndDate ||
+      !vehicleStartTime || !vehicleEndTime || !vehicleLocation || !bookedBy
+    ) {
       return res.status(400).json({ error: "All required fields must be provided." });
     }
 
+    // Convert to 24-hour format for consistent filtering later
+    const startTime24 = convertTo24Hour(vehicleStartTime);
+    const endTime24 = convertTo24Hour(vehicleEndTime);
+
     const newRide = await FreeVehicle.create({
       vehicleType,
-      vehicleStartTime,
-      vehicleEndTime,
+      vehicleStartDate,
+      vehicleEndDate,
+      vehicleStartTime: startTime24,
+      vehicleEndTime: endTime24,
       vehicleLocation,
       description,
       bookedBy
@@ -36,6 +47,64 @@ export const addFreeVehicle = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
+
+export const getAvailableFreeRides = async (req, res) => {
+  try {
+    const now = new Date();
+    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+
+    const currentDate = nowIST.toISOString().split('T')[0]; // YYYY-MM-DD
+    const currentTime = `${nowIST.getHours().toString().padStart(2, '0')}:${nowIST.getMinutes().toString().padStart(2, '0')}`;
+
+    console.log("📅 Current IST Date:", currentDate);
+    console.log("⏰ Current IST Time:", currentTime);
+
+    const rides = await FreeVehicle.find({
+      isCompleted: false,
+      vehicleStartDate: { $lte: currentDate },
+      vehicleEndDate: { $gte: currentDate }
+    }).populate('bookedBy', 'name phoneNumber email _id');
+
+    const filteredRides = rides.filter(ride => {
+      const isTodayStart = ride.vehicleStartDate === currentDate;
+      const isTodayEnd = ride.vehicleEndDate === currentDate;
+
+      // If ride is only for today — check both start and end time
+      if (isTodayStart && isTodayEnd) {
+        return (
+          ride.vehicleStartTime <= currentTime &&
+          ride.vehicleEndTime >= currentTime
+        );
+      }
+
+      // If today is the start date — check start time
+      if (isTodayStart) {
+        return ride.vehicleStartTime <= currentTime;
+      }
+
+      // If today is the end date — check end time
+      if (isTodayEnd) {
+        return ride.vehicleEndTime >= currentTime;
+      }
+
+      // If it's between the start and end dates — always valid
+      return true;
+    });
+
+    return res.status(200).json({
+      message: "Filtered available free vehicle rides",
+      rides: filteredRides
+    });
+
+  } catch (error) {
+    console.error("Get Available Rides Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+
 
 
 export const deleteFreeVehicle = async (req, res) => {
@@ -89,50 +158,6 @@ export const getFreeVehiclesByUser = async (req, res) => {
     return res.status(200).json({ rides });
   } catch (error) {
     console.error("Get Rides by User Error:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
-  }
-};
-
-
-export const getAvailableFreeRides = async (req, res) => {
-  try {
-    // Get current Indian Standard Time (IST)
-    const now = new Date();
-    const nowIST = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-
-    const hours = nowIST.getHours().toString().padStart(2, '0');   // e.g., "00"
-    const minutes = nowIST.getMinutes().toString().padStart(2, '0'); // e.g., "28"
-
-    const currentTime = `${hours}:${minutes}`; // e.g., "00:28"
-
-    console.log("Current Time (IST, 24hr):", currentTime);
-
-    // Get today's IST start and end
-    const startOfTodayIST = new Date(nowIST);
-    startOfTodayIST.setHours(0, 0, 0, 0);
-
-    const endOfTodayIST = new Date(nowIST);
-    endOfTodayIST.setHours(23, 59, 59, 999);
-
-
-    const rides = await FreeVehicle.find({
-      isCompleted: false,
-      vehicleStartTime: { $lte: currentTime },
-      vehicleEndTime: { $gte: currentTime },
-      createdAt: {
-        $gte: startOfTodayIST,
-        $lte: endOfTodayIST,
-      }
-    }).populate('bookedBy', 'name phoneNumber email _id');
-
-
-
-    return res.status(200).json({
-      message: `Rides available at ${currentTime} and ${startOfTodayIST}`,
-      rides
-    });
-  } catch (error) {
-    console.error("Get Available Rides Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };

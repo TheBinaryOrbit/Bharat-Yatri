@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 import VehicleType from "../utils/VehicleType.js";
 
 const BookingSchema = new mongoose.Schema({
+  bookingId: {
+    type: String,
+    required: true,
+    unique: true
+  },
   vehicleType: {
     type: String,
     required: true,
@@ -103,6 +108,5 @@ const BookingSchema = new mongoose.Schema({
 }, {
   timestamps: true
 });
-
 
 export const booking = mongoose.model('booking', BookingSchema);

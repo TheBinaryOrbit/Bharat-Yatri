@@ -54,4 +54,5 @@ const DriverSchema = new mongoose.Schema({
   timestamps: true // optional: adds createdAt and updatedAt
 });
 
+
 export const Driver =  mongoose.model("Driver", DriverSchema);

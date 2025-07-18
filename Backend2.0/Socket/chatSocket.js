@@ -36,35 +36,51 @@ export function initSocket(server) {
             }
         });
 
-        socket.on("private_message", async ({ sender, receiver, content, images = [] }) => {
+        socket.on("private_message", async ({ sender, receiver, content, bookingId, images = [] }) => {
             try {
-                // Create the message (with optional images)
 
-                const message = await Message.create({ sender, receiver, content, images });
-                // Emit to receiver: chat list item update
+                console.log("Received private_message:", { bookingId, sender, receiver, content, images });
+                // Step 1: Create message document
+                const message = await Message.create({
+                    sender,
+                    receiver,
+                    content,
+                    bookingId,
+                    images,
+                    delivered: false // default; may update below
+                });
+
+                // Step 2: Get sender details for UI
                 const user = await User.findById(sender).select("name email");
 
-                // Check if receiver is online
-                const receiverSocket = users[receiver];
+                const receiverSocket = users[receiver]; // map of connected users
                 const senderSocket = users[sender];
 
-                console.log("Receiver socket:", senderSocket);
-                
-
-
+                // Step 3: If receiver is online
                 if (receiverSocket) {
-                    console.log(receiverSocket);
-                    // Mark as delivered
-                    await Message.findByIdAndUpdate(message._id, { delivered: true });
+                    console.log("Receiver is online:", receiverSocket);
 
-                    // Emit to receiver: chat thread (if open)
-                    io.to(receiverSocket).emit("new_message", message);
+                    // Mark message as delivered immediately
+                    // await Message.findByIdAndUpdate(message._id, { delivered: true });
 
+                    // Emit the message in the receiver’s open chat thread
+                    io.to(receiverSocket).emit("new_message", {
+                        _id: message._id,
+                        sender,
+                        receiver,
+                        content,
+                        images,
+                        bookingId,
+                        delivered: true,
+                        timestamp: message.timestamp
+                    });
 
+                    // Emit/update receiver's chat list
                     const latestChatItem = {
                         senderId: sender,
                         message: content,
                         timestamp: message.timestamp,
+                        bookingId: bookingId,
                         sender: {
                             _id: user._id,
                             name: user.name,
@@ -72,62 +88,106 @@ export function initSocket(server) {
                         }
                     };
 
-        
-                    
-
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
                 } else {
+                    // Step 4: Receiver is offline – no real-time delivery
                     sendChatNotification(user.name, receiver, content);
-                    console.log("Receiver offline. Message saved.");
+                    console.log("Receiver offline. Message saved for later.");
                 }
+
+                // Step 5: Optionally notify sender their message was sent (ack)
+                if (senderSocket) {
+                    io.to(senderSocket).emit("message_sent", {
+                        success: true,
+                        messageId: message._id,
+                        timestamp: message.timestamp
+                    });
+                }
+
             } catch (err) {
                 console.error("Error handling private_message:", err);
+                if (users[sender]) {
+                    io.to(users[sender]).emit("error", { message: "Failed to send message." });
+                }
             }
         });
 
-        socket.on("startchat", async ({ sender, receiver, driverId, vehicleId }) => {
+
+        socket.on("startchat", async ({ sender, receiver, driverId, bookingId, vehicleId }) => {
             try {
 
-                console.log("startchat", sender, receiver, driverId, vehicleId);
+                console.log("startchat event received:", {
 
-                // if (!mongoose.Types.ObjectId.isValid(sender) || !mongoose.Types.ObjectId.isValid(receiver)) {
-                //     return;
-                // }
+                    bookingId,
+                });
+                console.log("startchat:", sender, receiver, driverId, bookingId, vehicleId);
 
+                // Validate required fields
+                if (!sender || !receiver || !driverId || !bookingId || !vehicleId) {
+                    console.warn("Missing data in startchat event.");
+                    return;
+                }
+
+                const senderDetails = await User.findById(sender).select("name email");
+                const receiverDetails = await User.findById(receiver).select("name email");
+
+                if (!senderDetails || !receiverDetails) {
+                    console.warn("Sender or Receiver not found.");
+                    return;
+                }
+
+                const driver = await Driver.findById(driverId).select("name driverImage");
+                const vehicle = await Vehicle.findById(vehicleId).select("vehicleImages");
+
+                if (!driver || !vehicle) {
+                    console.warn("Driver or Vehicle not found.");
+                    return;
+                }
+
+                // Collect images (driver + vehicle)
                 const images = [];
+                if (driver.driverImage) images.push(driver.driverImage);
+                if (vehicle.vehicleImages?.length > 0) images.push(...vehicle.vehicleImages);
 
-                const senderDetails = await User.findById(sender);
-                const receiverDetails = await User.findById(receiver);
+                // Message content
+                const content = `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`;
 
-                const driver = await Driver.findById(driverId);
-                images.push(driver.driverImage)
+                // Create message
+                const message = await Message.create({
+                    sender,
+                    receiver,
+                    content,
+                    bookingId,
+                    images,
+                    delivered: false
+                });
 
-
-
-                const vehicle = await Vehicle.findById(vehicleId);
-                images.push(...vehicle.vehicleImages)
-
-
-                console.log(images);
-                // Create and save the message
-                const message = await Message.create({ sender, receiver, content: `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`, images });
-
-                // Check if receiver is online
                 const receiverSocket = users[receiver];
 
-
+                // If receiver is online
                 if (receiverSocket) {
-                    // Mark the message as delivered
-                    await Message.findByIdAndUpdate(message._id, { delivered: true });
+                    // Mark message as delivered
+                    // await Message.findByIdAndUpdate(message._id, { delivered: true });
 
-                    
+                    // Emit new message to receiver (in thread)
+                    io.to(receiverSocket).emit("new_message", {
+                        _id: message._id,
+                        sender,
+                        receiver,
+                        content,
+                        bookingId,
+                        images,
+                        timestamp: message.timestamp,
+                        delivered: true
+                    });
 
-                    // Construct the single chat item object
+                    // Update receiver's chat list
                     const latestChatItem = {
                         senderId: sender,
-                        message: `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`,
-                        images: images,
+                        message: content,
+                        images,
                         timestamp: message.timestamp,
+                        bookingId,
                         sender: {
                             _id: senderDetails._id,
                             name: senderDetails.name,
@@ -135,16 +195,33 @@ export function initSocket(server) {
                         }
                     };
 
-                    // Emit only the new chat item to receiver
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
-
                 } else {
-                    sendChatNotification(senderDetails.name, receiver, `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`)   ;
+                    // Receiver offline — send push/email/etc. notification
+                    sendChatNotification(senderDetails.name, receiver, content);
                     console.log("Receiver offline. Message saved.");
                 }
+
+                // Optional: notify sender their message was sent
+                const senderSocket = users[sender];
+                if (senderSocket) {
+                    io.to(senderSocket).emit("message_sent", {
+                        success: true,
+                        bookingId,
+                        timestamp: message.timestamp
+                    });
+                }
+
             } catch (err) {
-                console.error("Error handling sent_to_chat_list:", err);
+                console.error("Error handling startchat event:", err);
+                const senderSocket = users[sender];
+                if (senderSocket) {
+                    io.to(senderSocket).emit("error", {
+                        message: "Failed to start chat."
+                    });
+                }
             }
         });
+
     })
 }

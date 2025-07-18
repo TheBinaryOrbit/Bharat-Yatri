@@ -2,7 +2,8 @@ import { User } from "../Model/UserModel.js";
 import { sendOTP, verifyOTPWithPhoneNumber } from "../utils/OTP.js";
 import { Vehicle } from '../Model/VehicleModel.js'
 import { Driver } from '../Model/DriverModel.js'
-
+import { uploadUserFiles } from "../Storage/UserStorage.js";
+import { SubscriptionPurchase } from '../Model/SubscriptionPurchaseModel.js';
 
 
 // Send OTP Controller
@@ -15,6 +16,8 @@ export const GetOTP = async (req, res) => {
         }
 
         const OTPStatus = await sendOTP(phoneNumber);
+
+        console.log("OTP Status:", OTPStatus); 
 
         if (!OTPStatus.status) {
             return res.status(503).json({ error: "Failed to send OTP. Service unavailable." });
@@ -34,8 +37,6 @@ export const GetOTP = async (req, res) => {
 export const verifyOTP = async (req, res) => {
     try {
         const { phoneNumber, OTP, sessionId, fcmToken } = req.body;
-
-        console.log(req.body);
 
         if (!phoneNumber || !OTP || !sessionId) {
             return res.status(400).json({ error: "All fields are required: phoneNumber, OTP, and sessionId." });
@@ -204,15 +205,30 @@ export const getUserById = async (req, res) => {
             return res.status(400).json({ error: "User ID is required." });
         }
 
-        const user = await User.findById(id).lean(); // `lean()` returns a plain JS object
-
+        let user = await User.findById(id).lean(); // `lean()` returns a plain JS object
+        console.log(user)
         if (!user) {
             return res.status(404).json({ error: "User not found." });
         }
 
+        // check purshaed subscription that user has a valid subscription
+        const currentDate = new Date();
+        const subscription = await SubscriptionPurchase.findOne({
+            subscribedBy: id,
+            endDate: { $gte: currentDate } // Check if subscription is still valid
+        });
+
+
+        // is user is not subscribed or subscription is expired
+        if (!subscription) {
+            //update user isSubscribed to false
+            console.log("User is not subscribed or subscription expired, updating user status.");
+            user = await User.findByIdAndUpdate(id, { isSubscribed: false } , { new: true });
+        }
+
         return res.status(200).json({
             message: "User fetched successfully.",
-            user
+            user,
         });
     } catch (error) {
         console.error("GetUser Error:", error);
@@ -340,6 +356,43 @@ export const checkUser = async (req, res) => {
         });
     } catch (error) {
         console.error("Update Alerts Error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+}
+
+
+export const uploadUserPhoto = async(req, res) => {
+    try {
+        uploadUserFiles(req, res, async (err) => {
+            if (err) {
+                console.error("File upload error:", err);
+                return res.status(400).json({ error: "File upload failed." });
+            }
+
+            if (!req.files || !req.files.userImage || req.files.userImage.length === 0) {
+                return res.status(400).json({ error: "No user image uploaded." });
+            }
+
+            const userId = req.params.id;
+            const userImagePath = `/userimages/${req.files.userImage[0].filename}`;
+
+            const updatedUser = await User.findByIdAndUpdate(
+                userId,
+                { userImage: userImagePath },
+                { new: true, runValidators: true }
+            );
+
+            if (!updatedUser) {
+                return res.status(404).json({ error: "User not found." });
+            }
+
+            return res.status(200).json({
+                message: "User image uploaded successfully.",
+                user: updatedUser
+            });
+        });
+    } catch (error) {
+        console.error("Upload User Photo Error:", error);
         return res.status(500).json({ error: "Internal Server Error" });
     }
 }

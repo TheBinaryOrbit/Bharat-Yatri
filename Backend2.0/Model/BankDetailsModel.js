@@ -35,4 +35,6 @@ const bankDetailsSchema = new mongoose.Schema({
   }
 });
 
+bankDetailsSchema.index({ accountNumber: 1, userId: 1 }, { unique: true });
+bankDetailsSchema.index({ ifscCode: 1, userId: 1 }, { unique: true });
 export const BankDetails = mongoose.model('BankDetails', bankDetailsSchema);
