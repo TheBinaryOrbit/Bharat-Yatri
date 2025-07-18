@@ -1,0 +1,30 @@
+# .github/workflows/deploy.yml
+name: CI/CD Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_PRIVATE_KEY }}
+
+      - name: Deploy to VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no root@46.202.162.36 << 'EOF'
+            cd Bharat-Yatri
+            git pull
+            cd Backend2.0
+            npm install
+            pm2 restart 17
+          EOF
