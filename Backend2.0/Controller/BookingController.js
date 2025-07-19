@@ -274,11 +274,13 @@ export const requestCommissionUpdate = async (req, res) => {
 
     const message = await Message.create({
       bookingId: id,
-      sender: bookingDetails.bookedBy,
+      sender: bookingDetails[0].bookedBy,
       receiver: recivedUserId,
       content: paymentDetails.short_url,
       delivered: false,
     });
+
+    console.log("Message Created:", message);
 
     const latestChatItem = {
       senderId: message.sender,
@@ -295,6 +297,8 @@ export const requestCommissionUpdate = async (req, res) => {
     const io = getSocket();
     if (io) {
       const receiverSocket = users[recivedUserId];
+      const senderSocket = users[bookingDetails[0].bookedBy];
+
       io.to(receiverSocket).emit("new_message", {
         _id: message._id,
         sender: message.sender,
@@ -306,7 +310,19 @@ export const requestCommissionUpdate = async (req, res) => {
         timestamp: message.timestamp
       });
 
+      io.to(senderSocket).emit("new_message", {
+        _id: message._id,
+        sender: message.sender,
+        receiver: message.receiver,
+        content: message.content,
+        images: message.images,
+        bookingId: message.bookingId,
+        delivered: true,
+        timestamp: message.timestamp
+      });
+
       io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
+      io.to(senderSocket).emit("chat_list_item_update", latestChatItem);
     }
 
 
