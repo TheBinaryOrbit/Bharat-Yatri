@@ -6,7 +6,7 @@ import { User } from "../Model/UserModel.js";
 import { users } from "../Socket/chatSocket.js";
 import { getSocket } from "../Socket/chatSocket.js";
 import { Message } from "../Model/MessageModel.js";
-
+import { upidetails} from "../Model/UpiModel.js";
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
@@ -232,7 +232,7 @@ export const updateBookingStatus = async (req, res) => {
 export const requestCommissionUpdate = async (req, res) => {
   try {
     const { id } = req.params;
-    const { recivedUserId, upiId } = req.body;
+    const { recivedUserId } = req.body;
 
     const bookingDetails = await booking.findById(id);
 
@@ -244,6 +244,12 @@ export const requestCommissionUpdate = async (req, res) => {
 
 
     const receiver = await User.findById(recivedUserId).select("name email");
+
+    const upi = await upidetails.findOne({ userId: bookingDetails.bookedBy });
+
+    if(!upi?.upiId){
+      return res.status(404).json({ error: "UPI ID not found for the user." });
+    }
 
     const paymentDetails = await razorpay.paymentLink.create({
       amount: bookingDetails.commissionAmount * 100, // in paise,
@@ -294,7 +300,7 @@ export const requestCommissionUpdate = async (req, res) => {
 
 
     await booking.findByIdAndUpdate(id, {
-      upiId: upiId,
+      upiId: upi.upiId,
       paymentLinkId: paymentDetails.id,
       paymentRequestedTo: recivedUserId
     }, { new: true });
