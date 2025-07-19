@@ -212,7 +212,9 @@ export const updateBookingStatus = async (req, res) => {
       return res.status(400).json({ error: "Invalid status provided." });
     }
 
-    const updatedBooking = await booking.findByIdAndUpdate(id, { status }, { new: true });
+    const updatedBooking = await booking.find({
+      bookingId: id
+    }, { status }, { new: true });
 
     if (!updatedBooking) {
       return res.status(404).json({ error: "Booking not found." });
@@ -234,7 +236,9 @@ export const requestCommissionUpdate = async (req, res) => {
     const { id } = req.params;
     const { recivedUserId } = req.body;
 
-    const bookingDetails = await booking.findById(id);
+    const bookingDetails = await booking.findOne({
+      bookingId: id,
+    });
 
     if (!bookingDetails.commissionAmount || !bookingDetails.bookingAmount) {
       return res.status(404).json({ error: "Booking should have updated the commission and booking amounts." });
@@ -328,7 +332,9 @@ export const recivebooking = async (req, res) => {
     if (!recivedBy) {
       return res.status(400).json({ error: "Receiver ID is required." });
     }
-    const bookingDetails = await booking.findById(id);
+    const bookingDetails = await booking.findOne({
+      bookingId: id
+    });
 
     if (bookingDetails.paymentRequestedTo.toString() !== recivedBy) {
       return res.status(400).json({ error: "This booking is not assigned to you." });
