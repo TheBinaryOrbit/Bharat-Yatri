@@ -6,7 +6,7 @@ import { User } from "../Model/UserModel.js";
 import { users } from "../Socket/chatSocket.js";
 import { getSocket } from "../Socket/chatSocket.js";
 import { Message } from "../Model/MessageModel.js";
-import { upidetails} from "../Model/UpiModel.js";
+import { upidetails } from "../Model/UpiModel.js";
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
@@ -236,11 +236,16 @@ export const requestCommissionUpdate = async (req, res) => {
     const { id } = req.params;
     const { recivedUserId } = req.body;
 
-    const bookingDetails = await booking.findOne({
+    console.log(id);
+    console.log(req.body);
+
+    const bookingDetails = await booking.find({
       bookingId: id,
     });
 
-    if (!bookingDetails.commissionAmount || !bookingDetails.bookingAmount) {
+    console.log("Booking Details:", bookingDetails);
+
+    if (!bookingDetails[0].commissionAmount || !bookingDetails[0].bookingAmount) {
       return res.status(404).json({ error: "Booking should have updated the commission and booking amounts." });
     }
 
@@ -249,16 +254,18 @@ export const requestCommissionUpdate = async (req, res) => {
 
     const receiver = await User.findById(recivedUserId).select("name email");
 
-    const upi = await upidetails.findOne({ userId: bookingDetails.bookedBy });
+    const upi = await upidetails.find({ userId: bookingDetails[0].bookedBy });
 
-    if(!upi?.upiId){
+    console.log("UPI Details:", upi);
+
+    if (!upi[0].upiId) {
       return res.status(404).json({ error: "UPI ID not found for the user." });
     }
 
     const paymentDetails = await razorpay.paymentLink.create({
-      amount: bookingDetails.commissionAmount * 100, // in paise,
+      amount: bookingDetails[0].commissionAmount * 100, // in paise,
       currency: "INR",
-      description: `Commission for Ride #${bookingDetails.bookingId}`,
+      description: `Commission for Ride #${bookingDetails[0].bookingId}`,
       customer: {
         name: receiver.name,
         email: receiver.email
@@ -303,18 +310,25 @@ export const requestCommissionUpdate = async (req, res) => {
     }
 
 
-    await booking.findByIdAndUpdate(id, {
-      upiId: upi.upiId,
-      paymentLinkId: paymentDetails.id,
-      paymentRequestedTo: recivedUserId
-    }, { new: true });
+    const newbooking = await booking.findOneAndUpdate(
+      {
+        bookingId: id
+      },
+      {
+        upiId: upi[0].upiId,
+        paymentLinkId: paymentDetails.id,
+        paymentRequestedTo: recivedUserId
+      }, { new: true });
+
+
+    console.log("Booking Updated with Payment Link:", newbooking);
 
     console.log("Payment Link Created:", paymentDetails);
 
     return res.status(200).json({
       message: "Commission request created successfully.",
       paymentLink: paymentDetails.short_url,
-      latestChatItem : latestChatItem
+      latestChatItem: latestChatItem
     });
   } catch (error) {
     console.error("Request Commission Update Error:", error);
@@ -346,7 +360,7 @@ export const recivebooking = async (req, res) => {
       return res.status(400).json({ error: "Payment not completed for this booking." });
     }
 
-    const updatedBooking = await booking.findByIdAndUpdate(id, { recivedBy , status : 'ASSIGNED' }, { new: true });
+    const updatedBooking = await booking.findByIdAndUpdate(id, { recivedBy, status: 'ASSIGNED' }, { new: true });
 
     if (!updatedBooking) {
       return res.status(404).json({ error: "Booking not found." });
