@@ -2,11 +2,7 @@ import { booking } from "../Model/BookingModel.js";
 import { sendnotification } from "../Notification/notification.js";
 import { generateShortBookingId } from '../utils/BookingIdGenerator.js';
 import Razorpay from "razorpay";
-import { User } from "../Model/UserModel.js";
-import { users } from "../Socket/chatSocket.js";
-import { getSocket } from "../Socket/chatSocket.js";
-import { Message } from "../Model/MessageModel.js";
-import { upidetails } from "../Model/UpiModel.js";
+import crypto from 'crypto';
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
@@ -234,160 +230,103 @@ export const updateBookingStatus = async (req, res) => {
 export const requestCommissionUpdate = async (req, res) => {
   try {
     const { id } = req.params;
-    const { recivedUserId } = req.body;
+    let { bookingAmount, commissionAmount, recivedUserId, upiId } = req.body;
 
-    console.log(id);
-    console.log(req.body);
 
-    const bookingDetails = await booking.find({
-      bookingId: id,
-    });
-
-    console.log("Booking Details:", bookingDetails);
-
-    if (!bookingDetails[0].commissionAmount || !bookingDetails[0].bookingAmount) {
-      return res.status(404).json({ error: "Booking should have updated the commission and booking amounts." });
+    if (!recivedUserId || !upiId) {
+      return res.status(400).json({ error: "Receiver user ID and UPI ID are required." });
     }
 
+    // Fetch booking
+    const bookingDetails = await booking.findOne({ bookingId: id });
 
-
-
-    const receiver = await User.findById(recivedUserId).select("name email");
-
-    const upi = await upidetails.find({ userId: bookingDetails[0].bookedBy });
-
-    console.log("UPI Details:", upi);
-
-    if (!upi[0].upiId) {
-      return res.status(404).json({ error: "UPI ID not found for the user." });
+    if (!bookingDetails) {
+      return res.status(404).json({ error: "Booking not found." });
     }
 
-    const paymentDetails = await razorpay.paymentLink.create({
-      amount: bookingDetails[0].commissionAmount * 100, // in paise,
-      currency: "INR",
-      description: `Commission for Ride #${bookingDetails[0].bookingId}`,
-      customer: {
-        name: receiver.name,
-        email: receiver.email
-      }
-    });
-
-    const message = await Message.create({
-      bookingId: id,
-      sender: bookingDetails[0].bookedBy,
-      receiver: recivedUserId,
-      content: paymentDetails.short_url,
-      delivered: false,
-    });
-
-    console.log("Message Created:", message);
-
-    const latestChatItem = {
-      senderId: message.sender,
-      message: message.content,
-      timestamp: message.timestamp,
-      bookingId: message.bookingId,
-      sender: {
-        _id: receiver._id,
-        name: receiver.name,
-        email: receiver.email
-      }
-    };
-
-    const io = getSocket();
-    if (io) {
-      const receiverSocket = users[recivedUserId];
-      const senderSocket = users[bookingDetails[0].bookedBy];
-
-      io.to(receiverSocket).emit("new_message", {
-        _id: message._id,
-        sender: message.sender,
-        receiver: message.receiver,
-        content: message.content,
-        images: message.images,
-        bookingId: message.bookingId,
-        delivered: true,
-        timestamp: message.timestamp
-      });
-
-      io.to(senderSocket).emit("new_message", {
-        _id: message._id,
-        sender: message.sender,
-        receiver: message.receiver,
-        content: message.content,
-        images: message.images,
-        bookingId: message.bookingId,
-        delivered: true,
-        timestamp: message.timestamp
-      });
-
-      io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
-      io.to(senderSocket).emit("chat_list_item_update", latestChatItem);
+    if (bookingDetails.getBestQuotePrice == true && (!bookingAmount || !commissionAmount)) {
+      return res.status(400).json({ error: "Booking amount and commission amount are required." });
+    } else {
+      bookingAmount = bookingDetails.bookingAmount;
+      commissionAmount = bookingDetails.commissionAmount;
     }
 
+    // Check for duplicate commission request
+    const alreadyExists = bookingDetails.paymentRequesteds.some(
+      (req) =>
+        req.requestedTo.toString() === recivedUserId
+    );
 
-    const newbooking = await booking.findOneAndUpdate(
-      {
-        bookingId: id
-      },
-      {
-        upiId: upi[0].upiId,
-        paymentLinkId: paymentDetails.id,
-        paymentRequestedTo: recivedUserId
-      }, { new: true });
+    if (alreadyExists) {
+      return res.status(409).json({ error: "Commission request already exists." });
+    }
 
+    // Push new commission request
+    bookingDetails.paymentRequesteds.push({
+      bookingAmount,
+      commissionAmount,
+      requestedTo: recivedUserId,
+    });
 
-    console.log("Booking Updated with Payment Link:", newbooking);
+    // Update UPI ID
+    bookingDetails.upiId = upiId;
 
-    console.log("Payment Link Created:", paymentDetails);
+    await bookingDetails.save();
 
     return res.status(200).json({
-      message: "Commission request created successfully.",
-      paymentLink: paymentDetails.short_url,
-      latestChatItem: latestChatItem
+      message: "Commission update requested successfully.",
+      booking: bookingDetails
     });
+
   } catch (error) {
     console.error("Request Commission Update Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
-}
-
+};
 
 
 export const recivebooking = async (req, res) => {
   try {
     const { id } = req.params;
-    const { recivedBy } = req.body;
+    const { recivedBy, razorpay_order_id, razorpay_payment_id, razorpay_signature, } = req.body;
 
-    if (!recivedBy) {
-      return res.status(400).json({ error: "Receiver ID is required." });
-    }
-    const bookingDetails = await booking.findOne({
-      bookingId: id
-    });
-
-    if (bookingDetails.paymentRequestedTo.toString() !== recivedBy) {
-      return res.status(400).json({ error: "This booking is not assigned to you." });
+    if (!recivedBy || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({ error: "Receiver user ID and Razorpay details are required." });
     }
 
-    const paymentDetails = await razorpay.paymentLink.fetch(bookingDetails.paymentLinkId);
+    // verify Razorpay payment signature
+    const secret = process.env.key_secret;
+    const generatedSignature = crypto.createHmac('sha256', secret)
+      .update(razorpay_order_id + "|" + razorpay_payment_id)
+      .digest('hex');
 
-    if (paymentDetails.status !== 'paid') {
-      return res.status(400).json({ error: "Payment not completed for this booking." });
+    if (generatedSignature !== razorpay_signature) {
+      return res.status(400).json({ error: "Invalid payment signature." });
     }
 
-    const updatedBooking = await booking.findByIdAndUpdate(id, { recivedBy, status: 'ASSIGNED' }, { new: true });
+    const bookingDetails = await booking.findOneAndUpdate(
+      { bookingId: id },
+      {
+        $set: {
+          status: "ASSIGNED",
+          recivedBy,
+          isPaid: true,
+        },
+      },
+      { new: true }
+    );
 
-    if (!updatedBooking) {
+    if (!bookingDetails) {
       return res.status(404).json({ error: "Booking not found." });
     }
 
     return res.status(200).json({
-      message: "Booking assigned successfully.",
-      booking: updatedBooking
+      message: "Booking received successfully.",
+      booking: bookingDetails
     });
+
   } catch (error) {
-    console.error("Assign Ride Error:", error);
+    console.error("Receive Booking Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }

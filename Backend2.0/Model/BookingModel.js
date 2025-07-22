@@ -1,6 +1,27 @@
 import mongoose from "mongoose";
 import VehicleType from "../utils/VehicleType.js";
 
+
+const commissionSchema = new mongoose.Schema({
+  bookingAmount: {
+    type: String,
+    required: true,
+    trim: true,
+    match: [/^\d+(\.\d{1,2})?$/, 'Invalid booking amount format']
+  },
+  commissionAmount: {
+    type: String,
+    required: true,
+    trim: true,
+    match: [/^\d+(\.\d{1,2})?$/, 'Invalid commission amount format']
+  },
+  requestedTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'user',
+    required: true
+  }
+})
+
 const BookingSchema = new mongoose.Schema({
   bookingId: {
     type: String,
@@ -95,31 +116,30 @@ const BookingSchema = new mongoose.Schema({
   recivedBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'user',
-    default : null
+    default: null
   },
-
-  status : {
-    type : String,
-    enum : ['PENDING' , 'ASSIGNED' , 'PICKEDUP' , 'COMPLETED' , 'CANCELLED'],
-    default : 'PENDING'
+  status: {
+    type: String,
+    enum: ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'],
+    default: 'PENDING'
   },
-
-  upiId : {
+  upiId: {
     type: String,
     trim: true,
     match: [/^\w+@\w+$/, 'Invalid UPI ID format']
   },
-  paymentLinkId: {
-    type: String,
-    trim: true,
+  paymentRequesteds: [
+    {
+      type: commissionSchema,
+    }
+  ],
+
+  isPaid: {
+    type: Boolean,
+    default: false
   },
-  paymentRequestedTo : {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'user',
-    default: null
-  }
 }, {
-  timestamps: true
+  timestamps: true,
 });
 
 export const booking = mongoose.model('booking', BookingSchema);
