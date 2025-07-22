@@ -204,17 +204,22 @@ export const updateBookingStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
+
+    console.log("Received booking ID to update status:", id);
+    console.log("Received new status:", status);
+
     if (!status || !['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'].includes(status)) {
       return res.status(400).json({ error: "Invalid status provided." });
     }
 
-    const updatedBooking = await booking.find({
+    const updatedBooking = await booking.findOneAndUpdate({
       bookingId: id
     }, { status }, { new: true });
 
     if (!updatedBooking) {
       return res.status(404).json({ error: "Booking not found." });
     }
+
 
     return res.status(200).json({
       message: "Booking status updated successfully.",
@@ -232,6 +237,7 @@ export const requestCommissionUpdate = async (req, res) => {
     const { id } = req.params;
     let { bookingAmount, commissionAmount, recivedUserId, upiId } = req.body;
 
+    console.log("Received booking ID:", id);
 
     if (!recivedUserId || !upiId) {
       return res.status(400).json({ error: "Receiver user ID and UPI ID are required." });
@@ -252,7 +258,7 @@ export const requestCommissionUpdate = async (req, res) => {
     }
 
     // Check for duplicate commission request
-    const alreadyExists = bookingDetails.paymentRequesteds.some(
+    const alreadyExists = bookingDetails.paymentRequests.some(
       (req) =>
         req.requestedTo.toString() === recivedUserId
     );
@@ -261,17 +267,25 @@ export const requestCommissionUpdate = async (req, res) => {
       return res.status(409).json({ error: "Commission request already exists." });
     }
 
-    // Push new commission request
-    bookingDetails.paymentRequesteds.push({
-      bookingAmount,
-      commissionAmount,
-      requestedTo: recivedUserId,
-    });
+    const updatedBooking = await booking.findByIdAndUpdate(
+      bookingDetails._id,
+      {
+        $push: {
+          paymentRequests: {
+            bookingAmount,
+            commissionAmount,
+            requestedTo: recivedUserId,
+          },
+        },
+        $set: {
+          upiId: upiId,
+        },
+      },
+      {
+        new: true, // return updated doc
+      }
+    );
 
-    // Update UPI ID
-    bookingDetails.upiId = upiId;
-
-    await bookingDetails.save();
 
     return res.status(200).json({
       message: "Commission update requested successfully.",
