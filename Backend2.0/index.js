@@ -65,7 +65,9 @@ app.use('/api/v2/message' , MessageRouter)
 
 
 app.get('/', (req, res) => {
-    console.log("get")
+    console.log('User IP :', req.ip);
+    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log('User IP :', ip);
     res.end('Har Har Mahadev')
 })
 
