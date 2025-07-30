@@ -3,6 +3,8 @@ import { sendnotification } from "../Notification/notification.js";
 import { generateShortBookingId } from '../utils/BookingIdGenerator.js';
 import Razorpay from "razorpay";
 import crypto from 'crypto';
+
+
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
@@ -99,7 +101,10 @@ export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.find({ bookedBy: userId }).populate('bookedBy', 'name phoneNumber email _id');
+    const bookings = await booking.find({ bookedBy: userId })
+      .populate('bookedBy', 'name phoneNumber email _id')
+      .populate('recivedBy', 'name phoneNumber email _id'); // This will handle null automatically
+
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -113,7 +118,9 @@ export const getRecivedBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.find({ recivedBy: userId }).populate('bookedBy', 'name phoneNumber email _id');
+    const bookings = await booking.find({ recivedBy: userId })
+    .populate('bookedBy', 'name phoneNumber email _id')
+    .populate('recivedBy', 'name phoneNumber email _id');
 
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ error: "No bookings found for this user." });

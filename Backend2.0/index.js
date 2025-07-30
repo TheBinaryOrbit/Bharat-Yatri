@@ -68,6 +68,8 @@ app.get('/', (req, res) => {
     console.log('User IP :', req.ip);
     const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     console.log('User IP :', ip);
+    console.log('User Agent :', req.headers['user-agent']);
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Har Har Mahadev')
 })
 

@@ -5,12 +5,10 @@ import { Driver } from "../Model/DriverModel.js";
 import { User } from "../Model/UserModel.js";
 import { sendChatNotification } from "../Notification/chatNotification.js";
 
-export const users = {}
+const users = {}
 
-let io = null;
 export function initSocket(server) {
-
-    io = new Server(server, {
+    const io = new Server(server, {
         cors: {
             origin: "*",
             credentials: true,
@@ -23,8 +21,13 @@ export function initSocket(server) {
 
         // save user id to the user object to get the socket id
         socket.on("join", (userId) => {
-            users[userId] = socket.id;
-            console.log("User joined:", userId);
+            console.log("akjn "+users?.[userId])
+            if(users?.[userId] !== undefined) {
+                console.log("User already connected:", userId);
+            } else {
+                users[userId] = socket.id;
+                console.log("User joined:", userId);
+            }
         });
 
         // delete the user if when the uses is disconnected 
@@ -60,7 +63,7 @@ export function initSocket(server) {
 
                 // Step 3: If receiver is online
                 if (receiverSocket) {
-                    console.log("Receiver is online:", receiverSocket);
+                    console.log("Receiver is online:", receiverSocket , receiver);
 
                     // Mark message as delivered immediately
                     // await Message.findByIdAndUpdate(message._id, { delivered: true });
@@ -226,12 +229,4 @@ export function initSocket(server) {
         });
 
     })
-}
-
-
-export const getSocket = () => {
-    if (!io) {
-        throw new Error("Socket.io not initialized. Call initSocket(server) first.");
-    }
-    return io;
 }
