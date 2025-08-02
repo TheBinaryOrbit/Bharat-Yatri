@@ -158,6 +158,10 @@ export const getUserSubscriptions = async (req, res) => {
 export const getFreeTrialSubscription = async (req, res) => {
     try {
         const { userId } = req.params;
+        const { subscriptionType } = req.body;
+
+        console.log("🔔 Request received for free trial subscription");
+        console.log("📦 Request body:", req.body);
 
         if (!userId) {
             return res.status(400).json({ message: "User ID is required" });
@@ -179,6 +183,7 @@ export const getFreeTrialSubscription = async (req, res) => {
 
         // Create free trial subscription purchase
         const freeTrialSubscription = new SubscriptionPurchase({
+            subscriptionType: subscriptionType, // Assuming you have a free trial subscription type
             subscribedBy: userId,
             startDate,
             endDate
