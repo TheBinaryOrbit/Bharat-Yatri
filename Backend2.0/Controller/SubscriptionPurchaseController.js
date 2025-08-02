@@ -179,7 +179,6 @@ export const getFreeTrialSubscription = async (req, res) => {
 
         // Create free trial subscription purchase
         const freeTrialSubscription = new SubscriptionPurchase({
-            subscriptionType: "free-trial", // Assuming you have a free trial subscription type
             subscribedBy: userId,
             startDate,
             endDate
