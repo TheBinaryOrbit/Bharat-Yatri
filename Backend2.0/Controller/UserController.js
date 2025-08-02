@@ -336,7 +336,8 @@ export const checkUser = async (req, res) => {
         const responseData = {
             isPorfileCompleted : true,
             isVehicleAdded : true,
-            isDriverAdded : true
+            isDriverAdded : true,
+            isFreeTrialEligible: user.isFreeTrialEligible
         }
 
         if(!user.name || !user.phoneNumber || !user.city || !user.email || !user.companyName || !user.userType || !user.aadharNumber || !user.drivingLicenceNumber){

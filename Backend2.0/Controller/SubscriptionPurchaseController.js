@@ -155,3 +155,51 @@ export const getUserSubscriptions = async (req, res) => {
 };
 
 
+export const getFreeTrialSubscription = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId) {
+            return res.status(400).json({ message: "User ID is required" });
+        }
+
+        // Check if user is eligible for free trial
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        if (!user.isFreeTrialEligible) {
+            return res.status(403).json({ message: "User is not eligible for free trial" });
+        }
+
+
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + 3); // Free trial for 3 months
+
+        // Create free trial subscription purchase
+        const freeTrialSubscription = new SubscriptionPurchase({
+            subscriptionType: "free-trial", // Assuming you have a free trial subscription type
+            subscribedBy: userId,
+            startDate,
+            endDate
+        });
+
+        await freeTrialSubscription.save();
+
+        // Update user to mark free trial as used
+        await User.findByIdAndUpdate(userId, { isFreeTrialEligible: false }, { new: true });
+
+
+        console.log("💾 Free trial subscription saved:", freeTrialSubscription);
+
+        return res.status(201).json({
+            message: "Free trial subscription created successfully",
+            data: freeTrialSubscription
+        });
+
+    } catch (error) {
+        console.error("🔥 Error in getFreeTrialSubscription:", error);
+        return res.status(500).json({ message: "Server error", error: error.message });
+    }
+}

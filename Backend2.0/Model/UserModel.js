@@ -53,7 +53,7 @@ const UserSchema = new mongoose.Schema({
     // match: [/^[A-Z]{2}\d{13}$/, "Please enter a valid Driving Licence number"]
   },
 
-  userImage : {
+  userImage: {
     type: String,
     trim: true,
     default: "/userimages/default.png"
@@ -76,10 +76,10 @@ const UserSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  isSendNotification : {
-    type  : Boolean,
-    required : true,
-    default : false,
+  isSendNotification: {
+    type: Boolean,
+    required: true,
+    default: false,
   },
   carAleartFor: [
     {
@@ -90,8 +90,12 @@ const UserSchema = new mongoose.Schema({
   cityAleartFor: {
     type: String,
     trim: true
+  },
+  isFreeTrialEligible: {
+    type: Boolean,
+    required: true,
+    default: true
   }
-
 }, {
   timestamps: true
 });

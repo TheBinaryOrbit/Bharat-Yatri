@@ -3,7 +3,7 @@ import { sendnotification } from "../Notification/notification.js";
 import { generateShortBookingId } from '../utils/BookingIdGenerator.js';
 import Razorpay from "razorpay";
 import crypto from 'crypto';
-
+import { sendStatusNotification } from "../Notification/StatusNotification.js";
 
 // razorypay payment integration
 const razorpay = new Razorpay({
@@ -221,13 +221,18 @@ export const updateBookingStatus = async (req, res) => {
 
     const updatedBooking = await booking.findOneAndUpdate({
       bookingId: id
-    }, { status }, { new: true });
+    }, { status }, { new: true }). populate('bookedBy', 'name phoneNumber email _id fcmToken')
+    .populate('recivedBy', 'name phoneNumber email _id fcmToken');
+
+
+    console.log("Updated booking details:", updatedBooking);
 
     if (!updatedBooking) {
       return res.status(404).json({ error: "Booking not found." });
     }
 
 
+    sendStatusNotification([updatedBooking.bookedBy.fcmToken , updatedBooking.recivedBy.fcmToken], updatedBooking.bookingId, status);
     return res.status(200).json({
       message: "Booking status updated successfully.",
       booking: updatedBooking
