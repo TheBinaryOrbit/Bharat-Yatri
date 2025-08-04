@@ -155,7 +155,7 @@ export function initSocket(server) {
                 if (vehicle.vehicleImages?.length > 0) images.push(...vehicle.vehicleImages);
 
                 // Message content
-                const content = `Namaste ${receiverDetails.name}, aapki ride dekh kar kaafi achha laga! Driver ka naam hai: ${driver.name}. Kripya confirm kijiye agar yeh available ho. Dhanyavaad!`;
+                const content = `Driver Name : ${driver.name}, Contact : ${driver.phone}, Vehicle : ${vehicle.vehicleType}, vehicle Number : ${vehicle.registrationNumber}`;
 
                 // Create message
                 const message = await Message.create({
