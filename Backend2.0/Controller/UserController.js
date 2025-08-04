@@ -38,6 +38,8 @@ export const verifyOTP = async (req, res) => {
     try {
         const { phoneNumber, OTP, sessionId, fcmToken } = req.body;
 
+        console.log(fcmToken);
+
         if (!phoneNumber || !OTP || !sessionId) {
             return res.status(400).json({ error: "All fields are required: phoneNumber, OTP, and sessionId." });
         }
@@ -70,7 +72,9 @@ export const verifyOTP = async (req, res) => {
             },
             { new: true, runValidators: true }
         )
-        
+
+        console.log("User found:", user);
+        console.log("FCM Token:", user.fcmToken);
 
         return res.status(200).json({
             message: "OTP verified successfully.",
@@ -79,6 +83,7 @@ export const verifyOTP = async (req, res) => {
                 id: user._id,
                 name: user.name,
                 phoneNumber: user.phoneNumber,
+                fcmToken: user.fcmToken,
             }
         });
     } catch (error) {
