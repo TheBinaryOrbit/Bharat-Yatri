@@ -142,7 +142,7 @@ export function initSocket(server) {
                 }
 
                 const driver = await Driver.findById(driverId)
-                const vehicle = await Vehicle.findById(vehicleId).
+                const vehicle = await Vehicle.findById(vehicleId)
 
                 if (!driver || !vehicle) {
                     console.warn("Driver or Vehicle not found.");
