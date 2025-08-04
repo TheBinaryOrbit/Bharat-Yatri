@@ -141,8 +141,8 @@ export function initSocket(server) {
                     return;
                 }
 
-                const driver = await Driver.findById(driverId).select("name driverImage");
-                const vehicle = await Vehicle.findById(vehicleId).select("vehicleImages");
+                const driver = await Driver.findById(driverId)
+                const vehicle = await Vehicle.findById(vehicleId).
 
                 if (!driver || !vehicle) {
                     console.warn("Driver or Vehicle not found.");
