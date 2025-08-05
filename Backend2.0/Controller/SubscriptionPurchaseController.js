@@ -50,7 +50,7 @@ export const buySubscription = async (req, res) => {
 
 
 
-        if (razorpay_order_id === "free-trial'" && razorpay_payment_id === "free-trial'" && razorpay_signature === "free-trial") {
+        if (razorpay_order_id == "free-trial" && razorpay_payment_id == "free-trial" && razorpay_signature == "free-trial") {
             console.log("🆓 Free trial subscription requested");
 
             const user = await User.findById(subscribedBy);
