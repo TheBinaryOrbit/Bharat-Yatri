@@ -93,7 +93,7 @@ export function initSocket(server) {
                         }
                     };
 
-                    sendChatNotification(senderDetails.name, receiver, content);
+                    sendChatNotification(user.name, receiver, content);
 
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
                 } else {

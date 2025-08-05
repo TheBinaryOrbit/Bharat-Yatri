@@ -5,6 +5,7 @@ import Razorpay from "razorpay";
 import crypto from 'crypto';
 import { sendStatusNotification } from "../Notification/StatusNotification.js";
 import { generalNotification } from "../Notification/GeneralNotification.js";
+import { User } from "../Model/UserModel.js";
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
