@@ -4,7 +4,7 @@ import { generateShortBookingId } from '../utils/BookingIdGenerator.js';
 import Razorpay from "razorpay";
 import crypto from 'crypto';
 import { sendStatusNotification } from "../Notification/StatusNotification.js";
-
+import { generalNotification } from "../Notification/GeneralNotification.js";
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
@@ -298,6 +298,14 @@ export const requestCommissionUpdate = async (req, res) => {
       }
     );
 
+    const reciver = await User.findById(recivedUserId).select("fcmToken");
+
+    generalNotification({
+      userarray: [reciver.fcmToken],
+      title: "Commission Update Request",
+      body: `A Commission update request has been made for booking ID: ${updatedBooking.bookingId}.`
+    });
+
 
     return res.status(200).json({
       message: "Commission update requested successfully.",
@@ -340,11 +348,19 @@ export const recivebooking = async (req, res) => {
         },
       },
       { new: true }
-    );
+    ). populate('bookedBy', 'name phoneNumber email _id fcmToken')
+    .populate('recivedBy', 'name phoneNumber email _id fcmToken');
 
     if (!bookingDetails) {
       return res.status(404).json({ error: "Booking not found." });
     }
+
+    generalNotification({
+      userarray: [bookingDetails.bookedBy.fcmToken],
+      title: "Payment Completed",
+      body: `Your payment for booking ID: ${bookingDetails.bookingId} has been completed successfully.`
+    });
+
 
     return res.status(200).json({
       message: "Booking received successfully.",
