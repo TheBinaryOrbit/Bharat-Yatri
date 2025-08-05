@@ -48,6 +48,50 @@ export const buySubscription = async (req, res) => {
             return res.status(400).json({ message: "All payment and subscription details are required" });
         }
 
+
+
+        if (razorpay_order_id === "free-trail" && razorpay_payment_id === "free-trail" && razorpay_signature === "free-trail") {
+            console.log("🆓 Free trial subscription requested");
+
+            const user = await User.findById(subscribedBy);
+
+            if (!user) {
+                return res.status(404).json({ message: "User not found" });
+            }
+            if (!user.isFreeTrialEligible) {
+                return res.status(403).json({ message: "User is not eligible for free trial" });
+            }
+
+            const subscription = await Subscription.findById(subscriptionType);
+            if (!subscription) {
+                return res.status(404).json({ message: "Subscription type not found" });
+            }
+
+
+            const startDate = new Date();
+            const endDate = new Date(startDate);
+            endDate.setMonth(endDate.getMonth() + subscription.timePeriod);
+
+
+            const newPurchase = new SubscriptionPurchase({
+                subscriptionType,
+                subscribedBy,
+                startDate,
+                endDate,
+                razorpay_order_id,
+                razorpay_payment_id
+            });
+
+
+            await newPurchase.save();
+            console.log("💾 New purchase saved:", newPurchase);
+
+            return res.status(201).json({
+                message: "Subscription purchased and verified successfully",
+                data: newPurchase
+            });
+        }
+
         // Razorpay secret
         const secret = process.env.key_secret;
         console.log("🔐 Razorpay Secret Loaded");
