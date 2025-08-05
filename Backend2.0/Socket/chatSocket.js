@@ -93,6 +93,8 @@ export function initSocket(server) {
                         }
                     };
 
+                    sendChatNotification(senderDetails.name, receiver, content);
+
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
                 } else {
                     // Step 4: Receiver is offline – no real-time delivery
@@ -155,7 +157,7 @@ export function initSocket(server) {
                 if (vehicle.vehicleImages?.length > 0) images.push(...vehicle.vehicleImages);
 
                 // Message content
-                const content = `Namaste, \n Driver Name : ${driver.name},\n Contact : ${driver.phone},\n Vehicle : ${vehicle.vehicleType},\n vehicle Number : ${vehicle.registrationNumber}`;
+                const content = `Namaste, \nDriver Name : ${driver.name},\nContact : ${driver.phone},\n Vehicle : ${vehicle.vehicleType},\n vehicle Number : ${vehicle.registrationNumber}`;
 
                 // Create message
                 const message = await Message.create({
@@ -199,6 +201,8 @@ export function initSocket(server) {
                             email: senderDetails.email
                         }
                     };
+
+                    sendChatNotification(senderDetails.name, receiver, content);
 
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
                 } else {
