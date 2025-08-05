@@ -82,6 +82,7 @@ export const buySubscription = async (req, res) => {
                 razorpay_payment_id
             });
 
+            await User.findByIdAndUpdate(subscribedBy, { isFreeTrialEligible: false , isSubscribed: true }, { new: true });
 
             await newPurchase.save();
             console.log("💾 New purchase saved:", newPurchase);
