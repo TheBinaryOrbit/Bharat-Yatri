@@ -15,22 +15,22 @@ const VehicleSchema = new mongoose.Schema({
     required: true,
     trim: true,
     uppercase: true,
-    match: [/^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/, "Invalid registration number format"]
+    // match: [/^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/, "Invalid registration number format"]
     // Example format: MH12AB1234
   },
   yearOfManufacture: {
     type: String,
     required: true,
     trim: true,
-    match: [/^\d{4}$/, "Enter a valid 4-digit year"],
-    validate: {
-      validator: function (value) {
-        const year = parseInt(value);
-        const currentYear = new Date().getFullYear();
-        return year >= 1980 && year <= currentYear;
-      },
-      message: "Year must be between 1980 and the current year"
-    }
+    // match: [/^\d{4}$/, "Enter a valid 4-digit year"],
+    // validate: {
+    //   validator: function (value) {
+    //     const year = parseInt(value);
+    //     const currentYear = new Date().getFullYear();
+    //     return year >= 1980 && year <= currentYear;
+    //   },
+    //   message: "Year must be between 1980 and the current year"
+    // }
   },
   insuranceImage: {
     type: String,
@@ -40,22 +40,22 @@ const VehicleSchema = new mongoose.Schema({
   insuranceExpDate: {
     type: Date,
     required: true,
-    validate: {
-      validator: function (value) {
-        return value >= new Date();
-      },
-      message: "Insurance expiry date cannot be in the past"
-    }
+    // validate: {
+    //   validator: function (value) {
+    //     return value >= new Date();
+    //   },
+    //   message: "Insurance expiry date cannot be in the past"
+    // }
   },
   vehicleImages: {
     type: [String],
     required: true,
-    validate: {
-      validator: function (arr) {
-        return arr.length > 0;
-      },
-      message: "At least one vehicle image is required"
-    }
+    // validate: {
+    //   validator: function (arr) {
+    //     return arr.length > 0;
+    //   },
+    //   message: "At least one vehicle image is required"
+    // }
   },
   rcImage: {
     type: String,
