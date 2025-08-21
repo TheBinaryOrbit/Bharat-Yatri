@@ -1,4 +1,4 @@
-import { booking, booking } from "../Model/BookingModel.js";
+import { booking } from "../Model/BookingModel.js";
 import { sendnotification } from "../Notification/notification.js";
 import { generateShortBookingId } from '../utils/BookingIdGenerator.js';
 import Razorpay from "razorpay";
