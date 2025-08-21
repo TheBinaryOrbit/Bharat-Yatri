@@ -104,48 +104,6 @@ export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // let bookings = await booking.aggregate([
-    //   { $match: { bookedBy: userId } },
-    //   {
-    //     $addFields: {
-    //       statusOrder: {
-    //         $switch: {
-    //           branches: [
-    //             { case: { $eq: ["$status", "PENDING"] }, then: 1 },
-    //             { case: { $eq: ["$status", "ASSIGNED"] }, then: 2 },
-    //             { case: { $eq: ["$status", "PICKEDUP"] }, then: 3 },
-    //             { case: { $eq: ["$status", "COMPLETED"] }, then: 4 },
-    //             { case: { $eq: ["$status", "CANCELLED"] }, then: 5 }
-    //           ],
-    //           default: 6
-    //         }
-    //       }
-    //     }
-    //   },
-    //   { $sort: { statusOrder: 1 } },
-    //   {
-    //     $lookup: {
-    //       from: "users",
-    //       localField: "bookedBy",
-    //       foreignField: "_id",
-    //       as: "bookedBy"
-    //     }
-    //   },
-    //   { $unwind: "$bookedBy" },
-    //   {
-    //     $lookup: {
-    //       from: "users",
-    //       localField: "recivedBy",
-    //       foreignField: "_id",
-    //       as: "recivedBy"
-    //     }
-    //   },
-    //   { $unwind: { path: "$recivedBy", preserveNullAndEmptyArrays: true } }
-    // ]);
-
-
-    // bookings = bookings.filter(booking => booking.bookedBy != null);
-
     const bookings = await booking.find({ bookedBy: userId })
     .populate('bookedBy', 'name phoneNumber email _id')
     .populate('recivedBy', 'name phoneNumber email _id');
@@ -162,47 +120,6 @@ export const getRecivedBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // let bookings = await booking.aggregate([
-    //   { $match: { recivedBy: userId } },
-    //   {
-    //     $addFields: {
-    //       statusOrder: {
-    //         $switch: {
-    //           branches: [
-    //             { case: { $eq: ["$status", "PENDING"] }, then: 1 },
-    //             { case: { $eq: ["$status", "ASSIGNED"] }, then: 2 },
-    //             { case: { $eq: ["$status", "PICKEDUP"] }, then: 3 },
-    //             { case: { $eq: ["$status", "COMPLETED"] }, then: 4 },
-    //             { case: { $eq: ["$status", "CANCELLED"] }, then: 5 }
-    //           ],
-    //           default: 6
-    //         }
-    //       }
-    //     }
-    //   },
-    //   { $sort: { statusOrder: 1 } },
-    //   {
-    //     $lookup: {
-    //       from: "users",
-    //       localField: "bookedBy",
-    //       foreignField: "_id",
-    //       as: "bookedBy"
-    //     }
-    //   },
-    //   { $unwind: "$bookedBy" },
-    //   {
-    //     $lookup: {
-    //       from: "users",
-    //       localField: "recivedBy",
-    //       foreignField: "_id",
-    //       as: "recivedBy"
-    //     }
-    //   },
-    //   { $unwind: { path: "$recivedBy", preserveNullAndEmptyArrays: true } }
-    // ]);
-
-
-    // bookings = bookings.filter(booking => booking.bookedBy != null);
     const bookings = await booking.find({ recivedBy: userId })
     .populate('bookedBy', 'name phoneNumber email _id')
     .populate('recivedBy', 'name phoneNumber email _id');
@@ -221,11 +138,11 @@ export const getRecivedBookingsByUser = async (req, res) => {
 
 export const getAllBookings = async (req, res) => {
   try {
-    let bookings = await booking.find({
+    const bookings = await booking.find({
       status: 'PENDING',
+      recivedBy: null,  
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    // bookings = bookings.filter(booking => booking.bookedBy != null);
 
     console.log(bookings);
 
