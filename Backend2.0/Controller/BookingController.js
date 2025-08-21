@@ -214,9 +214,11 @@ export const getRecivedBookingsByUser = async (req, res) => {
 
 export const getAllBookings = async (req, res) => {
   try {
-    let bookings = await booking.find({}).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
+    let bookings = await booking.find({
+      status : 'PENDING',
+    }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    bookings = bookings.filter(booking => booking.bookedBy != null);
+    // bookings = bookings.filter(booking => booking.bookedBy != null);
 
     console.log(bookings);
 
