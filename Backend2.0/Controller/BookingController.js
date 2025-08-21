@@ -104,7 +104,7 @@ export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.aggregate([
+    let bookings = await booking.aggregate([
       { $match: { bookedBy: userId } },
       {
         $addFields: {
@@ -144,6 +144,7 @@ export const getBookingsByUser = async (req, res) => {
     ]);
 
 
+    bookings = bookings.filter(booking => booking.bookedBy != null);
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -157,7 +158,7 @@ export const getRecivedBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.aggregate([
+    let bookings = await booking.aggregate([
       { $match: { recivedBy: userId } },
       {
         $addFields: {
@@ -196,6 +197,9 @@ export const getRecivedBookingsByUser = async (req, res) => {
       { $unwind: { path: "$recivedBy", preserveNullAndEmptyArrays: true } }
     ]);
 
+
+    bookings = bookings.filter(booking => booking.bookedBy != null);
+
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ error: "No bookings found for this user." });
     }
@@ -210,14 +214,17 @@ export const getRecivedBookingsByUser = async (req, res) => {
 
 export const getAllBookings = async (req, res) => {
   try {
-    const bookings = await booking.find({}).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
+    let bookings = await booking.find({}).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
+
+    bookings = bookings.filter(booking => booking.bookedBy != null);
 
     console.log(bookings);
-    
+
     return res.status(200).json({
       message: "Unassigned and incomplete bookings fetched.",
       bookings
     });
+
   } catch (error) {
     console.error("Fetch Unassigned Incomplete Bookings Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
