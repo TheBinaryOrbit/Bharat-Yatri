@@ -6,6 +6,8 @@ import crypto from 'crypto';
 import { sendStatusNotification } from "../Notification/StatusNotification.js";
 import { generalNotification } from "../Notification/GeneralNotification.js";
 import { User } from "../Model/UserModel.js";
+import { Message } from '../Model/MessageModel.js'
+
 // razorypay payment integration
 const razorpay = new Razorpay({
   key_id: process.env.key_id,
@@ -102,9 +104,45 @@ export const getBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.find({ bookedBy: userId })
-      .populate('bookedBy', 'name phoneNumber email _id')
-      .populate('recivedBy', 'name phoneNumber email _id'); // This will handle null automatically
+    const bookings = await booking.aggregate([
+      { $match: { bookedBy: userId } },
+      {
+        $addFields: {
+          statusOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "PENDING"] }, then: 1 },
+                { case: { $eq: ["$status", "ASSIGNED"] }, then: 2 },
+                { case: { $eq: ["$status", "PICKEDUP"] }, then: 3 },
+                { case: { $eq: ["$status", "COMPLETED"] }, then: 4 },
+                { case: { $eq: ["$status", "CANCELLED"] }, then: 5 }
+              ],
+              default: 6
+            }
+          }
+        }
+      },
+      { $sort: { statusOrder: 1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "bookedBy",
+          foreignField: "_id",
+          as: "bookedBy"
+        }
+      },
+      { $unwind: "$bookedBy" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "recivedBy",
+          foreignField: "_id",
+          as: "recivedBy"
+        }
+      },
+      { $unwind: { path: "$recivedBy", preserveNullAndEmptyArrays: true } }
+    ]);
+
 
 
     return res.status(200).json({ bookings });
@@ -119,9 +157,44 @@ export const getRecivedBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const bookings = await booking.find({ recivedBy: userId })
-    .populate('bookedBy', 'name phoneNumber email _id')
-    .populate('recivedBy', 'name phoneNumber email _id');
+    const bookings = await booking.aggregate([
+      { $match: { recivedBy: userId } },
+      {
+        $addFields: {
+          statusOrder: {
+            $switch: {
+              branches: [
+                { case: { $eq: ["$status", "PENDING"] }, then: 1 },
+                { case: { $eq: ["$status", "ASSIGNED"] }, then: 2 },
+                { case: { $eq: ["$status", "PICKEDUP"] }, then: 3 },
+                { case: { $eq: ["$status", "COMPLETED"] }, then: 4 },
+                { case: { $eq: ["$status", "CANCELLED"] }, then: 5 }
+              ],
+              default: 6
+            }
+          }
+        }
+      },
+      { $sort: { statusOrder: 1 } },
+      {
+        $lookup: {
+          from: "users",
+          localField: "bookedBy",
+          foreignField: "_id",
+          as: "bookedBy"
+        }
+      },
+      { $unwind: "$bookedBy" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "recivedBy",
+          foreignField: "_id",
+          as: "recivedBy"
+        }
+      },
+      { $unwind: { path: "$recivedBy", preserveNullAndEmptyArrays: true } }
+    ]);
 
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ error: "No bookings found for this user." });
@@ -138,8 +211,8 @@ export const getRecivedBookingsByUser = async (req, res) => {
 export const getAllBookings = async (req, res) => {
   try {
     const bookings = await booking.find({
-      status: 'PENDING',
-      recivedBy: null
+      // status: 'PENDING',
+      // recivedBy: null
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
     return res.status(200).json({
@@ -222,8 +295,8 @@ export const updateBookingStatus = async (req, res) => {
 
     const updatedBooking = await booking.findOneAndUpdate({
       bookingId: id
-    }, { status }, { new: true }). populate('bookedBy', 'name phoneNumber email _id fcmToken')
-    .populate('recivedBy', 'name phoneNumber email _id fcmToken');
+    }, { status }, { new: true }).populate('bookedBy', 'name phoneNumber email _id fcmToken')
+      .populate('recivedBy', 'name phoneNumber email _id fcmToken');
 
 
     console.log("Updated booking details:", updatedBooking);
@@ -233,7 +306,7 @@ export const updateBookingStatus = async (req, res) => {
     }
 
 
-    sendStatusNotification([updatedBooking.bookedBy.fcmToken , updatedBooking.recivedBy.fcmToken], updatedBooking.bookingId, status);
+    sendStatusNotification([updatedBooking.bookedBy.fcmToken, updatedBooking.recivedBy.fcmToken], updatedBooking.bookingId, status);
     return res.status(200).json({
       message: "Booking status updated successfully.",
       booking: updatedBooking
@@ -257,7 +330,8 @@ export const requestCommissionUpdate = async (req, res) => {
     }
 
     // Fetch booking
-    const bookingDetails = await booking.findOne({ bookingId: id });
+    const bookingDetails = await booking.findOne({ bookingId: id })
+    .populate('bookedBy', 'name phoneNumber email _id fcmToken');
 
     if (!bookingDetails) {
       return res.status(404).json({ error: "Booking not found." });
@@ -308,6 +382,14 @@ export const requestCommissionUpdate = async (req, res) => {
     });
 
 
+    await Message.create({
+      sender : bookingDetails.bookedBy._id,
+      receiver : recivedUserId,
+      content : 'Payment Initiated👍',
+      bookingId : bookingDetails.bookingId,
+    });
+
+
     return res.status(200).json({
       message: "Commission update requested successfully.",
       booking: bookingDetails
@@ -349,8 +431,8 @@ export const recivebooking = async (req, res) => {
         },
       },
       { new: true }
-    ). populate('bookedBy', 'name phoneNumber email _id fcmToken')
-    .populate('recivedBy', 'name phoneNumber email _id fcmToken');
+    ).populate('bookedBy', 'name phoneNumber email _id fcmToken')
+      .populate('recivedBy', 'name phoneNumber email _id fcmToken');
 
     if (!bookingDetails) {
       return res.status(404).json({ error: "Booking not found." });
@@ -360,6 +442,13 @@ export const recivebooking = async (req, res) => {
       userarray: [bookingDetails.bookedBy.fcmToken],
       title: "Payment Completed",
       body: `Your payment for booking ID: ${bookingDetails.bookingId} has been completed successfully.`
+    });
+
+    await Message.create({
+      sender : recivedBy,
+      receiver : bookingDetails.bookedBy._id,
+      content : 'Payment Completed✅',
+      bookingId : bookingDetails.bookingId,
     });
 
 

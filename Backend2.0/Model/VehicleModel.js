@@ -34,12 +34,12 @@ const VehicleSchema = new mongoose.Schema({
   },
   insuranceImage: {
     type: String,
-    required: true,
+    // required: true,
     trim: true
   },
   insuranceExpDate: {
     type: Date,
-    required: true,
+    // required: true,
     // validate: {
     //   validator: function (value) {
     //     return value >= new Date();
