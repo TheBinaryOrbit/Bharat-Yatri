@@ -38,7 +38,7 @@ const storage = multer.diskStorage({
 export const uploadDriverFiles = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
+    fileSize: 20 * 1024 * 1024, // 20MB limit
   },
 }).fields([
   { name: "driverImage", maxCount: 1 },
