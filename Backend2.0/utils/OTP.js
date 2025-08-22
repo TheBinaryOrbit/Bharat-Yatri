@@ -1,10 +1,11 @@
 import axios from "axios";
 
-const API_KEY = process.env.OTP_KEY; 
+const API_KEY = process.env.OTP_KEY;
+const OTP_DIGIT_LENGTH = process.env.OTP_DIGIT_LENGTH;
 
 export const sendOTP = async (phoneNumber) => {
   try {
-    const response = await axios.get(`https://2factor.in/API/V1/${API_KEY}/SMS/${phoneNumber}/AUTOGEN2/OTP on Login`);
+    const response = await axios.get(`https://2factor.in/API/V1/${API_KEY}/SMS/${phoneNumber}/AUTOGEN${OTP_DIGIT_LENGTH == 4 ? '3' : '2'}/OTP on Login`);
 
     
     const { Status, Details } = response.data;
