@@ -172,9 +172,11 @@ export const getAllBookings = async (req, res) => {
 
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    bookings = bookings.filter(b => b.bookedBy != null);
+    // bookings = bookings.filter(b => b.bookedBy != null);
 
-    console.log(bookings);
+    const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
+    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+
 
     return res.status(200).json({
       message: "Unassigned and incomplete bookings fetched.",
