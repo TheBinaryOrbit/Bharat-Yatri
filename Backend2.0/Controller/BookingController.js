@@ -153,7 +153,7 @@ export const getAllBookings = async (req, res) => {
     // get all the rides
     let bookings = await booking.find({}).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    booking = bookings.filter(b => b.bookedBy != null);
+    bookings = bookings.filter(b => b.bookedBy != null);
 
     console.log(bookings);
 
