@@ -108,6 +108,10 @@ export const getBookingsByUser = async (req, res) => {
     .populate('bookedBy', 'name phoneNumber email _id')
     .populate('recivedBy', 'name phoneNumber email _id');
 
+
+    const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
+    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+
     return res.status(200).json({ bookings });
   } catch (error) {
     console.error("Get Bookings by User Error:", error);
@@ -123,6 +127,9 @@ export const getRecivedBookingsByUser = async (req, res) => {
     const bookings = await booking.find({ recivedBy: userId })
     .populate('bookedBy', 'name phoneNumber email _id')
     .populate('recivedBy', 'name phoneNumber email _id');
+
+    const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
+    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
 
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ error: "No bookings found for this user." });
