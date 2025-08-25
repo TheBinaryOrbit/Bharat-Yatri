@@ -17,7 +17,7 @@ export const sendnotification = async (vehicleType, notification , bookedBy) => 
     const message = {
         notification: {
             title: "Hello Rider",
-            body: "New Ride added"
+            body: `New ${vehicleType} ride added`
         },
         data: {
             message: JSON.stringify({

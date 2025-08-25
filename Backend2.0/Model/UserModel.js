@@ -84,7 +84,9 @@ const UserSchema = new mongoose.Schema({
   carAleartFor: [
     {
       type: String,
-      trim: true
+      trim: true ,
+      enum: ['HATCHBACK', 'SEDAN', 'ERTIGA', 'SUV', 'INNOVA', 'INNOVA CRYSTA'],
+      default: ['HATCHBACK', 'SEDAN', 'ERTIGA', 'SUV', 'INNOVA', 'INNOVA CRYSTA'] 
     }
   ],
   cityAleartFor: {

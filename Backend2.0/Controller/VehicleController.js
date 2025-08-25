@@ -77,14 +77,7 @@ export const getVehiclesByUserId = async (req, res) => {
 
     const vehicles = await Vehicle.find({ userId });
 
-    // {
-      //   vehicleType : 1,
-      //   registrationNumber : 1,
-      //   yearOfManufacture : 1,
-      //   vehicleImages : 1,
-      // }
-
-      console.log(vehicles);
+    console.log(vehicles);
 
     if (!vehicles || vehicles.length === 0) {
       return res.status(404).json({ error: "No vehicles found for this user." });
