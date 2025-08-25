@@ -33,8 +33,8 @@ export const addVehicle = (req, res) => {
         vehicleType,
         registrationNumber,
         yearOfManufacture,
-        insuranceExpDate,
-        insuranceImage: `/vehicle/insurance/${req.files.insuranceImage[0].filename}`,
+        insuranceExpDate, // to be removed
+        insuranceImage: `/vehicle/insurance/${req.files.insuranceImage[0].filename}`, // to be removed
         rcImage: req.files.rcImage ? `/vehicle/rc/${req.files.rcImage[0].filename}` : null,
         vehicleImages: req.files.vehicleImages.map(f => `/vehicle/images/${f.filename}`),
         userId
