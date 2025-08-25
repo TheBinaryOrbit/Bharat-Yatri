@@ -13,10 +13,10 @@ export const addVehicle = (req, res) => {
       }
 
       const {
-        vehicleType, registrationNumber, yearOfManufacture, userId
+        vehicleType, registrationNumber, yearOfManufacture, userId , insuranceExpDate
       } = req.body;
 
-      if (!vehicleType || !registrationNumber || !yearOfManufacture || !userId) {
+      if (!vehicleType || !registrationNumber || !yearOfManufacture || !userId || !insuranceExpDate) {
         return res.status(400).json({ error: "All required fields must be provided." });
       }
 
