@@ -14,9 +14,9 @@ export const sendChatNotification = async (senderName, reciver, content) => {
         },
         data: {
             action: "open_chat",
-            bookingId: String(bookingId ?? ""),      // required by your app
-            otherUserId: String(bookingId ?? ""),     // the chat peer for the receiver
-            otherUserName: String(bookingId ?? ""), // optional (nice for AppBar)
+            bookingId: String(reciver ?? ""),      // required by your app
+            otherUserId: String(reciver ?? ""),     // the chat peer for the receiver
+            otherUserName: String(reciver ?? ""), // optional (nice for AppBar)
             click_action: "FLUTTER_NOTIFICATION_CLICK",
         },
         tokens: [tokenArray],
