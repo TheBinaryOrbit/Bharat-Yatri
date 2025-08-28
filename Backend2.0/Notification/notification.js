@@ -12,24 +12,23 @@ export const sendnotification = async (vehicleType, notification, bookedBy) => {
     return "No users found for this vehicle type.";
   }
 
-
   const message = {
     notification: {
-      title: "Hello Rider",
-      body: `New ${vehicleType} ride added`
+      title: "New message",
+      body: "Tap to open chat"
     },
     data: {
-      message: JSON.stringify({
-        carModel: vehicleType,
-        from: notification.pickUpLocation,
-        to: notification.dropLocation,
-      }),
       action: "open_chat",
-      bookingId: bookedBy,
-      click_action: "FLUTTER_NOTIFICATION_CLICK",
+      bookingId: notification,
+      otherUserId: bookedBy,
+      otherUserName: bookedBy,
+      click_action: "FLUTTER_NOTIFICATION_CLICK"
     },
-    tokens: userarray
+    tokens: userarray,
+    android: { priority: "high" },
+    apns: { headers: { "apns-priority": "10" } }
   };
+
   try {
     const response = await firebaseadmin.messaging().sendEachForMulticast(message);
     console.log("Message send sucessfully");
