@@ -1,7 +1,7 @@
 import { firebaseadmin } from "../Firebase/firebase.js";
 import { User } from "../Model/UserModel.js";
 
-export const sendChatNotification = async (senderName , reciver , content) => {
+export const sendChatNotification = async (senderName, reciver, content) => {
 
     const token = await User.findById(reciver).select("fcmToken");
     console.log("Token:", token);
@@ -10,7 +10,14 @@ export const sendChatNotification = async (senderName , reciver , content) => {
     const message = {
         notification: {
             title: senderName,
-            body: "testing"
+            body: content
+        },
+        data: {
+            action: "open_chat",
+            bookingId: String(bookingId ?? ""),      // required by your app
+            otherUserId: String(bookingId ?? ""),     // the chat peer for the receiver
+            otherUserName: String(bookingId ?? ""), // optional (nice for AppBar)
+            click_action: "FLUTTER_NOTIFICATION_CLICK",
         },
         tokens: [tokenArray],
     };
