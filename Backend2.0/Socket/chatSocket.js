@@ -93,12 +93,12 @@ export function initSocket(server) {
                         }
                     };
 
-                    sendChatNotification(user.name, receiver, content);
+                    sendChatNotification(user.name, receiver, content, sender, bookingId);
 
                     io.to(receiverSocket).emit("chat_list_item_update", latestChatItem);
                 } else {
                     // Step 4: Receiver is offline – no real-time delivery
-                    sendChatNotification(user.name, receiver, content);
+                    sendChatNotification(user.name, receiver, content, sender, bookingId);
                     console.log("Receiver offline. Message saved for later.");
                 }
 
