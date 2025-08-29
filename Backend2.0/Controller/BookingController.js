@@ -105,9 +105,9 @@ export const getBookingsByUser = async (req, res) => {
     const { userId } = req.params;
 
     const bookings = await booking.find({ bookedBy: userId })
-    .populate('bookedBy', 'name phoneNumber email _id')
-    .populate('recivedBy', 'name phoneNumber email _id');
-
+      .populate('bookedBy', 'name phoneNumber email _id')
+      .populate('recivedBy', 'name phoneNumber email _id')
+      .sort({ pickUpDate: 1 });
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
     bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
@@ -125,8 +125,9 @@ export const getRecivedBookingsByUser = async (req, res) => {
     const { userId } = req.params;
 
     const bookings = await booking.find({ recivedBy: userId })
-    .populate('bookedBy', 'name phoneNumber email _id')
-    .populate('recivedBy', 'name phoneNumber email _id');
+      .populate('bookedBy', 'name phoneNumber email _id')
+      .populate('recivedBy', 'name phoneNumber email _id')
+      .sort({ pickUpDate: 1 });
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
     bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
@@ -134,7 +135,6 @@ export const getRecivedBookingsByUser = async (req, res) => {
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ error: "No bookings found for this user." });
     }
-
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -147,7 +147,7 @@ export const getAllBookings = async (req, res) => {
   try {
     const bookings = await booking.find({
       status: 'PENDING',
-      recivedBy: null,  
+      recivedBy: null,
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
     // get all the rides
