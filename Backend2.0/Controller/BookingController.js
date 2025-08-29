@@ -107,7 +107,7 @@ export const getBookingsByUser = async (req, res) => {
     const bookings = await booking.find({ bookedBy: userId })
       .populate('bookedBy', 'name phoneNumber email _id')
       .populate('recivedBy', 'name phoneNumber email _id')
-      .sort({ pickUpDate: 1 });
+      .sort({ pickUpDate: -1 });
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
     bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
@@ -127,7 +127,7 @@ export const getRecivedBookingsByUser = async (req, res) => {
     const bookings = await booking.find({ recivedBy: userId })
       .populate('bookedBy', 'name phoneNumber email _id')
       .populate('recivedBy', 'name phoneNumber email _id')
-      .sort({ pickUpDate: 1 });
+      .sort({ pickUpDate: -1 });
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
     bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
