@@ -106,11 +106,16 @@ export const getBookingsByUser = async (req, res) => {
 
     const bookings = await booking.find({ bookedBy: userId })
       .populate('bookedBy', 'name phoneNumber email _id')
-      .populate('recivedBy', 'name phoneNumber email _id')
-      .sort({ pickUpDate: -1 });
+      .populate('recivedBy', 'name phoneNumber email _id');
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
-    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+
+    // Sort by status first, then by pickUpDate (latest first)
+    bookings.sort((a, b) => {
+      const statusDiff = ORDER.indexOf(a.status) - ORDER.indexOf(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(b.pickUpDate) - new Date(a.pickUpDate); // -1 for descending
+    });
 
     return res.status(200).json({ bookings });
   } catch (error) {
@@ -119,18 +124,22 @@ export const getBookingsByUser = async (req, res) => {
   }
 };
 
-
 export const getRecivedBookingsByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
     const bookings = await booking.find({ recivedBy: userId })
       .populate('bookedBy', 'name phoneNumber email _id')
-      .populate('recivedBy', 'name phoneNumber email _id')
-      .sort({ pickUpDate: -1 });
+      .populate('recivedBy', 'name phoneNumber email _id');
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
-    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+
+    // Sort by status first, then by pickUpDate (latest first)
+    bookings.sort((a, b) => {
+      const statusDiff = ORDER.indexOf(a.status) - ORDER.indexOf(b.status);
+      if (statusDiff !== 0) return statusDiff;
+      return new Date(b.pickUpDate) - new Date(a.pickUpDate); // -1 for descending
+    });
 
     if (!bookings || bookings.length === 0) {
       return res.status(404).json({ error: "No bookings found for this user." });
@@ -138,7 +147,7 @@ export const getRecivedBookingsByUser = async (req, res) => {
 
     return res.status(200).json({ bookings });
   } catch (error) {
-    console.error("Get Bookings by User Error:", error);
+    console.error("Get Recived Bookings by User Error:", error);
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
