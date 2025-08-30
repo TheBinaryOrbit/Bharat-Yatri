@@ -4,6 +4,7 @@ import { User } from "../Model/UserModel.js";
 
 export const sendnotification = async (vehicleType, notification , bookedBy) => {
 
+
     const userarray = await getUserByvehicleType(vehicleType , bookedBy);
 
     console.log("User array:", userarray);
@@ -12,6 +13,7 @@ export const sendnotification = async (vehicleType, notification , bookedBy) => 
         return "No users found for this vehicle type.";
     }
 
+    
     const message = {
         notification: {
             title: "Hello Rider",
@@ -22,10 +24,7 @@ export const sendnotification = async (vehicleType, notification , bookedBy) => 
                 carModel: vehicleType,
                 from: notification.pickUpLocation,
                 to: notification.dropLocation,
-            }),
-            action: "open_booking",
-            bookingId: String(notification.bookingId ?? ""),
-            click_action: "FLUTTER_NOTIFICATION_CLICK",
+            })
         },
         tokens: userarray
     };
