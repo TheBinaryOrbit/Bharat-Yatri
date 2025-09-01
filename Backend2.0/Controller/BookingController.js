@@ -154,37 +154,38 @@ export const getRecivedBookingsByUser = async (req, res) => {
 
 export const getAllBookings = async (req, res) => {
   try {
-    const bookings = await booking.find({
-      status: 'PENDING',
-      recivedBy: null,
-    }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
-
-    // get all the rides
-    // let bookings = await booking.find({} , {
-    //   _id : 1,
-    //   bookingId : 1,
-    //   vehicleType : 1,
-    //   pickUpDate : 1,
-    //   pickUpTime : 1,
-    //   pickUpLocation : 1,
-    //   dropLocation : 1,
-    //   bookingType : 1,
-    //   getBestQuotePrice : 1,
-    //   isProfileHidden : 1,
-    //   extraRequirements : 1,
-    //   bookedBy : 1,
-    //   status : 1,
-    //   isPaid : 1,
-    //   bookingAmount : 1,
-    //   commissionAmount : 1,
-    //   upiId : 1
-
+    // const bookings = await booking.find({
+    //   status: 'PENDING',
+    //   recivedBy: null,
     // }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    // bookings = bookings.filter(b => b.bookedBy != null);
+    // get all the rides
+    let bookings = await booking.find({
+      status: { $ne: 'CANCELLED' }
+    } , {
+      _id : 1,
+      bookingId : 1,
+      vehicleType : 1,
+      pickUpDate : 1,
+      pickUpTime : 1,
+      pickUpLocation : 1,
+      dropLocation : 1,
+      bookingType : 1,
+      getBestQuotePrice : 1,
+      isProfileHidden : 1,
+      extraRequirements : 1,
+      bookedBy : 1,
+      status : 1,
+      isPaid : 1,
+      bookingAmount : 1,
+      commissionAmount : 1,
+      upiId : 1,
+    }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    // const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
-    // bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+    bookings = bookings.filter(b => b.bookedBy != null);
+
+    const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
+    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
 
 
     return res.status(200).json({
