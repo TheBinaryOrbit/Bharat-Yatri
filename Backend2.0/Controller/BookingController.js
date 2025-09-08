@@ -162,27 +162,41 @@ export const getAllBookings = async (req, res) => {
     // get all the rides
     let bookings = await booking.find({
       status: { $ne: 'CANCELLED' }
-    } , {
-      _id : 1,
-      bookingId : 1,
-      vehicleType : 1,
-      pickUpDate : 1,
-      pickUpTime : 1,
-      pickUpLocation : 1,
-      dropLocation : 1,
-      bookingType : 1,
-      getBestQuotePrice : 1,
-      isProfileHidden : 1,
-      extraRequirements : 1,
-      bookedBy : 1,
-      status : 1,
-      isPaid : 1,
-      bookingAmount : 1,
-      commissionAmount : 1,
-      upiId : 1,
+    }, {
+      _id: 1,
+      bookingId: 1,
+      vehicleType: 1,
+      pickUpDate: 1,
+      pickUpTime: 1,
+      pickUpLocation: 1,
+      dropLocation: 1,
+      bookingType: 1,
+      getBestQuotePrice: 1,
+      isProfileHidden: 1,
+      extraRequirements: 1,
+      bookedBy: 1,
+      status: 1,
+      isPaid: 1,
+      bookingAmount: 1,
+      commissionAmount: 1,
+      upiId: 1,
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
-    bookings = bookings.filter(b => b.bookedBy != null);
+    const date = new Date();
+
+    const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    bookings = bookings.filter(b => {
+      const pickupDate = new Date(b.pickUpDate);
+      pickupDate.setHours(0, 0, 0, 0); // reset to date only
+
+      return (
+        pickupDate >= today &&
+        b.status !== 'COMPLETED' &&
+        b.status !== 'CANCELLED' &&
+        b.bookedBy != null
+      );
+    });
 
     const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
     bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
