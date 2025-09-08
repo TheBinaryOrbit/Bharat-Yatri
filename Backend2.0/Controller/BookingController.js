@@ -186,14 +186,14 @@ export const getAllBookings = async (req, res) => {
 
     const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
+    const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
+
     bookings = bookings.filter(b => {
       const pickupDate = new Date(b.pickUpDate);
       pickupDate.setHours(0, 0, 0, 0); // reset to date only
 
       return (
         pickupDate >= today &&
-        b.status !== 'COMPLETED' &&
-        b.status !== 'CANCELLED' &&
         b.bookedBy != null
       );
     });
@@ -204,7 +204,7 @@ export const getAllBookings = async (req, res) => {
 
     return res.status(200).json({
       message: "Unassigned and incomplete bookings fetched.",
-      bookings
+      bookings: [...bookings, ...completedBookings]
     });
 
   } catch (error) {
