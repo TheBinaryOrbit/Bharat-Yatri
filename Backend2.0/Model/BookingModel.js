@@ -81,6 +81,12 @@ const BookingSchema = new mongoose.Schema({
     default: false
   },
 
+  communicationPreference: {
+    type: String,
+    enum: ['Chat', 'Chat & Call'],
+    required: true,
+  },
+
   // Amounts (consider converting to Number if doing calculations)
   bookingAmount: {
     type: String,

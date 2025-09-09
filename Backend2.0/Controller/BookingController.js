@@ -15,6 +15,7 @@ const razorpay = new Razorpay({
 });
 
 export const addBooking = async (req, res) => {
+  console.log('Add Booking Request Body:', req.body);
   try {
     const {
       vehicleType,
@@ -24,6 +25,8 @@ export const addBooking = async (req, res) => {
       dropLocation,
       bookingType,
       getBestQuotePrice,
+      communicationPreference,
+      // PSS
       bookingAmount,
       commissionAmount,
       isProfileHidden,
@@ -56,6 +59,8 @@ export const addBooking = async (req, res) => {
       bookingType,
       bookedBy,
       extraRequirements: extraRequirements ? String(extraRequirements).split(',') : [],
+      communicationPreference,
+      // PSS
     };
 
     if (getBestQuotePrice === true) {
@@ -174,6 +179,8 @@ export const getAllBookings = async (req, res) => {
       getBestQuotePrice: 1,
       isProfileHidden: 1,
       extraRequirements: 1,
+      communicationPreference: 1,
+      // PSS
       bookedBy: 1,
       status: 1,
       isPaid: 1,
@@ -181,10 +188,6 @@ export const getAllBookings = async (req, res) => {
       commissionAmount: 1,
       upiId: 1,
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
-
-    const date = new Date();
-
-    const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
     const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
 

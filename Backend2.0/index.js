@@ -17,7 +17,7 @@ import { SubscriptionPurchaseRouter } from './Routers/SubscriptionPurchaseRouter
 import { createServer } from 'http'
 import { initSocket } from './Socket/chatSocket.js'
 import { MessageRouter } from './Routers/MessageRouter.js'
-
+import travelAgencyRouter from './Routers/TravelAgencyRouter.js';
 
 
 const PORT = process.env.PORT;
@@ -62,7 +62,7 @@ app.use('/api/v2/upi' , UpiRouter)
 app.use('/api/v2/user' , UserRouter)
 app.use('/api/v2/vehicle' , VehicleRouter)
 app.use('/api/v2/message' , MessageRouter)
-
+app.use('/api/travel_agencies', travelAgencyRouter); // Mount TravelAgency routes under /api
 
 app.get('/', (req, res) => {
     console.log('User IP :', req.ip);

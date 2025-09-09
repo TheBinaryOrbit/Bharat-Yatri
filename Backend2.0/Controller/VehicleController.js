@@ -16,14 +16,15 @@ export const addVehicle = (req, res) => {
         vehicleType, registrationNumber, yearOfManufacture, userId , insuranceExpDate
       } = req.body;
 
-      if (!vehicleType || !registrationNumber || !yearOfManufacture || !userId || !insuranceExpDate) {
+      // if (!vehicleType || !registrationNumber || !yearOfManufacture || !userId || !insuranceExpDate) {
+      if (!vehicleType || !registrationNumber || !yearOfManufacture || !userId) {
         return res.status(400).json({ error: "All required fields must be provided." });
       }
 
       // remove the insurance image requirement ********to be removed******
-      if (!req.files.insuranceImage) {
-        return res.status(400).json({ error: "Insurance image is required." });
-      }
+      // if (!req.files.insuranceImage) {
+      //   return res.status(400).json({ error: "Insurance image is required." });
+      // }
 
       if (!req.files.vehicleImages || req.files.vehicleImages.length === 0) {
         return res.status(400).json({ error: "At least one vehicle image is required." });
@@ -33,8 +34,8 @@ export const addVehicle = (req, res) => {
         vehicleType,
         registrationNumber,
         yearOfManufacture,
-        insuranceExpDate, // to be removed
-        insuranceImage: `/vehicle/insurance/${req.files.insuranceImage[0].filename}`, // to be removed
+        // insuranceExpDate, // to be removed
+        // insuranceImage: `/vehicle/insurance/${req.files.insuranceImage[0].filename}`, // to be removed
         rcImage: req.files.rcImage ? `/vehicle/rc/${req.files.rcImage[0].filename}` : null,
         vehicleImages: req.files.vehicleImages.map(f => `/vehicle/images/${f.filename}`),
         userId
