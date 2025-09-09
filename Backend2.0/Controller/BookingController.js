@@ -189,6 +189,10 @@ export const getAllBookings = async (req, res) => {
       upiId: 1,
     }).sort({ createdAt: -1 }).populate('bookedBy', 'name phoneNumber email _id');
 
+    const date = new Date();
+
+    const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
     const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
 
     bookings = bookings.filter(b => {
