@@ -134,6 +134,11 @@ const BookingSchema = new mongoose.Schema({
     trim: true,
     match: [/^\w+@\w+$/, 'Invalid UPI ID format']
   },
+  payeeUpiId: {
+    type: String,
+    trim: true,
+    match: [/^\w+@\w+$/, 'Invalid UPI ID format']
+  },
   paymentRequests: [
     {
       type: commissionSchema,

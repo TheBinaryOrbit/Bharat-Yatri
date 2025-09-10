@@ -193,7 +193,7 @@ export const getAllBookings = async (req, res) => {
 
     const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
+    const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED' || b.status === 'PICKEDUP');
 
     bookings = bookings.filter(b => {
       const pickupDate = new Date(b.pickUpDate);
@@ -416,12 +416,16 @@ export const recivebooking = async (req, res) => {
       return res.status(400).json({ error: "Invalid payment signature." });
     }
 
+
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
     const bookingDetails = await booking.findOneAndUpdate(
       { bookingId: id },
       {
         $set: {
           status: "ASSIGNED",
           recivedBy,
+          payeeUpiId : payment.vpa,
           isPaid: true,
         },
       },
