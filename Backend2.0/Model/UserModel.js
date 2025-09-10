@@ -37,7 +37,7 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
     enum: ['AGENT', 'OWNER', 'DRIVER'],
-    default: 'AGENT'
+    default: 'DRIVER'
   },
   aadharNumber: {
     type: String,

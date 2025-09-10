@@ -49,6 +49,9 @@ export const addBooking = async (req, res) => {
       bookingId = generateShortBookingId(6);
     }
 
+
+    await User.findByIdAndUpdate(bookedBy, { userType: 'AGENT' });
+
     const data = {
       bookingId,
       vehicleType,
