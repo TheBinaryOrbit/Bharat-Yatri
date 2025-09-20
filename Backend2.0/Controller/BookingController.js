@@ -15,7 +15,6 @@ const razorpay = new Razorpay({
 });
 
 export const addBooking = async (req, res) => {
-  console.log('Add Booking Request Body:', req.body);
   try {
     const {
       vehicleType,
@@ -25,8 +24,6 @@ export const addBooking = async (req, res) => {
       dropLocation,
       bookingType,
       getBestQuotePrice,
-      communicationPreference,
-      // PSS
       bookingAmount,
       commissionAmount,
       isProfileHidden,
@@ -49,9 +46,6 @@ export const addBooking = async (req, res) => {
       bookingId = generateShortBookingId(6);
     }
 
-
-    await User.findByIdAndUpdate(bookedBy, { userType: 'AGENT' });
-
     const data = {
       bookingId,
       vehicleType,
@@ -62,8 +56,6 @@ export const addBooking = async (req, res) => {
       bookingType,
       bookedBy,
       extraRequirements: extraRequirements ? String(extraRequirements).split(',') : [],
-      communicationPreference,
-      // PSS
     };
 
     if (getBestQuotePrice === true) {
@@ -182,8 +174,6 @@ export const getAllBookings = async (req, res) => {
       getBestQuotePrice: 1,
       isProfileHidden: 1,
       extraRequirements: 1,
-      communicationPreference: 1,
-      // PSS
       bookedBy: 1,
       status: 1,
       isPaid: 1,
@@ -196,7 +186,7 @@ export const getAllBookings = async (req, res) => {
 
     const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED' || b.status === 'PICKEDUP');
+    const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
 
     bookings = bookings.filter(b => {
       const pickupDate = new Date(b.pickUpDate);
@@ -419,16 +409,12 @@ export const recivebooking = async (req, res) => {
       return res.status(400).json({ error: "Invalid payment signature." });
     }
 
-
-    const payment = await razorpay.payments.fetch(razorpay_payment_id);
-
     const bookingDetails = await booking.findOneAndUpdate(
       { bookingId: id },
       {
         $set: {
           status: "ASSIGNED",
           recivedBy,
-          payeeUpiId : payment.vpa,
           isPaid: true,
         },
       },

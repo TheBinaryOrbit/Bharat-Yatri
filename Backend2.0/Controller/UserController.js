@@ -4,7 +4,7 @@ import { Vehicle } from '../Model/VehicleModel.js'
 import { Driver } from '../Model/DriverModel.js'
 import { uploadUserFiles } from "../Storage/UserStorage.js";
 import { SubscriptionPurchase } from '../Model/SubscriptionPurchaseModel.js';
-import TravelAgency  from '../Model/TravelAgencyModel.js'
+
 
 // Send OTP Controller
 export const GetOTP = async (req, res) => {
@@ -338,13 +338,10 @@ export const checkUser = async (req, res) => {
             Driver.countDocuments({ userId: id })
         ]);
 
-        const travelAgency = await TravelAgency.findOne({ userId: id }).lean();
-
         const responseData = {
             isPorfileCompleted : true,
             isVehicleAdded : true,
             isDriverAdded : true,
-            isTravelAgencyCompleted : true,
             isFreeTrialEligible: user.isFreeTrialEligible
         }
 
@@ -358,15 +355,6 @@ export const checkUser = async (req, res) => {
 
         if(driverCount == 0){
             responseData.isDriverAdded = false
-        }
-
-        // Check travel agency completeness
-        if (!travelAgency ||
-            !travelAgency.travelAgencyName ||
-            !travelAgency.contactPersonName ||
-            !travelAgency.mobileNumber ||
-            !travelAgency.city) {
-            responseData.isTravelAgencyCompleted = false;
         }
 
         return res.status(200).json({
