@@ -136,8 +136,8 @@ const SpecificUser = () => {
           {data?.user?.userImage && (
             <div className="w-full h-fit bg-white shadow-2xs rounded-xl overflow-x-scroll scrolbar flex justify-center items-center p-6 mb-10">
               <div className="w-1/2 h-full text-center">
-                <a href={`https://api.bharatyaatri.com/${data.user.userImage}`} target="_blank" rel="noopener noreferrer">
-                  <img src={`https://api.bharatyaatri.com/${data.user.userImage}`} alt="User Photo" className="rounded-lg mb-2 mx-auto max-w-full h-auto cursor-pointer" />
+                <a href={`https://api.bharatyaatri.com${data.user.userImage}`} target="_blank" rel="noopener noreferrer">
+                  <img src={`https://api.bharatyaatri.com${data.user.userImage}`} alt="User Photo" className="rounded-lg mb-2 mx-auto max-w-full h-auto cursor-pointer" />
                 </a>
                 <h1 className="text-xl text-center mb-4 font-bold text-gray-700 capitalize">User Photo</h1>
               </div>
