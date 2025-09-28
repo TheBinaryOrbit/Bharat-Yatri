@@ -1,3 +1,3 @@
-const URL  : string = 'https://api.bharatyatri.in'
+const URL  : string = "https://api.bharatyaatri.com"
 
 export default URL
