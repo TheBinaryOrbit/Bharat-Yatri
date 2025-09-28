@@ -46,7 +46,7 @@ const Sidebar = () => {
                                         <div className="relative">
                                             <p className='text-sm translate-y-1'><FaDashcube /></p>
                                         </div>
-                                        <h2 className="text-gray-500 text-sm font-medium">All users</h2>
+                                        <h2 className="text-gray-500 text-sm font-medium">Dashboard</h2>
                                     </div>
                                 </div>
                             </li>
