@@ -1,3 +1,3 @@
-const URL  : string = 'http://localhost:8000'
+const URL  : string = 'https://api.bharatyatri.in'
 
 export default URL
