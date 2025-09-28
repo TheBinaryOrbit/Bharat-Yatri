@@ -9,7 +9,7 @@ const AdminOutlet = () => {
   const storedData  : any = localStorage.getItem('auth')
   const auth : auth = JSON.parse(storedData) 
   useEffect(()=>{
-    if(!auth?.authToken ||  !auth.authInfo ){
+    if(!auth.authInfo ){
       navigate('/')
     }
   },[])

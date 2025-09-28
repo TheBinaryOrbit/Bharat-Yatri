@@ -1,24 +1,11 @@
 export interface auth {
     authStatus : Boolean,
-    authToken : string,
     authInfo : {
       id : string,
       name : string,
       phoneNumber : string,
-      userType : string,
       email : string
     },
-    authpermission :[
-      {
-        name : string,
-        child : [
-          {
-            name : string,
-            icon : string
-          }
-        ]
-      }
-    ]
   }
 
 export interface user  {
@@ -70,33 +57,84 @@ export interface exchnage  {
 }
 
 
-export interface userdetails {
-  aadhaarNumber ?: string,
-  dlNumber ?: string,
-  email ?: string,
-  freeTrailEliglibity ?: boolean,
-  isSubscribed ?: boolean,
-  isVerified ?: boolean,
-  name ?: string,
-  phoneNumber ?: string,
-  suscriptionEndDate  ?: string,
-  suscriptionStaredDate ?: string,
-  suscriptionType ?: {
-    _id ?: string,
-    subscriptionType ?: string,
-    price ?: string,
-    description ?: string
+export interface subscriptionHistory {
+  _id?: string,
+  subscriptionType?: {
+    _id?: string,
+    title?: string,
+    price?: number,
+    benefits?: string,
+    timePeriod?: number
   },
-  userCurrentLocation ?: string,
-  userType ?: string,
-  agencyName ?: string ,
-  pincode ?: string,
-  address ?: string,
-  state ?: string,
-  city ?: string,
-  dob ?: string,
-  aadhaarPhoto ?: string,
-  dlPhoto ?: string
+  subscribedBy?: string,
+  startDate?: string,
+  endDate?: string,
+  createdAt?: string,
+  updatedAt?: string
+}
+
+export interface driver {
+  _id?: string,
+  name?: string,
+  phone?: string,
+  address?: string,
+  city?: string,
+  driverImage?: string,
+  dlNumber?: string,
+  dlFront?: string,
+  dlBack?: string,
+  userId?: string,
+  createdAt?: string,
+  updatedAt?: string
+}
+
+export interface vehicle {
+  _id?: string,
+  vehicleType?: string,
+  registrationNumber?: string,
+  yearOfManufacture?: string,
+  insuranceImage?: string,
+  insuranceExpDate?: string,
+  vehicleImages?: string[],
+  rcImage?: string,
+  userId?: string,
+  createdAt?: string,
+  updatedAt?: string
+}
+
+export interface bankDetail {
+  _id?: string,
+  accountHolderName?: string,
+  accountNumber?: string,
+  bankName?: string,
+  ifscCode?: string,
+  isVerified?: boolean,
+  userId?: string,
+  createdAt?: string,
+  updatedAt?: string
+}
+
+export interface userdetails {
+  message?: string,
+  user?: {
+    _id?: string,
+    name?: string,
+    phoneNumber?: string,
+    city?: string,
+    userType?: string,
+    userImage?: string,
+    isSubscribed?: boolean,
+    isUserVerified?: boolean,
+    isSendNotification?: boolean,
+    carAleartFor?: string[],
+    isFreeTrialEligible?: boolean,
+    createdAt?: string,
+    updatedAt?: string,
+    subscriptionHistory?: subscriptionHistory[],
+    drivers?: driver[],
+    vehicles?: vehicle[],
+    bankDetails?: bankDetail[]
+  }
 }
 
 export interface statc {

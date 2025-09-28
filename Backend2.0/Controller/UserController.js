@@ -2,6 +2,7 @@ import { User } from "../Model/UserModel.js";
 import { sendOTP, verifyOTPWithPhoneNumber } from "../utils/OTP.js";
 import { Vehicle } from '../Model/VehicleModel.js'
 import { Driver } from '../Model/DriverModel.js'
+import { BankDetails } from '../Model/BankDetailsModel.js'
 import { uploadUserFiles } from "../Storage/UserStorage.js";
 import { SubscriptionPurchase } from '../Model/SubscriptionPurchaseModel.js';
 
@@ -17,7 +18,7 @@ export const GetOTP = async (req, res) => {
 
         const OTPStatus = await sendOTP(phoneNumber);
 
-        console.log("OTP Status:", OTPStatus); 
+        console.log("OTP Status:", OTPStatus);
 
         if (!OTPStatus.status) {
             return res.status(503).json({ error: "Failed to send OTP. Service unavailable." });
@@ -62,7 +63,7 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-        
+
         await User.findOneAndUpdate(
             { phoneNumber: phoneNumber },
             {
@@ -229,7 +230,7 @@ export const getUserById = async (req, res) => {
         if (!subscription) {
             //update user isSubscribed to false
             console.log("User is not subscribed or subscription expired, updating user status.");
-            user = await User.findByIdAndUpdate(id, { isSubscribed: false } , { new: true });
+            user = await User.findByIdAndUpdate(id, { isSubscribed: false }, { new: true });
         }
 
         return res.status(200).json({
@@ -258,7 +259,7 @@ export const onUserAlerts = async (req, res) => {
             return res.status(400).json({ error: "ID is required." });
         }
 
-        
+
 
         // cityAlertFor to null if empty
         const city = cityAlertFor?.trim() || null;
@@ -339,26 +340,26 @@ export const checkUser = async (req, res) => {
         ]);
 
         const responseData = {
-            isPorfileCompleted : true,
-            isVehicleAdded : true,
-            isDriverAdded : true,
+            isPorfileCompleted: true,
+            isVehicleAdded: true,
+            isDriverAdded: true,
             isFreeTrialEligible: user.isFreeTrialEligible
         }
 
-        if(!user.name || !user.phoneNumber || !user.city || !user.email || !user.companyName || !user.userType || !user.aadharNumber || !user.drivingLicenceNumber){
+        if (!user.name || !user.phoneNumber || !user.city || !user.email || !user.companyName || !user.userType || !user.aadharNumber || !user.drivingLicenceNumber) {
             responseData.isPorfileCompleted == false
         }
 
-        if(vehicleCount == 0){
+        if (vehicleCount == 0) {
             responseData.isVehicleAdded = false
         }
 
-        if(driverCount == 0){
+        if (driverCount == 0) {
             responseData.isDriverAdded = false
         }
 
         return res.status(200).json({
-            message : "User Checked Sucessfully",
+            message: "User Checked Sucessfully",
             responseData
         });
     } catch (error) {
@@ -368,7 +369,7 @@ export const checkUser = async (req, res) => {
 }
 
 
-export const uploadUserPhoto = async(req, res) => {
+export const uploadUserPhoto = async (req, res) => {
     try {
         uploadUserFiles(req, res, async (err) => {
             if (err) {
@@ -403,3 +404,101 @@ export const uploadUserPhoto = async(req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 }
+
+// Get All Users - Admin endpoint with subscription filter
+export const getAllUsers = async (req, res) => {
+    try {
+        const { subscriptionStatus, page = 1, limit = 10 } = req.query;
+
+        // Build filter based on subscription status
+        let filter = {};
+        if (subscriptionStatus === 'subscribed') {
+            filter.isSubscribed = true;
+        } else if (subscriptionStatus === 'not-subscribed') {
+            filter.isSubscribed = false;
+        }
+        // If subscriptionStatus is 'all' or not provided, no filter applied
+
+        const skip = (page - 1) * limit;
+
+        // Get users with minimal details for listing
+        const users = await User.find(filter)
+            .select('name phoneNumber email city userType isSubscribed isUserVerified createdAt userImage')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean();
+
+        // Get total count for pagination
+        const totalUsers = await User.countDocuments(filter);
+        const totalPages = Math.ceil(totalUsers / limit);
+
+        return res.status(200).json({
+            message: "Users retrieved successfully.",
+            users,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages,
+                totalUsers,
+                hasNextPage: page < totalPages,
+                hasPrevPage: page > 1
+            }
+        });
+    } catch (error) {
+        console.error("Get All Users Error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+// Get Specific User Details - Admin endpoint
+export const getUserDetails = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId) {
+            return res.status(400).json({ error: "User ID is required." });
+        }
+
+        // Get user with all details (no populate needed as User schema doesn't have references)
+        const user = await User.findById(userId).lean();
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        // Get user's subscription purchases separately
+        const subscriptionPurchases = await SubscriptionPurchase.find({ subscribedBy: userId })
+            .populate('subscriptionType', 'title price benefits timePeriod')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Get user's driver details
+        const drivers = await Driver.find({ userId: userId })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Get user's vehicle details
+        const vehicles = await Vehicle.find({ userId: userId })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Get user's bank details
+        const bankDetails = await BankDetails.find({ userId: userId })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        // Add all related info to user object
+        user.subscriptionHistory = subscriptionPurchases;
+        user.drivers = drivers;
+        user.vehicles = vehicles;
+        user.bankDetails = bankDetails;
+
+        return res.status(200).json({
+            message: "User details retrieved successfully.",
+            user
+        });
+    } catch (error) {
+        console.error("Get User Details Error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};

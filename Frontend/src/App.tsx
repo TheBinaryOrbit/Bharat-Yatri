@@ -5,16 +5,11 @@ import { ToastContainer } from 'react-toastify'
 import AdminOutlet from './Admin/AdminOutlet'
 import Dashboard from './Admin/Dashboard'
 import AllUser from './Admin/User/Alluser'
-import Rider from './Admin/User/Rider'
-import Agents from './Admin/User/Agents'
-import Unverified from './Admin/User/Unverified'
 import SpecificUser from './Admin/User/SpecificUser'
-import Duty from './Admin/Rides/Duty'
-import Available from './Admin/Rides/Available'
-import Exchange from './Admin/Rides/Exchange'
-import Subscription from './Admin/Subscription/Subscription'
-import AddRide from './Admin/Rides/AddRide'
-import AddDuty from './Admin/Rides/AddDuty'
+
+
+import AllBookings from './Admin/Bookings/AllBookings'
+import BookingDetails from './Admin/Bookings/BookingDetails'
 function App() {
   return (
     <Router>
@@ -23,17 +18,20 @@ function App() {
         <Route path='/' element={<Login />} />
         <Route path='/admin' element={<AdminOutlet />}>
           <Route path='/admin/dashboard' element={<Dashboard />} />
+          
+          {/* User Management Routes */}
+          <Route path='/admin/users' element={<AllUser />} />
           <Route path='/admin/user/allusers' element={<AllUser />} />
-          <Route path='/admin/user/riders' element={<Rider />} />
-          <Route path='/admin/user/agents' element={<Agents />} />
-          <Route path='/admin/user/unverified' element={<Unverified />} />
+          
           <Route path='/admin/specificuser/:id' element={<SpecificUser />} />
-          <Route path='/admin/ride/duty' element={<Duty />} />
-          <Route path='/admin/ride/available' element={<Available />} />
-          <Route path='/admin/ride/exchange' element={<Exchange />} />
-          <Route path='/admin/ride/addride' element={<AddRide />} />
-          <Route path='/admin/ride/addduty' element={<AddDuty />} />
-          <Route path='/admin/subscription' element={<Subscription />} />
+          <Route path='/admin/user/details/:userId' element={<SpecificUser />} />
+          
+          {/* Booking Management Routes */}
+          <Route path='/admin/bookings' element={<AllBookings />} />
+          <Route path='/admin/booking/details/:bookingId' element={<BookingDetails />} />
+          
+          
+          
         </Route>
       </Routes>
     </Router>

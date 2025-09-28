@@ -450,3 +450,128 @@ export const recivebooking = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
+
+// Get All Bookings - Admin endpoint with status filter
+export const getAllBookingsAdmin = async (req, res) => {
+  try {
+    const { status = 'All', page = 1, limit = 10 } = req.query;
+    
+    // Define allowed statuses
+    const allowedStatuses = ['All', 'PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
+    
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ 
+        error: "Invalid status. Allowed values: All, PENDING, ASSIGNED, PICKEDUP, COMPLETED, CANCELLED" 
+      });
+    }
+
+    // Build filter based on status
+    let filter = {};
+    if (status !== 'All') {
+      filter.status = status;
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Get bookings with minimal details for listing
+    const bookings = await booking.find(filter)
+      .select('bookingId vehicleType pickUpDate pickUpTime pickUpLocation dropLocation bookingType status bookingAmount bookedBy recivedBy createdAt')
+      .populate('bookedBy', 'name phoneNumber city userType')
+      .populate('recivedBy', 'name phoneNumber city userType')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .lean();
+
+    // Get total count for pagination
+    const totalBookings = await booking.countDocuments(filter);
+    const totalPages = Math.ceil(totalBookings / limit);
+
+    // Get status counts for dashboard
+    const statusCounts = await booking.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const statusSummary = {
+      PENDING: 0,
+      ASSIGNED: 0,
+      PICKEDUP: 0,
+      COMPLETED: 0,
+      CANCELLED: 0
+    };
+
+    statusCounts.forEach(item => {
+      statusSummary[item._id] = item.count;
+    });
+
+    return res.status(200).json({
+      message: "Bookings retrieved successfully.",
+      bookings,
+      statusSummary,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalBookings,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
+    });
+  } catch (error) {
+    console.error("Get All Bookings Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+// Get Specific Booking Details - Admin endpoint
+export const getBookingDetails = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    if (!bookingId) {
+      return res.status(400).json({ error: "Booking ID is required." });
+    }
+
+    // Get booking with all details and populate user info
+    const bookingDetails = await booking.findOne({ bookingId })
+      .populate('bookedBy', 'name phoneNumber email city userType aadharNumber drivingLicenceNumber userImage isSubscribed isUserVerified')
+      .populate('recivedBy', 'name phoneNumber email city userType aadharNumber drivingLicenceNumber userImage')
+      .populate('paymentRequests.requestedTo', 'name phoneNumber city userType')
+      .lean();
+
+    if (!bookingDetails) {
+      return res.status(404).json({ error: "Booking not found." });
+    }
+
+    // Get related messages for this booking
+    const messages = await Message.find({
+      $or: [
+        { sender: bookingDetails.bookedBy._id },
+        { receiver: bookingDetails.bookedBy._id },
+        ...(bookingDetails.recivedBy ? [
+          { sender: bookingDetails.recivedBy._id },
+          { receiver: bookingDetails.recivedBy._id }
+        ] : [])
+      ]
+    })
+    .populate('sender', 'name phoneNumber')
+    .populate('receiver', 'name phoneNumber')
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
+
+    bookingDetails.recentMessages = messages;
+
+    return res.status(200).json({
+      message: "Booking details retrieved successfully.",
+      booking: bookingDetails
+    });
+  } catch (error) {
+    console.error("Get Booking Details Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};

@@ -1,9 +1,8 @@
-import { auth } from "../../lib/types"
+
 import img from '../../assets/logo.png'
+
+
 const Navbar = () => {
-  const storedData  : any = localStorage.getItem('auth')
-  const auth : auth = JSON.parse(storedData)
-  const user = auth?.authInfo
   return (
     <div className='w-full h-[10vh] py-4 bg-white fixed top-0 left-0 md:px-10 shadow flex items-center justify-between z-40'>
       <div>
@@ -14,8 +13,8 @@ const Navbar = () => {
           <img src="https://uxwing.com/wp-content/themes/uxwing/download/peoples-avatars/man-user-circle-icon.png" alt="" />
         </div>
         <div className=' flex flex-col items-start justify-center '>
-          <h1 className='font-bold text-sm'>{user?.name}</h1>
-          <p className='text-xs'>{user?.email}</p>
+          <h1 className='font-bold text-sm'>admin</h1>
+          <p className='text-xs'>admin@bharatyaatri.com</p>
         </div>
       </div>
     </div>
