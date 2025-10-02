@@ -1,4 +1,4 @@
-import { FaEye, FaCalendar, FaCar } from "react-icons/fa";
+import { FaEye, FaCalendar, FaCar, FaSearch, FaTimes } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import URL from "../../lib/url";
@@ -59,6 +59,8 @@ const AllBookings = () => {
     const [limit, setLimit] = useState('10');
     const [searchParams] = useSearchParams();
     const [status, setStatus] = useState('All');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchInput, setSearchInput] = useState('');
     const [data, setData] = useState<Booking[]>([]);
     const [statusSummary, setStatusSummary] = useState({
         PENDING: 0,
@@ -87,6 +89,28 @@ const AllBookings = () => {
         }
     }, [searchParams]);
 
+    // Debounce search input
+    useEffect(() => {
+        const delayedSearch = setTimeout(() => {
+            setSearchQuery(searchInput);
+            setPage(1); // Reset to first page when searching
+        }, 500); // 500ms delay
+
+        return () => clearTimeout(delayedSearch);
+    }, [searchInput]);
+
+    // Handle search input change
+    const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setSearchInput(e.target.value);
+    };
+
+    // Clear search
+    const clearSearch = () => {
+        setSearchInput('');
+        setSearchQuery('');
+        setPage(1);
+    };
+
     const fetchData = async () => {
         const storedData: any = localStorage.getItem('auth');
         const auth: auth = JSON.parse(storedData);
@@ -94,8 +118,16 @@ const AllBookings = () => {
         setLoading(true);
         
         try {
+            // Build query parameters
+            const queryParams = new URLSearchParams({
+                status: status,
+                page: page.toString(),
+                limit: limit,
+                ...(searchQuery && { search: searchQuery })
+            });
+
             const res = await axios.get<BookingResponse>(
-                `${URL}/api/v2/booking/admin/all?status=${status}&page=${page}&limit=${limit}`, 
+                `${URL}/api/v2/booking/admin/all?${queryParams.toString()}`, 
                 {
                     headers: {
                         "Authorization": "Bearer " + token
@@ -128,7 +160,7 @@ const AllBookings = () => {
 
     useEffect(() => {
         fetchData();
-    }, [page, limit, status]);
+    }, [page, limit, status, searchQuery]);
 
     const getPageTitle = () => {
         switch(status) {
@@ -199,24 +231,78 @@ const AllBookings = () => {
                         </div>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-                        <div className='flex gap-4'>
-                            {/* <select 
-                                name='status' 
-                                value={status}
-                                className="border rounded p-2 w-full sm:w-auto text-gray-700 cursor-pointer" 
+                    {/* Search and Controls */}
+                    <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center mb-6 gap-4">
+                        {/* Search Bar */}
+                        <div className="relative flex-1 max-w-md">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FaSearch className="h-4 w-4 text-gray-400" />
+                            </div>
+                            <input
+                                type="text"
+                                value={searchInput}
+                                onChange={handleSearchChange}
+                                placeholder="Search by booking ID, name, phone, vehicle type, location..."
+                                className="block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#fb651e] focus:border-transparent"
+                            />
+                            {searchInput && (
+                                <button
+                                    onClick={clearSearch}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                                >
+                                    <FaTimes className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Controls */}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <select 
+                                name='limit' 
+                                value={limit}
+                                className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#fb651e] focus:border-transparent" 
                                 onChange={(e) => {
-                                    setStatus(e.target.value);
+                                    setLimit(e.target.value);
                                     setPage(1);
                                 }} 
                             >
-                                <option value='All'>All Bookings</option>
-                                <option value='PENDING'>Pending</option>
-                                <option value='ASSIGNED'>Assigned</option>
-                                <option value='PICKEDUP'>Picked Up</option>
-                                <option value='COMPLETED'>Completed</option>
-                                <option value='CANCELLED'>Cancelled</option>
-                            </select> */}
+                                <option value='10'>10 per page</option>
+                                <option value='25'>25 per page</option>
+                                <option value='50'>50 per page</option>
+                                <option value='100'>100 per page</option>
+                            </select>
+                            
+                            <button 
+                                className="px-4 py-2 border border-gray-800 flex justify-center items-center gap-2 rounded-lg cursor-pointer font-medium hover:bg-gray-50 transition-colors" 
+                                onClick={() => exportToExcel(data)}
+                            >
+                                <FaFileExport className="translate-y-[1px]" />Export
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Search Results Info */}
+                    {searchQuery && (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-blue-700">
+                                    Search results for: <strong>"{searchQuery}"</strong>
+                                    {pagination.totalBookings > 0 && (
+                                        <span className="ml-2">({pagination.totalBookings} found)</span>
+                                    )}
+                                </span>
+                                <button
+                                    onClick={clearSearch}
+                                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                >
+                                    Clear search
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
+                        <div className='flex gap-4'>
                             <select 
                                 name='limit' 
                                 value={limit}
@@ -245,7 +331,9 @@ const AllBookings = () => {
                     {loading ? (
                         <div className="flex justify-center items-center py-8">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#fb651e]"></div>
-                            <span className="ml-2 text-gray-600">Loading bookings...</span>
+                            <span className="ml-2 text-gray-600">
+                                {searchQuery ? 'Searching bookings...' : 'Loading bookings...'}
+                            </span>
                         </div>
                     ) : (
                         <div className="rounded-xl overflow-x-scroll scrolbar border border-gray-300 shadow-md bg-white">
@@ -267,8 +355,21 @@ const AllBookings = () => {
                                 <tbody>
                                     {data.length === 0 ? (
                                         <tr className="border-b hover:bg-gray-50 transition text-center">
-                                            <td className="py-4 px-6 font-semibold text-gray-600" colSpan={10}>
-                                                No bookings found.
+                                            <td className="py-8 px-6 font-semibold text-gray-600" colSpan={9}>
+                                                {searchQuery ? (
+                                                    <div className="flex flex-col items-center gap-2">
+                                                        <FaSearch className="text-gray-400 text-2xl" />
+                                                        <span>No bookings found matching "{searchQuery}"</span>
+                                                        <button
+                                                            onClick={clearSearch}
+                                                            className="text-[#fb651e] hover:underline text-sm font-medium"
+                                                        >
+                                                            Clear search to see all bookings
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    "No bookings found."
+                                                )}
                                             </td>
                                         </tr>
                                     ) : (
@@ -359,7 +460,7 @@ const AllBookings = () => {
                                 <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
                                     <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                                         <div className="text-sm text-gray-600">
-                                            Showing {((pagination?.currentPage || 1 - 1) * parseInt(limit)) + 1} to {Math.min((pagination?.currentPage || 1) * parseInt(limit), pagination?.totalBookings || 0)} of {pagination?.totalBookings || 0} bookings
+                                            Showing {((pagination?.currentPage || 1 - 1) * parseInt(limit)) + 1} to {Math.min((pagination?.currentPage || 1) * parseInt(limit), pagination?.totalBookings || 0)} of {pagination?.totalBookings || 0} {searchQuery ? 'search results' : 'bookings'}
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <button

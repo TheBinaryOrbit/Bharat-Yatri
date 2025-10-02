@@ -451,10 +451,10 @@ export const recivebooking = async (req, res) => {
   }
 }
 
-// Get All Bookings - Admin endpoint with status filter
+// Get All Bookings - Admin endpoint with status filter and search
 export const getAllBookingsAdmin = async (req, res) => {
   try {
-    const { status = 'All', page = 1, limit = 10 } = req.query;
+    const { status = 'All', page = 1, limit = 10, search = '' } = req.query;
     
     // Define allowed statuses
     const allowedStatuses = ['All', 'PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
@@ -471,20 +471,157 @@ export const getAllBookingsAdmin = async (req, res) => {
       filter.status = status;
     }
 
+    // Build search filter if search query provided
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), 'i'); // case-insensitive search
+      
+      // Create an array of search conditions
+      const searchConditions = [
+        { bookingId: searchRegex },
+        { vehicleType: searchRegex },
+        { pickUpLocation: searchRegex },
+        { dropLocation: searchRegex },
+        { bookingType: searchRegex },
+        { 'bookedBy.name': searchRegex },
+        { 'bookedBy.phoneNumber': searchRegex },
+        { 'bookedBy.city': searchRegex },
+        { 'recivedBy.name': searchRegex },
+        { 'recivedBy.phoneNumber': searchRegex },
+        { 'recivedBy.city': searchRegex }
+      ];
+
+      // If the search term looks like a phone number (contains only digits and is 10 digits)
+      if (/^\d{10}$/.test(search.trim())) {
+        searchConditions.push(
+          { 'bookedBy.phoneNumber': search.trim() },
+          { 'recivedBy.phoneNumber': search.trim() }
+        );
+      }
+
+      // Add search conditions to filter using $or operator
+      filter.$or = searchConditions;
+    }
+
     const skip = (page - 1) * limit;
 
-    // Get bookings with minimal details for listing
-    const bookings = await booking.find(filter)
-      .select('bookingId vehicleType pickUpDate pickUpTime pickUpLocation dropLocation bookingType status bookingAmount bookedBy recivedBy createdAt')
-      .populate('bookedBy', 'name phoneNumber city userType')
-      .populate('recivedBy', 'name phoneNumber city userType')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    // Get bookings with minimal details for listing using aggregation for better search
+    const bookings = await booking.aggregate([
+      // Lookup for bookedBy user details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'bookedBy',
+          foreignField: '_id',
+          as: 'bookedBy'
+        }
+      },
+      {
+        $unwind: {
+          path: '$bookedBy',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Lookup for recivedBy user details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'recivedBy',
+          foreignField: '_id',
+          as: 'recivedBy'
+        }
+      },
+      {
+        $unwind: {
+          path: '$recivedBy',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Apply filters
+      {
+        $match: filter
+      },
+      // Project only required fields
+      {
+        $project: {
+          bookingId: 1,
+          vehicleType: 1,
+          pickUpDate: 1,
+          pickUpTime: 1,
+          pickUpLocation: 1,
+          dropLocation: 1,
+          bookingType: 1,
+          status: 1,
+          bookingAmount: 1,
+          createdAt: 1,
+          'bookedBy._id': 1,
+          'bookedBy.name': 1,
+          'bookedBy.phoneNumber': 1,
+          'bookedBy.city': 1,
+          'bookedBy.userType': 1,
+          'recivedBy._id': 1,
+          'recivedBy.name': 1,
+          'recivedBy.phoneNumber': 1,
+          'recivedBy.city': 1,
+          'recivedBy.userType': 1
+        }
+      },
+      // Sort by creation date
+      {
+        $sort: { createdAt: -1 }
+      },
+      // Skip and limit for pagination
+      {
+        $skip: skip
+      },
+      {
+        $limit: parseInt(limit)
+      }
+    ]);
 
-    // Get total count for pagination
-    const totalBookings = await booking.countDocuments(filter);
+    // Get total count for pagination (using same filter)
+    const totalCountPipeline = [
+      // Lookup for bookedBy user details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'bookedBy',
+          foreignField: '_id',
+          as: 'bookedBy'
+        }
+      },
+      {
+        $unwind: {
+          path: '$bookedBy',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Lookup for recivedBy user details
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'recivedBy',
+          foreignField: '_id',
+          as: 'recivedBy'
+        }
+      },
+      {
+        $unwind: {
+          path: '$recivedBy',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      // Apply same filters
+      {
+        $match: filter
+      },
+      // Count documents
+      {
+        $count: "totalBookings"
+      }
+    ];
+
+    const totalCountResult = await booking.aggregate(totalCountPipeline);
+    const totalBookings = totalCountResult.length > 0 ? totalCountResult[0].totalBookings : 0;
     const totalPages = Math.ceil(totalBookings / limit);
 
     // Get status counts for dashboard
