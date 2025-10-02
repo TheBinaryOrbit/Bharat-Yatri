@@ -502,3 +502,29 @@ export const getUserDetails = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
+
+export const searchUserByPhoneNumber = async (req, res) => {
+    try {
+        const { phoneNumber } = req.params;
+
+        if (!phoneNumber) {
+            return res.status(400).json({ error: "Phone number is required." });
+        }
+
+        // Suggest users by partial phone number
+        const users = await User.find(
+            { phoneNumber: { $regex: phoneNumber, $options: "i" } }, // case-insensitive search
+            { _id: 1, name: 1, phoneNumber: 1 } // only return id, name, phoneNumber
+        ).lean();
+
+        if (!users.length) {
+            return res.status(404).json({ error: "No users found." });
+        }
+
+        return res.json(users);
+    } catch (error) {
+        console.error("Search User by Phone Number Error:", error);
+        return res.status(500).json({ error: "Internal Server Error" });
+    }
+};

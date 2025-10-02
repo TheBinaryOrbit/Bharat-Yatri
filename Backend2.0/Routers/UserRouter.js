@@ -1,5 +1,5 @@
 import express from 'express';
-import { checkUser, createUser, GetOTP, getUserById, offUserAlerts, onUserAlerts, updateUser, uploadUserPhoto, verifyOTP, getAllUsers, getUserDetails } from '../Controller/UserController.js';
+import { checkUser, createUser, GetOTP, getUserById, offUserAlerts, onUserAlerts, updateUser, uploadUserPhoto, verifyOTP, getAllUsers, getUserDetails, searchUserByPhoneNumber } from '../Controller/UserController.js';
 
 export const UserRouter = express.Router();
 
@@ -21,3 +21,5 @@ UserRouter.post('/upload/:id', uploadUserPhoto);
 // Admin routes for user management
 UserRouter.get('/admin/all', getAllUsers);  // GET /api/user/admin/all?subscriptionStatus=all&page=1&limit=10
 UserRouter.get('/admin/details/:userId', getUserDetails);  // GET /api/user/admin/details/:userId
+
+UserRouter.get('/admin/search/:phoneNumber', searchUserByPhoneNumber);
