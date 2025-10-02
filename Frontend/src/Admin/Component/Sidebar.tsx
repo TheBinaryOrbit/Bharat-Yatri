@@ -3,7 +3,7 @@ import { BiMenuAltRight } from 'react-icons/bi';
 import { IoLogOutOutline } from "react-icons/io5";
 import { NavLink, useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify';
-import { FaUsers, FaCar , FaDashcube } from 'react-icons/fa';
+import { FaUsers, FaCar , FaDashcube, FaPlus } from 'react-icons/fa';
 
 
 const Sidebar = () => {
@@ -199,6 +199,25 @@ const Sidebar = () => {
                                 </div>
                             </li>
                         </ul>
+                    </NavLink>
+
+
+                    <div className="w-full h-8 px-3 flex items-center pl-0 mb-2 mt-2">
+                        <h6 className="text-gray-500 text-sm font-semibold">Seeting</h6>
+                    </div>
+                    <NavLink to={'/admin/addride'}>
+                    <ul className="flex flex-col gap-2">
+                        <li>
+                            <div className={`flex-col p-3 hover:bg-blue-100 duration-300 rounded-lg ml-2 cursor-pointer`}>
+                                <div className="h-5 flex gap-3">
+                                    <div className="relative">
+                                        <p className='text-sm translate-y-1'><FaPlus /></p>
+                                    </div>
+                                    <h2 className="text-gray-500 text-sm font-medium">Add Ride</h2>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
                     </NavLink>
 
 

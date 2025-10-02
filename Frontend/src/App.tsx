@@ -10,6 +10,8 @@ import SpecificUser from './Admin/User/SpecificUser'
 
 import AllBookings from './Admin/Bookings/AllBookings'
 import BookingDetails from './Admin/Bookings/BookingDetails'
+import AddBookings from './Admin/Bookings/AddBookings'
+
 function App() {
   return (
     <Router>
@@ -28,6 +30,7 @@ function App() {
           
           {/* Booking Management Routes */}
           <Route path='/admin/bookings' element={<AllBookings />} />
+          <Route path='/admin/addride' element={<AddBookings />} />
           <Route path='/admin/booking/details/:bookingId' element={<BookingDetails />} />
           
           
