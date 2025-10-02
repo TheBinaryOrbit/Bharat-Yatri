@@ -5,6 +5,7 @@ import { auth } from "../../lib/types";
 import { toast } from "react-toastify";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaUser, FaCar, FaMapMarkerAlt, FaCalendar, FaClock, FaRupeeSign, FaPhone, FaEnvelope, FaIdCard } from "react-icons/fa";
+import { PiPaypalLogoLight } from "react-icons/pi";
 
 interface BookingDetails {
     _id: string;
@@ -36,6 +37,7 @@ interface BookingDetails {
         isSubscribed: boolean;
         isUserVerified: boolean;
     };
+    payeeUpiId?: string;
     recivedBy?: {
         _id: string;
         name: string;
@@ -364,6 +366,10 @@ const BookingDetails = () => {
                                         <div className="flex items-center gap-2">
                                             <FaMapMarkerAlt className="text-gray-400" />
                                             <span className="text-sm">{booking.recivedBy.city}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <PiPaypalLogoLight className="text-gray-400" />
+                                            <span className="text-sm">{booking?.payeeUpiId || 'N/A'}</span>
                                         </div>
                                         {booking.recivedBy.drivingLicenceNumber && (
                                             <div className="flex items-center gap-2">

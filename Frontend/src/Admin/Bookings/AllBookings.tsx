@@ -301,32 +301,6 @@ const AllBookings = () => {
                         </div>
                     )}
 
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-2">
-                        <div className='flex gap-4'>
-                            <select 
-                                name='limit' 
-                                value={limit}
-                                className="border rounded p-2 w-full sm:w-auto text-gray-700 cursor-pointer" 
-                                onChange={(e) => {
-                                    setLimit(e.target.value);
-                                    setPage(1);
-                                }} 
-                            >
-                                <option value='10'>10 per page</option>
-                                <option value='25'>25 per page</option>
-                                <option value='50'>50 per page</option>
-                                <option value='100'>100 per page</option>
-                            </select>
-                        </div>
-                        <div className='flex gap-4 flex-col sm:flex-row'>
-                            <button 
-                                className="px-4 py-2 border border-gray-800 flex justify-center items-center gap-2 rounded-lg cursor-pointer font-medium" 
-                                onClick={() => exportToExcel(data)}
-                            >
-                                <FaFileExport className="translate-y-[1px]" />Export
-                            </button>
-                        </div>
-                    </div>
 
                     {loading ? (
                         <div className="flex justify-center items-center py-8">
@@ -398,15 +372,7 @@ const AllBookings = () => {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                {/* <td className="py-4 px-6 max-w-xs">
-                                                    <div className="flex items-start gap-2">
-                                                        <FaMapMarkerAlt className="text-gray-400 mt-1 flex-shrink-0" />
-                                                        <div className="text-sm">
-                                                            <div className="font-medium truncate">{booking.pickUpLocation}</div>
-                                                            <div className="text-gray-500 truncate">→ {booking.dropLocation}</div>
-                                                        </div>
-                                                    </div>
-                                                </td> */}
+                                                
                                                 <td className="py-4 px-6">
                                                     <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
                                                         {booking?.bookingType || 'N/A'}
