@@ -575,3 +575,59 @@ export const getBookingDetails = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+// Get Location Suggestions - Google Places API
+export const getLocationSuggestions = async (req, res) => {
+  try {
+    const { keyword } = req.query;
+
+    if (!keyword || keyword.trim().length < 2) {
+      return res.status(400).json({ 
+        error: "Keyword is required and must be at least 2 characters long." 
+      });
+    }
+
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    
+    if (!apiKey) {
+      return res.status(500).json({ 
+        error: "Google Places API key not configured." 
+      });
+    }
+
+    // Google Places Autocomplete API URL
+    const apiUrl = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(keyword)}&key=${apiKey}&types=geocode&components=country:in`;
+
+    const response = await fetch(apiUrl);
+    const data = await response.json();
+
+    if (data.status === 'OK') {
+      const suggestions = data.predictions.map(prediction => ({
+        place_id: prediction.place_id,
+        description: prediction.description,
+        main_text: prediction.structured_formatting?.main_text || '',
+        secondary_text: prediction.structured_formatting?.secondary_text || '',
+        types: prediction.types
+      }));
+
+      return res.status(200).json({
+        message: "Location suggestions retrieved successfully.",
+        suggestions
+      });
+    } else if (data.status === 'ZERO_RESULTS') {
+      return res.status(200).json({
+        message: "No location suggestions found.",
+        suggestions: []
+      });
+    } else {
+      console.error("Google Places API Error:", data);
+      return res.status(500).json({ 
+        error: "Failed to fetch location suggestions." 
+      });
+    }
+
+  } catch (error) {
+    console.error("Get Location Suggestions Error:", error);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+};
