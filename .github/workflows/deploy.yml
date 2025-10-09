@@ -27,8 +27,9 @@ jobs:
             cd Backend2.0
             npm install
             pm2 restart 17
-            cd ..
-            cd Bharat-Yatri/Frontend
+            cd
+            cd Bharat-Yatri
+            cd Frontend
             npm install
             npm run build
             sudo rm -rf /var/www/admin/*
