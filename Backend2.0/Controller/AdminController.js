@@ -155,8 +155,8 @@ export const processBookingPayout = async (req, res) => {
             reference_id: `booking_${bookingId}`,
             booking_id: bookingId,
             user_id: userId,
-            payout_type: userId === bookingDetails.bookedBy._id.toString() ? 'refund' : 'commission',
-            idempotency_key: bookingDetails._id.toString()
+            payout_type : userId === bookingDetails.bookedBy._id.toString() ? 'refund' : 'commission',
+            idempotency_key: `booking_${userId === bookingDetails.bookedBy._id.toString() ? 'refund' : 'commission'}_${bookingDetails._id.toString()}`
         };
 
         const payoutResponse = await createRazorpayPayout(payoutData);

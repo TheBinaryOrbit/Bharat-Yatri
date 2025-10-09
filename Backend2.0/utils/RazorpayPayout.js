@@ -130,22 +130,39 @@ export const createRazorpayFundAccount = async (contactId, upiId) => {
  */
 export const createRazorpayPayout = async (payoutData) => {
   try {
+    // Create a clean narration without special characters
+    const cleanBookingId = payoutData.booking_id.replace(/[^a-zA-Z0-9]/g, '');
+    const narration = cleanNarrationText(`Bharat Yatri Payout ${cleanBookingId}`);
+    
+    // Create a clean reference ID
+    const cleanRefId = cleanReferenceId(`booking_${cleanBookingId}_${Date.now()}`);
+    
     const payoutPayload = {
-      account_number: process.env.RAZORPAY_ACCOUNT_NUMBER, // Add this to your .env
+      account_number: process.env.RAZORPAY_ACCOUNT_NUMBER,
       fund_account_id: payoutData.fund_account_id,
       amount: Math.round(parseFloat(payoutData.amount) * 100), // Convert to paise
       currency: 'INR',
       mode: 'UPI',
       purpose: 'refund',
       queue_if_low_balance: true,
-      reference_id: payoutData.reference_id,
-      narration: `Payout for Booking #${payoutData.booking_id}`,
+      reference_id: cleanRefId,
+      narration: narration,
       notes: {
         booking_id: payoutData.booking_id,
         user_id: payoutData.user_id,
-        payout_type: payoutData.payout_type
+        payout_type: payoutData.payout_type,
+        original_reference: payoutData.reference_id
       }
     };
+
+    // Validate payload before sending
+    const validation = validatePayoutPayload(payoutPayload);
+    if (!validation.isValid) {
+      return {
+        success: false,
+        error: `Validation failed: ${validation.errors.join(', ')}`
+      };
+    }
 
     const headers = {
       'X-Payout-Idempotency': payoutData.idempotency_key
@@ -361,4 +378,69 @@ export const isInvalidUpiError = (errorMessage) => {
   return invalidUpiKeywords.some(keyword => 
     errorMessage.toLowerCase().includes(keyword.toLowerCase())
   );
+};
+
+/**
+ * Validate and clean narration text for Razorpay
+ * @param {string} text - Text to clean
+ * @returns {string} Cleaned text
+ */
+export const cleanNarrationText = (text) => {
+  // Remove special characters and limit to 30 characters
+  return text
+    .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
+    .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+    .trim()
+    .substring(0, 30); // Limit to 30 characters
+};
+
+/**
+ * Validate and clean reference ID for Razorpay
+ * @param {string} referenceId - Reference ID to clean
+ * @returns {string} Cleaned reference ID
+ */
+export const cleanReferenceId = (referenceId) => {
+  // Remove special characters except underscore and hyphen
+  return referenceId
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .substring(0, 40); // Limit to 40 characters
+};
+
+/**
+ * Validate payout payload before sending to Razorpay
+ * @param {Object} payoutPayload - Payout payload to validate
+ * @returns {Object} Validation result
+ */
+export const validatePayoutPayload = (payoutPayload) => {
+  const errors = [];
+
+  // Validate account number
+  if (!payoutPayload.account_number) {
+    errors.push('Account number is required');
+  }
+
+  // Validate fund account ID
+  if (!payoutPayload.fund_account_id || !payoutPayload.fund_account_id.startsWith('fa_')) {
+    errors.push('Valid fund account ID is required');
+  }
+
+  // Validate amount
+  if (!payoutPayload.amount || payoutPayload.amount < 100) {
+    errors.push('Amount must be at least ₹1 (100 paise)');
+  }
+
+  // Validate narration length
+  if (payoutPayload.narration && payoutPayload.narration.length > 30) {
+    errors.push('Narration must be 30 characters or less');
+  }
+
+  // Validate reference ID length
+  if (payoutPayload.reference_id && payoutPayload.reference_id.length > 40) {
+    errors.push('Reference ID must be 40 characters or less');
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
 };
