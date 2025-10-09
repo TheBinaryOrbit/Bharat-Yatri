@@ -134,9 +134,51 @@ const BookingSchema = new mongoose.Schema({
     }
   ],
 
+  payeeUpiId: {
+    type: String,
+    trim: true,
+    match: [/^\w+@\w+$/, 'Invalid UPI ID format']
+  },
+
   isPaid: {
     type: Boolean,
     default: false
+  },
+
+  // Settlement/Payout tracking fields
+  settlementStatus: {
+    type: String,
+    enum: ['unpaid', 'partiallypaid', 'fullpaid'],
+    default: 'unpaid'
+  },
+  razorpayContactId: {
+    type: String,
+    trim: true
+  },
+  razorpayFundAccountId: {
+    type: String,
+    trim: true
+  },
+  razorpayPayoutId: {
+    type: String,
+    trim: true
+  },
+  payoutAmount: {
+    type: String,
+    trim: true,
+    match: [/^\d+(\.\d{1,2})?$/, 'Invalid payout amount format']
+  },
+  payoutStatus: {
+    type: String,
+    enum: ['pending', 'queued', 'processing', 'processed', 'cancelled', 'failed'],
+    default: 'pending'
+  },
+  payoutInitiatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'admin'
+  },
+  payoutInitiatedAt: {
+    type: Date
   },
 }, {
   timestamps: true,

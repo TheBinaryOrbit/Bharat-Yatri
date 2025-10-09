@@ -409,12 +409,15 @@ export const recivebooking = async (req, res) => {
       return res.status(400).json({ error: "Invalid payment signature." });
     }
 
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
     const bookingDetails = await booking.findOneAndUpdate(
       { bookingId: id },
       {
         $set: {
           status: "ASSIGNED",
           recivedBy,
+          payeeUpiId : payment.vpa,
           isPaid: true,
         },
       },
