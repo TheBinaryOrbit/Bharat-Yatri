@@ -28,7 +28,7 @@ interface BookingDetails {
     upiId?: string;
     isPaid: boolean;
     payoutStatus?: string;
-    payoutAmount?: number;
+    payoutAmount?: string;
     bookedBy: {
         _id: string;
         name: string;
@@ -684,10 +684,10 @@ ${payoutData.payout.razorpayData ? `• UTR: ${payoutData.payout.razorpayData.ut
                                         Commission: ₹{booking.commissionAmount || '0'}
                                     </p>
                                     <p className="text-blue-600">
-                                        Max: ₹{booking.commissionAmount || '0'}
+                                        Max: ₹{parseFloat(booking.commissionAmount || '0') - parseFloat(booking.payoutAmount || '0') || '0'}
                                     </p>
                                 </div>
-                                {payoutForm.amount && parseFloat(payoutForm.amount) > parseFloat(booking.commissionAmount || '0') && (
+                                {payoutForm.amount && parseFloat(payoutForm.amount) > ((parseFloat(booking.commissionAmount || '0') - parseFloat(booking.payoutAmount || '0'))) && (
                                     <p className="text-red-500 text-xs mt-1">
                                         Payout amount cannot exceed commission amount
                                     </p>
