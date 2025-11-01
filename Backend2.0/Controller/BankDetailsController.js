@@ -14,6 +14,8 @@ export const addBankDetails = async (req, res) => {
       return res.status(409).json({ error: "Bank details already exist for this user." });
     }
 
+    console.log("Adding Bank Details:", req.body);
+
     const newDetails = await BankDetails.create({
       accountHolderName,
       accountNumber,
