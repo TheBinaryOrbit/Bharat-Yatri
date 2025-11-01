@@ -80,9 +80,9 @@ export const processBookingPayout = async (req, res) => {
         }
 
         // Check if payout already exists for this booking and user
-        if (bookingDetails.razorpayPayoutId) {
+        if (bookingDetails.payoutAmount === bookingDetails.commissionAmount) {
             return res.status(409).json({
-                error: "Payout already processed for this booking."
+                error: "Max Payout has been already initiated for this booking."
             });
         }
 
