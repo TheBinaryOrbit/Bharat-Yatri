@@ -1,20 +1,21 @@
 import Admin from "../Model/admin.js";
 import { matchedPassword } from "../utils/password.js";
 import { booking } from "../Model/BookingModel.js";
-import { 
-  createRazorpayContact, 
-  createRazorpayFundAccount, 
-  createRazorpayPayout,
-  getRazorpayPayoutStatus,
-  mapPayoutStatus,
+import {
+    createRazorpayContact,
+    createRazorpayFundAccount,
+    createRazorpayPayout,
+    getRazorpayPayoutStatus,
+    mapPayoutStatus,
 } from "../utils/RazorpayPayout.js";
+import { BankDetails } from "../Model/BankDetailsModel.js";
 
 export const loginAdmin = async (req, res) => {
     const { email, password } = req.body;
     try {
 
         const admin = await Admin.findOne({ email });
-        
+
         if (!admin) {
             return res.status(401).json({ message: "Invalid email or password" });
         }
@@ -41,15 +42,15 @@ export const processBookingPayout = async (req, res) => {
 
         // Validate required fields
         if (!bookingId || !userId || !amount) {
-            return res.status(400).json({ 
-                error: "Booking ID, User ID, and amount are required." 
+            return res.status(400).json({
+                error: "Booking ID, User ID, and amount are required."
             });
         }
 
         // Validate amount format
         if (!/^\d+(\.\d{1,2})?$/.test(amount) || parseFloat(amount) <= 0) {
-            return res.status(400).json({ 
-                error: "Invalid amount format. Amount must be a positive number." 
+            return res.status(400).json({
+                error: "Invalid amount format. Amount must be a positive number."
             });
         }
 
@@ -73,27 +74,27 @@ export const processBookingPayout = async (req, res) => {
             targetUser = bookingDetails.recivedBy;
             upiId = bookingDetails.payeeUpiId;
         } else {
-            return res.status(400).json({ 
-                error: "User ID does not match booking participants." 
+            return res.status(400).json({
+                error: "User ID does not match booking participants."
             });
         }
 
         if (!upiId) {
-            return res.status(400).json({ 
-                error: "UPI ID not found for the specified user." 
+            return res.status(400).json({
+                error: "UPI ID not found for the specified user."
             });
         }
 
         // Check if payout already exists for this booking and user
         if (bookingDetails.razorpayPayoutId) {
-            return res.status(409).json({ 
-                error: "Payout already processed for this booking." 
+            return res.status(409).json({
+                error: "Payout already processed for this booking."
             });
         }
 
         // Step 1: Create or fetch Razorpay contact
         let contactId = bookingDetails.razorpayContactId;
-        
+
         if (!contactId) {
             const contactData = {
                 name: targetUser.name,
@@ -105,16 +106,16 @@ export const processBookingPayout = async (req, res) => {
             };
 
             const contactResponse = await createRazorpayContact(contactData);
-            
+
             if (!contactResponse.success) {
-                return res.status(500).json({ 
+                return res.status(500).json({
                     error: "Failed to create Razorpay contact.",
                     details: contactResponse.error
                 });
             }
 
             contactId = contactResponse.data.id;
-            
+
             // Update booking with contact ID
             await booking.findByIdAndUpdate(bookingDetails._id, {
                 razorpayContactId: contactId
@@ -123,19 +124,22 @@ export const processBookingPayout = async (req, res) => {
 
         // Step 2: Create or fetch fund account
         let fundAccountId = bookingDetails.razorpayFundAccountId;
-        
+
+        // fetch the bank account details from booking
+        const bankAccountDetails = BankDetails.findOne({ userId: targetUser._id });
+
         if (!fundAccountId) {
-            const fundAccountResponse = await createRazorpayFundAccount(contactId, upiId);
-            
+            const fundAccountResponse = await createRazorpayFundAccount(contactId, bankAccountDetails.accountHolderName, bankAccountDetails.ifscCode, bankAccountDetails.accountNumber);
+
             if (!fundAccountResponse.success) {
-                return res.status(500).json({ 
+                return res.status(500).json({
                     error: "Failed to create fund account.",
                     details: fundAccountResponse.error
                 });
             }
 
             fundAccountId = fundAccountResponse.data.id;
-            
+
             // Update booking with fund account ID
             await booking.findByIdAndUpdate(bookingDetails._id, {
                 razorpayFundAccountId: fundAccountId
@@ -149,14 +153,14 @@ export const processBookingPayout = async (req, res) => {
             reference_id: `booking_${bookingId}`,
             booking_id: bookingId,
             user_id: userId,
-            payout_type : userId === bookingDetails.bookedBy._id.toString() ? 'refund' : 'commission',
+            payout_type: userId === bookingDetails.bookedBy._id.toString() ? 'refund' : 'commission',
             idempotency_key: `${userId === bookingDetails.bookedBy._id.toString() ? 'ref' : 'comm'}_${bookingDetails._id.toString()}`
         };
 
         const payoutResponse = await createRazorpayPayout(payoutData);
-        
+
         if (!payoutResponse.success) {
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: "Failed to create payout.",
                 details: payoutResponse.error
             });
@@ -199,7 +203,7 @@ export const processBookingPayout = async (req, res) => {
 
     } catch (error) {
         console.error("Process Booking Payout Error:", error);
-        return res.status(500).json({ 
+        return res.status(500).json({
             error: "Internal Server Error",
             details: error.message
         });
@@ -226,7 +230,7 @@ export const checkPayoutStatus = async (req, res) => {
         }
 
         if (!bookingDetails.razorpayPayoutId) {
-            return res.status(404).json({ 
+            return res.status(404).json({
                 error: "No payout found for this booking.",
                 settlementStatus: bookingDetails.settlementStatus
             });
@@ -234,9 +238,9 @@ export const checkPayoutStatus = async (req, res) => {
 
         // Fetch latest payout status from Razorpay
         const payoutStatusResponse = await getRazorpayPayoutStatus(bookingDetails.razorpayPayoutId);
-        
+
         if (!payoutStatusResponse.success) {
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: "Failed to fetch payout status.",
                 details: payoutStatusResponse.error
             });
@@ -248,8 +252,8 @@ export const checkPayoutStatus = async (req, res) => {
         if (latestStatus !== bookingDetails.payoutStatus) {
             await booking.findByIdAndUpdate(bookingDetails._id, {
                 payoutStatus: latestStatus,
-                settlementStatus: latestStatus === 'processed' ? 'fullpaid' : 
-                                 latestStatus === 'failed' ? 'unpaid' : 'partiallypaid'
+                settlementStatus: latestStatus === 'processed' ? 'fullpaid' :
+                    latestStatus === 'failed' ? 'unpaid' : 'partiallypaid'
             });
         }
 
@@ -264,14 +268,14 @@ export const checkPayoutStatus = async (req, res) => {
             },
             booking: {
                 bookingId: bookingDetails.bookingId,
-                settlementStatus: latestStatus === 'processed' ? 'fullpaid' : 
-                                 latestStatus === 'failed' ? 'unpaid' : 'partiallypaid'
+                settlementStatus: latestStatus === 'processed' ? 'fullpaid' :
+                    latestStatus === 'failed' ? 'unpaid' : 'partiallypaid'
             }
         });
 
     } catch (error) {
         console.error("Check Payout Status Error:", error);
-        return res.status(500).json({ 
+        return res.status(500).json({
             error: "Internal Server Error",
             details: error.message
         });

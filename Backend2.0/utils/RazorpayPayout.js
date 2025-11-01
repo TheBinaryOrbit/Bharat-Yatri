@@ -64,14 +64,14 @@ export const createRazorpayContact = async (contactData) => {
     };
 
     const result = await makeRazorpayRequest('/contacts', 'POST', contactPayload);
-    
+
     if (!result.success) {
       return {
         success: false,
         error: result.error || 'Failed to create contact'
       };
     }
-    
+
     return {
       success: true,
       data: result.data
@@ -91,25 +91,27 @@ export const createRazorpayContact = async (contactData) => {
  * @param {string} upiId - UPI ID for payout
  * @returns {Promise<Object>} Fund account creation response
  */
-export const createRazorpayFundAccount = async (contactId, upiId) => {
+export const createRazorpayFundAccount = async (contactId, name, ifsc, accountNumber) => {
   try {
     const fundAccountPayload = {
       contact_id: contactId,
-      account_type: 'vpa',
-      vpa: {
-        address: upiId
+      account_type: 'bank_account',
+      bank_account: {
+        name: name,
+        ifsc: ifsc,
+        account_number: accountNumber
       }
     };
 
     const result = await makeRazorpayRequest('/fund_accounts', 'POST', fundAccountPayload);
-    
+
     if (!result.success) {
       return {
         success: false,
         error: result.error || 'Failed to create fund account'
       };
     }
-    
+
     return {
       success: true,
       data: result.data
@@ -133,17 +135,17 @@ export const createRazorpayPayout = async (payoutData) => {
     // Create a clean narration without special characters
     const cleanBookingId = payoutData.booking_id.replace(/[^a-zA-Z0-9]/g, '');
     const narration = cleanNarrationText(`Bharat Yatri Payout ${cleanBookingId}`);
-    
+
     // Create a clean reference ID
     const cleanRefId = cleanReferenceId(`booking_${cleanBookingId}_${Date.now()}`);
-    
+
     const payoutPayload = {
       account_number: process.env.RAZORPAY_ACCOUNT_NUMBER,
       fund_account_id: payoutData.fund_account_id,
       amount: Math.round(parseFloat(payoutData.amount) * 100), // Convert to paise
       currency: 'INR',
-      mode: 'UPI',
-      purpose: 'refund',
+      mode: 'IMPS',
+      purpose: 'payout',
       queue_if_low_balance: true,
       reference_id: cleanRefId,
       narration: narration,
@@ -169,14 +171,14 @@ export const createRazorpayPayout = async (payoutData) => {
     };
 
     const result = await makeRazorpayRequest('/payouts', 'POST', payoutPayload, headers);
-    
+
     if (!result.success) {
       return {
         success: false,
         error: result.error || 'Failed to create payout'
       };
     }
-    
+
     return {
       success: true,
       data: result.data
@@ -198,14 +200,14 @@ export const createRazorpayPayout = async (payoutData) => {
 export const getRazorpayPayoutStatus = async (payoutId) => {
   try {
     const result = await makeRazorpayRequest(`/payouts/${payoutId}`, 'GET');
-    
+
     if (!result.success) {
       return {
         success: false,
         error: result.error || 'Failed to fetch payout status'
       };
     }
-    
+
     return {
       success: true,
       data: result.data
@@ -227,7 +229,7 @@ export const getRazorpayPayoutStatus = async (payoutId) => {
 export const getAllPayouts = async (filters = {}) => {
   try {
     const queryParams = new URLSearchParams();
-    
+
     // Add filters to query params
     if (filters.count) queryParams.append('count', filters.count);
     if (filters.skip) queryParams.append('skip', filters.skip);
@@ -237,14 +239,14 @@ export const getAllPayouts = async (filters = {}) => {
 
     const endpoint = `/payouts${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     const result = await makeRazorpayRequest(endpoint, 'GET');
-    
+
     if (!result.success) {
       return {
         success: false,
         error: result.error || 'Failed to fetch payouts'
       };
     }
-    
+
     return {
       success: true,
       data: result.data
@@ -266,14 +268,14 @@ export const getAllPayouts = async (filters = {}) => {
 export const cancelRazorpayPayout = async (payoutId) => {
   try {
     const result = await makeRazorpayRequest(`/payouts/${payoutId}/cancel`, 'POST');
-    
+
     if (!result.success) {
       return {
         success: false,
         error: result.error || 'Failed to cancel payout'
       };
     }
-    
+
     return {
       success: true,
       data: result.data
@@ -301,7 +303,7 @@ export const mapPayoutStatus = (razorpayStatus) => {
     'cancelled': 'cancelled',
     'failed': 'failed'
   };
-  
+
   return statusMapping[razorpayStatus] || 'pending';
 };
 
@@ -356,8 +358,8 @@ export const isInsufficientBalanceError = (errorMessage) => {
     'insufficient funds',
     'BAD_REQUEST_ERROR'
   ];
-  
-  return insufficientBalanceKeywords.some(keyword => 
+
+  return insufficientBalanceKeywords.some(keyword =>
     errorMessage.toLowerCase().includes(keyword.toLowerCase())
   );
 };
@@ -374,8 +376,8 @@ export const isInvalidUpiError = (errorMessage) => {
     'vpa not found',
     'invalid account'
   ];
-  
-  return invalidUpiKeywords.some(keyword => 
+
+  return invalidUpiKeywords.some(keyword =>
     errorMessage.toLowerCase().includes(keyword.toLowerCase())
   );
 };
