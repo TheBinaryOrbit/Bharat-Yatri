@@ -79,12 +79,6 @@ export const processBookingPayout = async (req, res) => {
             });
         }
 
-        if (!upiId) {
-            return res.status(400).json({
-                error: "UPI ID not found for the specified user."
-            });
-        }
-
         // Check if payout already exists for this booking and user
         if (bookingDetails.razorpayPayoutId) {
             return res.status(409).json({
@@ -126,7 +120,13 @@ export const processBookingPayout = async (req, res) => {
         let fundAccountId = bookingDetails.razorpayFundAccountId;
 
         // fetch the bank account details from booking
-        const bankAccountDetails = BankDetails.findOne({ userId: targetUser._id });
+        const bankAccountDetails = await BankDetails.findOne({ userId: targetUser._id });
+
+        if (!bankAccountDetails) {
+            return res.status(404).json({
+                error: "Bank account details not found for the user."
+            });
+        }
 
         if (!fundAccountId) {
             const fundAccountResponse = await createRazorpayFundAccount(contactId, bankAccountDetails.accountHolderName, bankAccountDetails.ifscCode, bankAccountDetails.accountNumber);
