@@ -169,16 +169,18 @@ export const processBookingPayout = async (req, res) => {
         const payoutId = payoutResponse.data.id;
         const payoutStatus = mapPayoutStatus(payoutResponse.data.status);
 
+        const totalPayoutAmount = bookingDetails.payoutAmount ? parseFloat(bookingDetails.payoutAmount) + parseFloat(amount) : parseFloat(amount);
+
         // Update booking with payout details
         const updatedBooking = await booking.findByIdAndUpdate(
             bookingDetails._id,
             {
                 razorpayPayoutId: payoutId,
-                payoutAmount: amount,
+                payoutAmount: totalPayoutAmount,
                 payoutStatus: payoutStatus,
                 payoutInitiatedBy: req.user?._id, // Assuming admin user is attached to request
                 payoutInitiatedAt: new Date(),
-                settlementStatus: payoutStatus === 'processed' ? 'fullpaid' : 'partiallypaid'
+                settlementStatus: bookingDetails.commissionAmount === totalPayoutAmount ? 'fullpaid' : 'partiallypaid'
             },
             { new: true }
         );
