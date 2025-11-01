@@ -69,10 +69,8 @@ export const processBookingPayout = async (req, res) => {
 
         if (userId === bookingDetails.bookedBy._id.toString()) {
             targetUser = bookingDetails.bookedBy;
-            upiId = bookingDetails.upiId;
         } else if (bookingDetails.recivedBy && userId === bookingDetails.recivedBy._id.toString()) {
             targetUser = bookingDetails.recivedBy;
-            upiId = bookingDetails.payeeUpiId;
         } else {
             return res.status(400).json({
                 error: "User ID does not match booking participants."
@@ -87,37 +85,30 @@ export const processBookingPayout = async (req, res) => {
         }
 
         // Step 1: Create or fetch Razorpay contact
-        let contactId = bookingDetails.razorpayContactId;
+        const contactData = {
+            name: targetUser.name,
+            email: targetUser.email,
+            phoneNumber: targetUser.phoneNumber,
+            reference_id: `booking_${bookingId}_${userId}`,
+            user_id: userId,
+            booking_id: bookingId
+        };
 
-        if (!contactId) {
-            const contactData = {
-                name: targetUser.name,
-                email: targetUser.email,
-                phoneNumber: targetUser.phoneNumber,
-                reference_id: `booking_${bookingId}_${userId}`,
-                user_id: userId,
-                booking_id: bookingId
-            };
+        const contactResponse = await createRazorpayContact(contactData);
 
-            const contactResponse = await createRazorpayContact(contactData);
-
-            if (!contactResponse.success) {
-                return res.status(500).json({
-                    error: "Failed to create Razorpay contact.",
-                    details: contactResponse.error
-                });
-            }
-
-            contactId = contactResponse.data.id;
-
-            // Update booking with contact ID
-            await booking.findByIdAndUpdate(bookingDetails._id, {
-                razorpayContactId: contactId
+        if (!contactResponse.success) {
+            return res.status(500).json({
+                error: "Failed to create Razorpay contact.",
+                details: contactResponse.error
             });
         }
 
-        // Step 2: Create or fetch fund account
-        let fundAccountId = bookingDetails.razorpayFundAccountId;
+        const contactId = contactResponse.data.id;
+
+        // Update booking with contact ID
+        await booking.findByIdAndUpdate(bookingDetails._id, {
+            razorpayContactId: contactId
+        });
 
         // fetch the bank account details from booking
         const bankAccountDetails = await BankDetails.findOne({ userId: targetUser._id });
@@ -128,23 +119,22 @@ export const processBookingPayout = async (req, res) => {
             });
         }
 
-        if (!fundAccountId) {
-            const fundAccountResponse = await createRazorpayFundAccount(contactId, bankAccountDetails.accountHolderName, bankAccountDetails.ifscCode, bankAccountDetails.accountNumber);
+        const fundAccountResponse = await createRazorpayFundAccount(contactId, bankAccountDetails.accountHolderName, bankAccountDetails.ifscCode, bankAccountDetails.accountNumber);
 
-            if (!fundAccountResponse.success) {
-                return res.status(500).json({
-                    error: "Failed to create fund account.",
-                    details: fundAccountResponse.error
-                });
-            }
-
-            fundAccountId = fundAccountResponse.data.id;
-
-            // Update booking with fund account ID
-            await booking.findByIdAndUpdate(bookingDetails._id, {
-                razorpayFundAccountId: fundAccountId
+        if (!fundAccountResponse.success) {
+            return res.status(500).json({
+                error: "Failed to create fund account.",
+                details: fundAccountResponse.error
             });
         }
+
+        const fundAccountId = fundAccountResponse.data.id;
+
+        // Update booking with fund account ID
+        await booking.findByIdAndUpdate(bookingDetails._id, {
+            razorpayFundAccountId: fundAccountId
+        });
+
 
         // Step 3: Create payout with MongoDB _id as idempotency key
         const payoutData = {
