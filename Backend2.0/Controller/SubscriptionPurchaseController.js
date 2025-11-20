@@ -204,6 +204,8 @@ export const getFreeTrialSubscription = async (req, res) => {
     try {
         const { userId } = req.params;
 
+        console.log("🔔 Request received for free trial subscription for user:", userId);
+
         if (!userId) {
             return res.status(400).json({ message: "User ID is required" });
         }
