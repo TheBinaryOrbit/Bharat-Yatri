@@ -63,7 +63,7 @@ const UserSchema = new mongoose.Schema({
   isSubscribed: {
     type: Boolean,
     required: true,
-    default: false
+    default: true // to be changed to false in someDays / months
   },
   isUserVerified: {
     type: Boolean,
