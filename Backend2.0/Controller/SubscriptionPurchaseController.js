@@ -82,10 +82,15 @@ export const buySubscription = async (req, res) => {
                 razorpay_payment_id
             });
 
+            console.log("📆 Free trial subscription period:", startDate, "to", endDate);
+
             await User.findByIdAndUpdate(subscribedBy, { isFreeTrialEligible: false , isSubscribed: true }, { new: true });
 
             await newPurchase.save();
             console.log("💾 New purchase saved:", newPurchase);
+
+
+            console.log("✅ Free trial subscription created successfully");
 
             return res.status(201).json({
                 message: "Subscription purchased and verified successfully",
