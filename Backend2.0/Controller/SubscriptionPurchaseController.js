@@ -55,20 +55,21 @@ export const buySubscription = async (req, res) => {
 
             const user = await User.findById(subscribedBy);
 
-            console.log("👤 User found for free trial:", user);
+            // console.log("👤 User found for free trial:", user);
 
             if (!user) {
-                console.log("❌ User not found for free trial:", subscribedBy);
+                
                 return res.status(404).json({ message: "User not found" });
 
             }
-            if (!user.isFreeTrialEligible) {
-                console.log("❌ User not eligible for free trial:", subscribedBy);
-                return res.status(403).json({ message: "User is not eligible for free trial" });
-            }
+
+            // if (!user.isFreeTrialEligible) {
+            //     console.log("❌ User not eligible for free trial:", subscribedBy);
+            //     return res.status(403).json({ message: "User is not eligible for free trial" });
+            // }
 
             const subscription = await Subscription.findById(subscriptionType);
-            console.log("📄 Subscription found for free trial:", subscription);
+            
             if (!subscription) {
                 console.error("❌ Subscription type not found for free trial");
                 return res.status(404).json({ message: "Subscription type not found" });
@@ -79,8 +80,6 @@ export const buySubscription = async (req, res) => {
             const endDate = new Date(startDate);
             endDate.setMonth(endDate.getMonth() + subscription.timePeriod);
 
-            console.log("📆 Free trial subscription period1:", startDate, "to", endDate);
-
 
             const newPurchase = new SubscriptionPurchase({
                 subscriptionType,
@@ -90,8 +89,6 @@ export const buySubscription = async (req, res) => {
                 razorpay_order_id,
                 razorpay_payment_id
             });
-
-            console.log("📆 Free trial subscription period2:", startDate, "to", endDate);
 
             await User.findByIdAndUpdate(subscribedBy, { isFreeTrialEligible: false , isSubscribed: true }, { new: true });
 
