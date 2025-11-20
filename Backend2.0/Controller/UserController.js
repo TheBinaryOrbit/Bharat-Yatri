@@ -220,18 +220,18 @@ export const getUserById = async (req, res) => {
 
         // check purshaed subscription that user has a valid subscription
         const currentDate = new Date();
-        const subscription = await SubscriptionPurchase.findOne({
-            subscribedBy: id,
-            endDate: { $gte: currentDate } // Check if subscription is still valid
-        });
+        // const subscription = await SubscriptionPurchase.findOne({
+        //     subscribedBy: id,
+        //     endDate: { $gte: currentDate } // Check if subscription is still valid
+        // });
 
 
         // is user is not subscribed or subscription is expired
-        if (!subscription) {
-            //update user isSubscribed to false
-            console.log("User is not subscribed or subscription expired, updating user status.");
-            user = await User.findByIdAndUpdate(id, { isSubscribed: false }, { new: true });
-        }
+        // if (!subscription) {
+        //     //update user isSubscribed to false
+        //     console.log("User is not subscribed or subscription expired, updating user status.");
+        //     user = await User.findByIdAndUpdate(id, { isSubscribed: false }, { new: true });
+        // }
 
         return res.status(200).json({
             message: "User fetched successfully.",
