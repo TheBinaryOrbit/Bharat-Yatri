@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import VehicleType from "../utils/VehicleType.js";
 
 
 const commissionSchema = new mongoose.Schema({
@@ -32,7 +31,6 @@ const BookingSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    enum: VehicleType,
     uppercase: true
   },
   pickUpDate: {

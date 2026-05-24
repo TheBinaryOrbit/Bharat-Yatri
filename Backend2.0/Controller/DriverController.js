@@ -1,4 +1,5 @@
 import { Driver } from "../Model/DriverModel.js";
+import { User } from "../Model/UserModel.js";
 import { uploadDriverFiles } from "../Storage/DriverStorage.js";
 import { deleteImageFile } from "../utils/DeleteFiles.js";
 import multer from "multer";
@@ -18,6 +19,13 @@ export const addDriver = (req, res) => {
         name, phone, address, city,
         dlNumber, userId
       } = req.body;
+
+      const user = await User.findById(userId);
+      const existingDriver = await Driver.find({ userId });
+
+      if ( user.userType === 'Driver'  && existingDriver.length >= 1 ) {
+        return res.status(400).json({ error: "As an Driver you can only add one Driver" });
+      }
 
       if (!name || !phone || !address || !city || !dlNumber || !userId) {
         return res.status(400).json({ error: "All fields are required." });

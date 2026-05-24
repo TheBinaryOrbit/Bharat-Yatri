@@ -161,7 +161,8 @@ export const getAllBookings = async (req, res) => {
 
     // get all the rides
     let bookings = await booking.find({
-      status: { $ne: 'CANCELLED' }
+      status: 'PENDING',
+      recivedBy: null,
     }, {
       _id: 1,
       bookingId: 1,
@@ -186,7 +187,7 @@ export const getAllBookings = async (req, res) => {
 
     const today = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-    const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
+    // const completedBookings = bookings.filter(b => b.status === 'COMPLETED' || b.status === 'ASSIGNED' && b.status !== 'CANCELLED');
 
     bookings = bookings.filter(b => {
       const pickupDate = new Date(b.pickUpDate);
@@ -198,13 +199,13 @@ export const getAllBookings = async (req, res) => {
       );
     });
 
-    const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
-    bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
+    // const ORDER = ['PENDING', 'ASSIGNED', 'PICKEDUP', 'COMPLETED', 'CANCELLED'];
+    // bookings.sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
 
 
     return res.status(200).json({
       message: "Unassigned and incomplete bookings fetched.",
-      bookings: [...bookings, ...completedBookings]
+      bookings: bookings
     });
 
   } catch (error) {

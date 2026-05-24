@@ -20,7 +20,7 @@ export const loginAdmin = async (req, res) => {
             return res.status(401).json({ message: "Invalid email or password" });
         }
 
-        if (!matchedPassword(password, admin.password)) {
+        if (!matchedPassoword(password, admin.password)) {
             return res.status(401).json({ message: "Invalid email or password" });
         }
 

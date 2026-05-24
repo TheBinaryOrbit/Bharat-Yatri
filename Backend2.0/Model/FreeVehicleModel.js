@@ -1,12 +1,10 @@
 import mongoose from "mongoose";
-import VehicleType from "../utils/VehicleType.js";
 
 const FreeVehicleSchema = new mongoose.Schema({
   vehicleType: {
     type: String,
     required: true,
     trim: true,
-    enum: VehicleType,
     uppercase : true
   },
   vehicleStartDate: {

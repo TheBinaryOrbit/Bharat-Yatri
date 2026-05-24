@@ -36,15 +36,17 @@ const UserSchema = new mongoose.Schema({
   userType: {
     type: String,
     required: true,
-    enum: ['AGENT', 'OWNER', 'DRIVER'],
-    default: 'AGENT'
+    enum: ['AGENT','DRIVER'],
+    default: 'DRIVER'
   },
+
   aadharNumber: {
     type: String,
     unique: true,
     sparse: true, // Allows uniqueness but can be null
     match: [/^\d{12}$/, "Please enter a valid 12-digit Aadhar number"]
   },
+  // optional 
   drivingLicenceNumber: {
     type: String,
     unique: true,
@@ -97,6 +99,35 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     required: true,
     default: true
+  },
+
+
+  // kyc information
+  isKycCompleted: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+
+  // signzy kyc details
+  kycDetails: {
+    requestId: {
+      type: String,
+      trim: true
+    },
+    status: {
+      type: String,
+      trim: true,
+      enum: ['success', 'failed'],
+    },
+    adharFileId : {
+      type: String,
+      trim: true
+    },
+    aadhaarJpeg : {
+      type: String,
+      trim: true
+    }
   }
 }, {
   timestamps: true

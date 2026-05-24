@@ -1,5 +1,5 @@
 import express from 'express';
-import { checkUser, createUser, GetOTP, getUserById, offUserAlerts, onUserAlerts, updateUser, uploadUserPhoto, verifyOTP, getAllUsers, getUserDetails, searchUserByPhoneNumber } from '../Controller/UserController.js';
+import { checkUser, createUser, GetOTP, getUserById, offUserAlerts, onUserAlerts, updateUser, uploadUserPhoto, verifyOTP, getAllUsers, getUserDetails, searchUserByPhoneNumber , verifyUserKyc , conmpleteUserKyc } from '../Controller/UserController.js';
 
 export const UserRouter = express.Router();
 
@@ -23,3 +23,6 @@ UserRouter.get('/admin/all', getAllUsers);  // GET /api/user/admin/all?subscript
 UserRouter.get('/admin/details/:userId', getUserDetails);  // GET /api/user/admin/details/:userId
 
 UserRouter.get('/admin/search/:phoneNumber', searchUserByPhoneNumber);
+
+UserRouter.get('/getkycurl/:userId', verifyUserKyc);
+UserRouter.post('/verifykyc/:userId', conmpleteUserKyc);

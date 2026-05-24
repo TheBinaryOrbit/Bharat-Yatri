@@ -5,6 +5,8 @@ import { Driver } from '../Model/DriverModel.js'
 import { BankDetails } from '../Model/BankDetailsModel.js'
 import { uploadUserFiles } from "../Storage/UserStorage.js";
 import { SubscriptionPurchase } from '../Model/SubscriptionPurchaseModel.js';
+import axios from 'axios';
+import "dotenv/config";
 
 
 // Send OTP Controller
@@ -85,6 +87,7 @@ export const verifyOTP = async (req, res) => {
                 name: user.name,
                 phoneNumber: user.phoneNumber,
                 fcmToken: user.fcmToken,
+                userType: user.userType,
             }
         });
     } catch (error) {
@@ -96,10 +99,10 @@ export const verifyOTP = async (req, res) => {
 // creating a new user if user not exist
 export const createUser = async (req, res) => {
     try {
-        const { name, phoneNumber, city } = req.body;
+        const { name, phoneNumber, city, userType } = req.body;
 
-        if (!name || !phoneNumber || !city) {
-            return res.status(400).json({ error: "All fields (name, phoneNumber, city) are required." });
+        if (!name || !phoneNumber || !city || !userType) {
+            return res.status(400).json({ error: "All fields (name, phoneNumber, city, userType) are required." });
         }
 
         // Second check - just before creating (race condition safety)
@@ -108,7 +111,7 @@ export const createUser = async (req, res) => {
             return res.status(409).json({ error: "Phone number already registered (retry check)." });
         }
 
-        const newUser = await User.create({ name, phoneNumber, city });
+        const newUser = await User.create({ name, phoneNumber, city, userType });
 
         return res.status(201).json({
             message: "User created successfully.",
@@ -117,6 +120,7 @@ export const createUser = async (req, res) => {
                 name: newUser.name,
                 phoneNumber: newUser.phoneNumber,
                 city: newUser.city,
+                userType: newUser.userType,
             }
         });
     } catch (error) {
@@ -528,3 +532,97 @@ export const searchUserByPhoneNumber = async (req, res) => {
         return res.status(500).json({ error: "Internal Server Error" });
     }
 };
+
+
+export const verifyUserKyc = async (req, res) => {
+    try {
+        const userId = req.params.userId;
+
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        console.log(user);
+
+        const data = await axios.post(
+            `${process.env.SIGNZY_BASE_URL}/api/v3/digilocker/createUrl`,
+            {
+                signup: true,
+                callbackUrl: `${process.env.SIGNZY_CallBACK_URL}/${user._id}`,
+                successRedirectUrl: process.env.SIGNZY_SUCESS_URL,
+                successRedirectTime: "5",
+                failureRedirectUrl: process.env.SIGNZY_FAILURE_URL,
+                failureRedirectTime: "5",
+
+                logoVisible: "true",
+                logo: "https://static.wixstatic.com/media/fac051_da14316a893448478965bfbd3187ec2f~mv2.png/v1/fill/w_80,h_80,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/Black%20logo.png",
+
+                docType: ["ADHAR"],
+                purpose: "kyc",
+                getScope: true,
+                getBase64Files: false,
+                getEAadhaarPdf: true,
+                getEAadhaarJpeg: true
+            },
+            {
+                headers: {
+
+                    "Content-Type": "application/json",
+                    "Authorization": process.env.SIGNZY_API_KEY,
+
+                }
+            }
+        );
+
+        console.log("Signzy Response:", data.data);
+
+        return res.json({ redirectUrl: data.data.result.url });
+    } catch (error) {
+        console.error("Unable to proceed with kyc", error.response?.data);
+        return res.status(500).json({ error: "Unable to proceed with kyc" });
+    }
+}
+
+
+export const conmpleteUserKyc = async (req, res) => {
+    try{
+        const userId = req.params.userId;
+        const  data  = req.body;
+
+
+        console.log("KYC Callback Data:", data.aadharDetail);
+        console.log("KYC Callback Data:", data.details.files);
+
+        
+        const requestId = data?.requestId;
+        const status = data?.status;
+        const adharFileId = data?.details?.files[0]?.id;
+        const aadhaarJpeg = data?.aadharDetail?.aadhaarJpeg;
+
+        if (!requestId || !status) {
+            console.error("Invalid KYC callback data:", data);
+            return res.status(400).json({ error: "Invalid KYC callback data" });
+        }
+
+        await User.findByIdAndUpdate(
+            userId,
+            {
+                isKycCompleted: status === "success",
+                kycDetails: {
+                    requestId,
+                    status,
+                    adharFileId,
+                    aadhaarJpeg
+                }
+            },
+            { new: true }
+        );
+
+        return res.status(200).json({ message: "User KYC status updated successfully." });
+    }catch(error){
+        console.error("Error in completing user kyc", error);
+        return res.status(500).json({ error: "Error in completing user kyc" });
+    }
+}

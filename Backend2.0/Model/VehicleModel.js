@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import VehicleType from "../utils/VehicleType.js";
 
 
 const VehicleSchema = new mongoose.Schema({
@@ -7,7 +6,6 @@ const VehicleSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    enum: VehicleType,
     uppercase : true
   },
   registrationNumber: {

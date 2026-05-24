@@ -1,0 +1,72 @@
+{
+  "vehicleTypes": [
+    {
+      "id": "bharat_mini",
+      "name": "Bharat Mini",
+      "description": "Compact and economical option for solo or couple riders",
+      "capacity": 4,
+      "ratePerKm": 8,
+      "ratePerMinute": 1.5,
+      "baseFare": 30,
+      "icon": "🚗",
+      "features": [
+        "AC Available",
+        "Compact Car",
+        "Best for Short Distance"
+      ]
+    },
+    {
+      "id": "yaatri_mini",
+      "name": "Yaatri Mini",
+      "description": "Comfortable mini car for city travel",
+      "capacity": 4,
+      "ratePerKm": 10,
+      "ratePerMinute": 2,
+      "baseFare": 40,
+      "icon": "🚙",
+      "features": [
+        "AC Available",
+        "Comfortable Seating",
+        "Ideal for City Rides"
+      ]
+    },
+    {
+      "id": "yaatri_sedan",
+      "name": "Yaatri Sedan",
+      "description": "Premium sedan for comfortable long-distance travel",
+      "capacity": 4,
+      "ratePerKm": 14,
+      "ratePerMinute": 2.5,
+      "baseFare": 60,
+      "icon": "🚘",
+      "features": [
+        "Premium AC",
+        "Spacious Interior",
+        "Best for Long Distance",
+        "Extra Luggage Space"
+      ]
+    },
+    {
+      "id": "yaatri_suv",
+      "name": "Yaatri SUV",
+      "description": "Luxury SUV for group travel and premium experience",
+      "capacity": 6,
+      "ratePerKm": 18,
+      "ratePerMinute": 3,
+      "baseFare": 80,
+      "icon": "🚐",
+      "features": [
+        "Premium AC",
+        "6-7 Seater",
+        "Extra Luggage Space",
+        "Luxury Experience",
+        "Best for Groups"
+      ]
+    }
+  ],
+  "metadata": {
+    "currency": "INR",
+    "lastUpdated": "2026-02-20",
+    "version": "1.0.0"
+  }
+}
