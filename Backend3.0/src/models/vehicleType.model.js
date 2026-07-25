@@ -38,6 +38,11 @@ const vehicleTypeSchema = new mongoose.Schema(
       type: String,
       default: '', // PNG image URL
     },
+    // Selling points shown under the type in the app, e.g. "AC Available"
+    features: {
+      type: [String],
+      default: [],
+    },
     isActive: {
       type: Boolean,
       default: true,

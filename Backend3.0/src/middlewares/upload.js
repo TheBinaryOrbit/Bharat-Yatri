@@ -61,6 +61,13 @@ export const uploadVehicleDocs = upload.fields([
   { name: 'rcBackImage', maxCount: 1 },
 ]);
 
+// Driver profile edit: photo + DL images (no vehicle files)
+export const uploadDriverDocs = upload.fields([
+  { name: 'profileImage', maxCount: 1 },
+  { name: 'dlFrontImage', maxCount: 1 },
+  { name: 'dlBackImage', maxCount: 1 },
+]);
+
 // Full driver onboarding: driver documents + vehicle documents in one request
 export const uploadDriverOnboarding = upload.fields([
   { name: 'profileImage', maxCount: 1 },

@@ -46,8 +46,73 @@ export class DriverController {
     }
   };
 
+  // PATCH /api/v3/drivers/me  (protected — driver only)
+  // Partial update of the signed-in driver's own profile. Driver comes from the
+  // token, never the body. Phone number and KYC state are not editable here.
+  // multipart/form-data: text fields + profileImage, dlFrontImage, dlBackImage
+  updateMe = async (req, res) => {
+    const driverId = req.user._id;
+    const { name, email, dob, gender, address, aadharCardNumber, dlNumber } = req.body;
+    const files = req.files || {};
+
+    if (name !== undefined && !String(name).trim()) {
+      return res.status(400).json({
+        message: 'Name is invalid',
+        errors: [{ field: 'name', message: 'Name cannot be empty' }],
+      });
+    }
+
+    if (dob !== undefined && Number.isNaN(Date.parse(dob))) {
+      return res.status(400).json({
+        message: 'Date of birth is invalid',
+        errors: [{ field: 'dob', message: 'Date of birth must be a valid date (YYYY-MM-DD)' }],
+      });
+    }
+
+    if (gender !== undefined && !String(gender).match(/^(male|female|other)$/i)) {
+      return res.status(400).json({
+        message: 'Gender is invalid',
+        errors: [{ field: 'gender', message: 'Gender must be one of: male, female, other' }],
+      });
+    }
+
+    // Only touch the fields actually sent — dot notation keeps dlDetails siblings intact
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (email !== undefined) updates.email = email;
+    if (dob !== undefined) updates.dob = dob;
+    if (gender !== undefined) updates.gender = String(gender).toLowerCase();
+    if (address !== undefined) updates.address = address;
+    if (aadharCardNumber !== undefined) updates.aadharCardNumber = aadharCardNumber;
+    if (dlNumber !== undefined) updates['dlDetails.dlNumber'] = dlNumber;
+
+    if (files.profileImage?.[0]) updates.profileImageUrl = buildFileUrl(req, files.profileImage[0].filename);
+    if (files.dlFrontImage?.[0]) updates['dlDetails.dlFrontImageUrl'] = buildFileUrl(req, files.dlFrontImage[0].filename);
+    if (files.dlBackImage?.[0]) updates['dlDetails.dlBackImageUrl'] = buildFileUrl(req, files.dlBackImage[0].filename);
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ message: 'No fields to update' });
+    }
+
+    try {
+      const driver = await this.driverService.updateDriver(driverId, updates);
+      if (!driver) {
+        return res.status(404).json({ message: 'Driver not found' });
+      }
+      return res.status(200).json({ message: 'Profile updated successfully.', driver });
+    } catch (error) {
+      console.log(error);
+      if (isDuplicateKeyError(error)) {
+        const { field, label, message } = duplicateKeyInfo(error);
+        return res.status(409).json({ message: `${label} already registered`, errors: [{ field, message }] });
+      }
+      return res.status(500).json({ error: 'Failed to update profile', message: 'Internal server error' });
+    }
+  };
+
   // POST /api/v3/drivers/onboard
-  // One multipart call → creates the driver AND their first vehicle, returns a JWT.
+  // One multipart call → creates the driver AND their vehicle, returns a JWT.
+  // A driver may own exactly one vehicle, so this is the only place it's created.
   // Files: profileImage, dlFrontImage, dlBackImage, vehicleImages[] (≤3), rcFrontImage, rcBackImage
   onboardDriver = async (req, res) => {
     const {

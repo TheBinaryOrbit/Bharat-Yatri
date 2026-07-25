@@ -13,6 +13,9 @@ router
 
 // '/my' must precede '/:id' so it isn't captured as an id
 router.get('/my', protect, authorize('driver'), vehicleController.getMyVehicles);
-router.route('/:id').get(vehicleController.getVehicleById);
+router
+  .route('/:id')
+  .get(vehicleController.getVehicleById)
+  .patch(protect, authorize('driver'), uploadVehicleDocs, vehicleController.updateVehicle);
 
 export default router;

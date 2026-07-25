@@ -213,8 +213,9 @@ Render only entries with `isActive: true`. Send back either the `_id` **or** the
 
 ## Step 4 — Create the driver account
 
-One multipart call creates the **driver + their first vehicle** and returns the
-JWT. There is no separate "create vehicle" step during signup.
+One multipart call creates the **driver + their vehicle** and returns the JWT.
+There is no separate "create vehicle" step during signup — and a driver may only
+ever have **one** vehicle, so this is the only time it gets created.
 
 **`POST /api/v3/drivers/onboard`**
 **`Content-Type: multipart/form-data`** (no auth header)

@@ -22,6 +22,7 @@ const vehicleSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Driver',
       required: [true, 'Driver is required'],
+      unique: true, // one vehicle per driver
     },
     vehicleTypeId: {
       type: mongoose.Schema.Types.ObjectId,

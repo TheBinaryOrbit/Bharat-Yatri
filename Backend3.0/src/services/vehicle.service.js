@@ -13,6 +13,11 @@ export class VehicleService {
     return Vehicle.find({ driverId }).populate('vehicleTypeId');
   };
 
+  // One vehicle per driver — the driver's single vehicle, or null
+  getVehicleByDriver = async (driverId) => {
+    return Vehicle.findOne({ driverId }).populate('vehicleTypeId');
+  };
+
   getVehicleByNumber = async (vehicleNumber) => {
     return Vehicle.findOne({ vehicleNumber });
   };
