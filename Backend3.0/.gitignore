@@ -1,0 +1,14 @@
+node_modules/
+.env
+
+# Uploaded files (keep the folder, ignore contents)
+uploads/*
+!uploads/.gitkeep
+.env.local
+*.log
+npm-debug.log*
+coverage/
+dist/
+.DS_Store
+.vscode/
+.idea/
