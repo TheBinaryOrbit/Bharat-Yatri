@@ -83,6 +83,11 @@ const driverSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    kycFailedReason: {
+      type: String,
+      default: '',
+    },
+    
     kycDetails: {
       type: kycDetailsSchema,
       default: () => ({}),

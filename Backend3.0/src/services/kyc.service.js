@@ -5,6 +5,7 @@ export class KycService {
   // Creates a Signzy DigiLocker session and returns the redirect URL.
   // `callbackUrl` is where Signzy posts the result (must include the account id).
   createDigilockerUrl = async (callbackUrl) => {
+    // console.log('Creating Signzy DigiLocker URL with callback:', callbackUrl);
     const { data } = await axios.post(
       `${env.SIGNZY_BASE_URL}/api/v3/digilocker/createUrl`,
       {
@@ -30,6 +31,8 @@ export class KycService {
         },
       }
     );
+
+    console.log('Signzy DigiLocker URL created:', data);
 
     return data?.result?.url;
   };

@@ -267,7 +267,11 @@ export class DriverController {
       const { driverId } = req.params;
       const { requestId, status, adharFileId, aadhaarJpeg } = this.kycService.parseCallback(req.body);
 
-      if (!requestId || !status) {
+      if (!requestId || !status || !adharFileId || !aadhaarJpeg) {
+        await this.driverService.updateDriver(driverId, {
+          isKycCompleted: false,
+          kycFailedReason: 'Invalid KYC Data: missing required fields',
+        });
         console.error('Invalid KYC callback data:', req.body);
         return res.status(400).json({ error: 'Invalid KYC callback data' });
       }
@@ -277,6 +281,13 @@ export class DriverController {
       if (adharFileId) {
         const owner = await this.driverService.getDriverByKycFileId(adharFileId);
         if (owner && String(owner._id) !== String(driverId)) {
+          await this.driverService.updateDriver(driverId, {
+            isKycCompleted: false,
+            kycDetails : {
+              status : 'failed',
+            },
+            kycFailedReason: 'This KYC document is already linked to another account',
+          });
           return res.status(409).json({ error: 'This KYC document is already linked to another account' });
         }
       }
