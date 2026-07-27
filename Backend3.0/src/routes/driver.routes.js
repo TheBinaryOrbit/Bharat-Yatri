@@ -12,9 +12,9 @@ router.get('/', driverController.getDrivers);
 router.post('/onboard', uploadDriverOnboarding, driverController.onboardDriver);
 
 // KYC — driver initiates with their token; Signzy posts back to the callback
-router.post('/kyc/verify', protect, authorize('driver'), driverController.verifyKyc);
-router.post('/kyc/callback/:driverId', driverController.completeKyc);
-
+router.post('/kyc/verify', driverController.verifyKyc);
+router.post('/kyc/callback/:phonenumber', driverController.completeKyc);
+router.get('/kyc/status/:phonenumber', driverController.checkKycStatus);
 // '/me' must precede '/:id' so it isn't captured as an id
 router.get('/me', protect, authorize('driver'), driverController.getMe);
 router.patch('/me', protect, authorize('driver'), uploadDriverDocs, driverController.updateMe);

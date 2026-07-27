@@ -246,8 +246,13 @@ export class DriverController {
   // Driver comes from the token; returns a Signzy DigiLocker redirect URL.
   verifyKyc = async (req, res) => {
     try {
-      const driverId = req.user._id;
-      const callbackUrl = `${env.SIGNZY_CALLBACK_URL}/api/v3/drivers/kyc/callback/${driverId}`;
+      const { phoneNumber } = req.body;
+
+      if (!phoneNumber || !String(phoneNumber).trim()) {
+        return res.status(400).json({ error: 'Phone number is required' });
+      }
+      console.log('verifyKyc called with phone:', phoneNumber);
+      const callbackUrl = `${env.SIGNZY_CALLBACK_URL}/api/v3/drivers/kyc/callback/${phoneNumber}`;
 
       const redirectUrl = await this.kycService.createDigilockerUrl(callbackUrl);
       if (!redirectUrl) {
@@ -261,14 +266,33 @@ export class DriverController {
     }
   };
 
-  // POST /api/v3/drivers/kyc/callback/:driverId  (Signzy webhook — no token)
+  // POST /api/v3/drivers/kyc/callback/:phonenumber  (Signzy webhook — no token)
   completeKyc = async (req, res) => {
     try {
-      const { driverId } = req.params;
+      const { phonenumber } = req.params;
+      const data = req.body;
+
+      // create user by phone number
+      const dob = data.aadharDetail?.dob
+        ? (() => {
+          const [day, month, year] = data.aadharDetail.dob.split("/");
+          return new Date(Number(year), Number(month) - 1, Number(day));
+        })()
+        : undefined;
+
+      let driver = await this.driverService.createDriver({
+        phoneNumber: phonenumber,
+        name: data.aadharDetail?.name || "unknown",
+        dob,
+        gender: data.aadharDetail?.gender
+          ? String(data.aadharDetail.gender).toLowerCase()
+          : undefined,
+      });
+
       const { requestId, status, adharFileId, aadhaarJpeg } = this.kycService.parseCallback(req.body);
 
       if (!requestId || !status || !adharFileId || !aadhaarJpeg) {
-        await this.driverService.updateDriver(driverId, {
+        await this.driverService.updateDriver(driver._id, {
           isKycCompleted: false,
           kycFailedReason: 'Invalid KYC Data: missing required fields',
         });
@@ -280,11 +304,12 @@ export class DriverController {
       // linked to a different driver.
       if (adharFileId) {
         const owner = await this.driverService.getDriverByKycFileId(adharFileId);
-        if (owner && String(owner._id) !== String(driverId)) {
-          await this.driverService.updateDriver(driverId, {
+        if (owner && String(owner._id) !== String(driver._id)) {
+          await this.driverService.updateDriver(driver._id, {
             isKycCompleted: false,
-            kycDetails : {
-              status : 'failed',
+            name: 'unknown',
+            kycDetails: {
+              status: 'failed',
             },
             kycFailedReason: 'This KYC document is already linked to another account',
           });
@@ -292,7 +317,7 @@ export class DriverController {
         }
       }
 
-      const driver = await this.driverService.updateDriver(driverId, {
+      driver = await this.driverService.updateDriver(driver._id, {
         isKycCompleted: status === 'success',
         kycDetails: { requestId, status, adharFileId, aadhaarJpeg },
       });
@@ -306,9 +331,35 @@ export class DriverController {
       console.error('Error in completing driver kyc:', error);
       // Safety net for a race that slips past the pre-check (unique index)
       if (isDuplicateKeyError(error)) {
+        await this.driverService.updateDriver(req.params.phonenumber, {
+          isKycCompleted: false,
+            name: 'unknown',
+            kycDetails: {
+              status: 'failed',
+            },
+            kycFailedReason: 'This KYC document is already linked to another account',
+          });
         return res.status(409).json({ error: 'This KYC document is already linked to another account' });
       }
       return res.status(500).json({ error: 'Error in completing driver kyc' });
     }
   };
+
+  checkKycStatus = async (req, res) => {
+    try {
+      const { phonenumber } = req.params;
+      const driver = await this.driverService.getDriverByPhone(phonenumber);
+
+      if (!driver) {
+        return res.status(404).json({ kycStatus: 'not_found', message: 'Driver not found' });
+      }
+
+      const token = generateToken({ id: driver._id, role: 'driver' });
+
+      return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, kycFailedReason: driver.kycFailedReason, token: token });
+    } catch (error) {
+      console.error('Error in checking driver kyc status:', error);
+      return res.status(500).json({ error: 'Error in checking driver kyc status' });
+    }
+  }
 }
