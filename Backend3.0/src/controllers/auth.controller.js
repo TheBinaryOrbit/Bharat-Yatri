@@ -74,6 +74,18 @@ export class AuthController {
 
       const account = await resolved.findByPhone(phoneNumber);
 
+      console.log(role == 'driver');
+      console.log(account.isKycCompleted);
+      console.log(String(account));
+      console.log(String(account.aadharCardNumber).startsWith("XXXX"));
+
+      if(role =='driver' && account.isKycCompleted == true && String(account.aadharCardNumber).startsWith("XXXXXXXX")){
+        return res.status(200).json({
+          message: 'OTP verified successfully, but Setup Incomplete.',
+          userStatus: 404,
+        });
+      }
+
       // OTP matched but no account yet → frontend routes to registration
       if (!account) {
         return res.status(200).json({

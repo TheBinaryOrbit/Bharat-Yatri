@@ -123,6 +123,13 @@ export class DriverController {
       manufactureYear, insuranceExpiryMonth, insuranceExpiryYear,
     } = req.body;
 
+
+    const userid = req.user._id;
+
+    if (!userid) {
+      return res.status(401).json({ message: 'Unauthorized: user ID missing from token' });
+    }
+
     const files = req.files || {};
 
     const errors = [];
@@ -152,27 +159,18 @@ export class DriverController {
 
     // Pre-checks so we don't create a driver we'd have to roll back
     try {
-      const [existingDriver, vehicleType, existingVehicle] = await Promise.all([
-        this.driverService.getDriverByPhone(phoneNumber),
-        this.resolveVehicleType(vehicleTypeId),
-        this.vehicleService.getVehicleByNumber(String(vehicleNumber).toUpperCase()),
-      ]);
+      const vehicleType = await this.resolveVehicleType(vehicleTypeId);
 
-      if (existingDriver) {
-        return res.status(409).json({ message: 'Phone number already registered' });
-      }
       if (!vehicleType) {
         return res.status(404).json({ message: 'Vehicle type not found' });
       }
-      if (existingVehicle) {
-        return res.status(409).json({ message: 'A vehicle with this number already exists' });
-      }
+
 
       const fileUrl = (field) => (files[field]?.[0] ? buildFileUrl(req, files[field][0].filename) : '');
       const vehicleImages = (files.vehicleImages || []).map((f) => buildFileUrl(req, f.filename));
 
       // 1) Create the driver
-      const driver = await this.driverService.createDriver({
+      const driver = await this.driverService.updateDriver(userid, {
         name,
         email,
         phoneNumber,
@@ -186,7 +184,7 @@ export class DriverController {
           dlFrontImageUrl: fileUrl('dlFrontImage'),
           dlBackImageUrl: fileUrl('dlBackImage'),
         },
-      });
+      }, { new: true, upsert: true, setDefaultsOnInsert: true });
 
       // 2) Create the vehicle — roll the driver back if this fails
       let vehicle;
@@ -215,11 +213,8 @@ export class DriverController {
         throw vehicleError;
       }
 
-      const token = generateToken({ id: driver._id, role: 'driver' });
-
       return res.status(201).json({
         message: 'Driver onboarded successfully.',
-        token,
         role: 'driver',
         driver,
         vehicle,
@@ -276,7 +271,7 @@ export class DriverController {
       const dob = data.aadharDetail?.dob
         ? (() => {
           const [day, month, year] = data.aadharDetail.dob.split("/");
-          return new Date(Number(year), Number(month) - 1, Number(day));
+          return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
         })()
         : undefined;
 
@@ -284,6 +279,7 @@ export class DriverController {
         phoneNumber: phonenumber,
         name: data.aadharDetail?.name || "unknown",
         dob,
+        aadharCardNumber: data.aadharDetail?.uid || undefined,
         gender: data.aadharDetail?.gender
           ? String(data.aadharDetail.gender).toLowerCase()
           : undefined,
@@ -333,12 +329,12 @@ export class DriverController {
       if (isDuplicateKeyError(error)) {
         await this.driverService.updateDriver(req.params.phonenumber, {
           isKycCompleted: false,
-            name: 'unknown',
-            kycDetails: {
-              status: 'failed',
-            },
-            kycFailedReason: 'This KYC document is already linked to another account',
-          });
+          name: 'unknown',
+          kycDetails: {
+            status: 'failed',
+          },
+          kycFailedReason: 'This KYC document is already linked to another account',
+        });
         return res.status(409).json({ error: 'This KYC document is already linked to another account' });
       }
       return res.status(500).json({ error: 'Error in completing driver kyc' });
@@ -354,9 +350,12 @@ export class DriverController {
         return res.status(404).json({ kycStatus: 'not_found', message: 'Driver not found' });
       }
 
-      const token = generateToken({ id: driver._id, role: 'driver' });
-
-      return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, kycFailedReason: driver.kycFailedReason, token: token });
+      if (driver.isKycCompleted) {
+        const token = generateToken({ id: driver._id, role: 'driver' });
+        return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, token: token });
+      } else {
+        return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, kycFailedReason: driver.kycFailedReason });
+      }
     } catch (error) {
       console.error('Error in checking driver kyc status:', error);
       return res.status(500).json({ error: 'Error in checking driver kyc status' });

@@ -9,7 +9,7 @@ const driverController = new DriverController();
 router.get('/', driverController.getDrivers);
 
 // Full onboarding — driver + their (only) vehicle in a single call
-router.post('/onboard', uploadDriverOnboarding, driverController.onboardDriver);
+router.post('/onboard', protect, uploadDriverOnboarding, driverController.onboardDriver);
 
 // KYC — driver initiates with their token; Signzy posts back to the callback
 router.post('/kyc/verify', driverController.verifyKyc);
