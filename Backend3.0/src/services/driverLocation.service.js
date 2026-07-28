@@ -1,0 +1,134 @@
+import { redis } from '../config/redis.js';
+import { env } from '../config/env.js';
+import { haversineKm, isValidCoordinate } from '../utils/geo.js';
+
+const GEO_KEY = 'drivers:geo';
+const metaKey = (driverId) => `driver:meta:${driverId}`;
+
+export class DriverLocationService {
+  // Records a driver's position and keeps their metadata alive.
+  //
+  // Two keys are involved: the GEO sorted set (which cannot expire individual members) and a
+  // per-driver hash that DOES expire. The hash's TTL is therefore the liveness signal — a driver
+  // whose app died stops refreshing it, and reads treat a missing hash as offline.
+  upsertLocation = async ({ driverId, latitude, longitude, meta = {} }) => {
+    const id = String(driverId);
+
+    await redis
+      .pipeline()
+      .geoadd(GEO_KEY, longitude, latitude, id)
+      .hset(metaKey(id), {
+        driverId: id,
+        latitude: String(latitude),
+        longitude: String(longitude),
+        isOnline: '1',
+        updatedAt: String(Date.now()),
+        ...Object.fromEntries(
+          Object.entries(meta)
+            .filter(([, v]) => v !== undefined && v !== null)
+            .map(([k, v]) => [k, String(v)])
+        ),
+      })
+      .expire(metaKey(id), env.DRIVER_LOCATION_TTL_SECONDS)
+      .exec();
+  };
+
+  getDriverMeta = async (driverId) => {
+    const meta = await redis.hgetall(metaKey(String(driverId)));
+    return Object.keys(meta).length ? meta : null;
+  };
+
+  // Last known position, or null if the driver has gone stale.
+  getLastLocation = async (driverId) => {
+    const meta = await this.getDriverMeta(driverId);
+    if (!meta) return null;
+
+    const latitude = Number(meta.latitude);
+    const longitude = Number(meta.longitude);
+    if (!isValidCoordinate(latitude, longitude)) return null;
+
+    return { latitude, longitude, at: Number(meta.updatedAt) || null };
+  };
+
+  goOffline = async (driverId) => {
+    const id = String(driverId);
+    await redis.pipeline().zrem(GEO_KEY, id).del(metaKey(id)).exec();
+  };
+
+  // Rejects a fix that would require the driver to have moved impossibly fast since their last one.
+  // Catches GPS glitches and crude location spoofing; a driver with no previous fix always passes.
+  isPlausibleJump = async (driverId, latitude, longitude) => {
+    const last = await this.getLastLocation(driverId);
+    if (!last?.at) return true;
+
+    const hours = (Date.now() - last.at) / 3_600_000;
+    if (hours <= 0) return true;
+
+    const km = haversineKm(last, { latitude, longitude });
+    return km / hours <= env.MAX_LOCATION_JUMP_KMPH;
+  };
+
+  // Drivers within radiusKm of a point, nearest first, restricted to a vehicle type.
+  //
+  // GEO members outlive their metadata hash, so anyone whose hash has expired is treated as
+  // offline and lazily evicted from the set — otherwise a driver who force-quit would stay
+  // "nearby" forever.
+  findNearbyDrivers = async ({ latitude, longitude, radiusKm, vehicleTypeId }) => {
+    const hits = await redis.geosearch(
+      GEO_KEY,
+      'FROMLONLAT',
+      longitude,
+      latitude,
+      'BYRADIUS',
+      radiusKm,
+      'km',
+      'ASC',
+      'WITHDIST'
+    );
+
+    if (!hits.length) return [];
+
+    const ids = hits.map(([id]) => id);
+    const metas = await redis.pipeline(ids.map((id) => ['hgetall', metaKey(id)])).exec();
+
+    const stale = [];
+    const drivers = [];
+
+    hits.forEach(([id, distance], i) => {
+      const [err, meta] = metas[i];
+      if (err || !meta || !Object.keys(meta).length) {
+        stale.push(id);
+        return;
+      }
+      if (vehicleTypeId && String(meta.vehicleTypeId) !== String(vehicleTypeId)) return;
+      if (meta.isOnline !== '1') return;
+
+      drivers.push({ ...meta, driverId: id, distanceKm: Number(distance) });
+    });
+
+    if (stale.length) await redis.zrem(GEO_KEY, ...stale);
+
+    return drivers;
+  };
+
+  // Widens the search ring until it finds drivers, or runs out of radius.
+  //
+  // `filter` is injected rather than applied by the caller afterwards: a 2km ring full of busy
+  // drivers must widen to 4km, not end the search with an empty result.
+  findNearbyDriversExpanding = async ({ latitude, longitude, vehicleTypeId, filter }) => {
+    const { DRIVER_SEARCH_RADIUS_START_KM, DRIVER_SEARCH_RADIUS_MAX_KM, DRIVER_SEARCH_RADIUS_STEP_KM } = env;
+
+    for (
+      let radiusKm = DRIVER_SEARCH_RADIUS_START_KM;
+      radiusKm <= DRIVER_SEARCH_RADIUS_MAX_KM;
+      radiusKm += DRIVER_SEARCH_RADIUS_STEP_KM
+    ) {
+      const found = await this.findNearbyDrivers({ latitude, longitude, radiusKm, vehicleTypeId });
+      const eligible = filter ? await filter(found) : found;
+
+      if (eligible.length) return { drivers: eligible, radiusKm };
+    }
+
+    return { drivers: [], radiusKm: DRIVER_SEARCH_RADIUS_MAX_KM };
+  };
+}

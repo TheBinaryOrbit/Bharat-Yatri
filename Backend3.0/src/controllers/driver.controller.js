@@ -1,9 +1,9 @@
-import mongoose from 'mongoose';
 import { DriverService } from '../services/driver.service.js';
 import { KycService } from '../services/kyc.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
 import { VehicleTypeService } from '../services/vehicleType.service.js';
 import { buildFileUrl } from '../utils/fileUrl.js';
+import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 import { isDuplicateKeyError, duplicateKeyInfo } from '../utils/duplicateKey.js';
 import { generateToken } from '../utils/token.js';
 import { env } from '../config/env.js';
@@ -159,7 +159,7 @@ export class DriverController {
 
     // Pre-checks so we don't create a driver we'd have to roll back
     try {
-      const vehicleType = await this.resolveVehicleType(vehicleTypeId);
+      const vehicleType = await resolveVehicleType(vehicleTypeId);
 
       if (!vehicleType) {
         return res.status(404).json({ message: 'Vehicle type not found' });
@@ -227,14 +227,6 @@ export class DriverController {
       }
       return res.status(500).json({ error: 'Failed to onboard driver', message: 'Internal server error' });
     }
-  };
-
-  // Accepts either a VehicleType ObjectId or its slug (e.g. "bharat_mini")
-  resolveVehicleType = async (vehicleTypeId) => {
-    if (mongoose.isValidObjectId(vehicleTypeId)) {
-      return this.vehicleTypeService.getVehicleTypeById(vehicleTypeId);
-    }
-    return this.vehicleTypeService.getVehicleTypeBySlug(String(vehicleTypeId).toLowerCase());
   };
 
   // POST /api/v3/drivers/kyc/verify  (protected — driver only)

@@ -1,21 +1,13 @@
-import mongoose from 'mongoose';
 import { VehicleService } from '../services/vehicle.service.js';
 import { VehicleTypeService } from '../services/vehicleType.service.js';
 import { buildFileUrl } from '../utils/fileUrl.js';
+import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 
 export class VehicleController {
   constructor() {
     this.vehicleService = new VehicleService();
     this.vehicleTypeService = new VehicleTypeService();
   }
-
-  // Accepts either a VehicleType ObjectId or its slug (e.g. "bharat_mini")
-  resolveVehicleType = async (vehicleTypeId) => {
-    if (mongoose.isValidObjectId(vehicleTypeId)) {
-      return this.vehicleTypeService.getVehicleTypeById(vehicleTypeId);
-    }
-    return this.vehicleTypeService.getVehicleTypeBySlug(String(vehicleTypeId).toLowerCase());
-  };
 
   // GET /api/v3/vehicles
   getVehicles = async (req, res) => {
@@ -88,7 +80,7 @@ export class VehicleController {
         });
       }
 
-      const vehicleType = await this.resolveVehicleType(vehicleTypeId);
+      const vehicleType = await resolveVehicleType(vehicleTypeId);
       if (!vehicleType) {
         return res.status(404).json({ message: 'Vehicle type not found' });
       }
@@ -164,7 +156,7 @@ export class VehicleController {
       const updates = {};
 
       if (vehicleTypeId !== undefined) {
-        const vehicleType = await this.resolveVehicleType(vehicleTypeId);
+        const vehicleType = await resolveVehicleType(vehicleTypeId);
         if (!vehicleType) {
           return res.status(404).json({ message: 'Vehicle type not found' });
         }
