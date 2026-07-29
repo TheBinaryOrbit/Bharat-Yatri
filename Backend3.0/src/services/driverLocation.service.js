@@ -50,9 +50,50 @@ export class DriverLocationService {
     return { latitude, longitude, at: Number(meta.updatedAt) || null };
   };
 
+  // Deliberate offline — the driver tapped the switch or logged out. Evicted immediately.
   goOffline = async (driverId) => {
     const id = String(driverId);
     await redis.pipeline().zrem(GEO_KEY, id).del(metaKey(id)).exec();
+  };
+
+  // The socket dropped without the driver asking to go offline. NOT the same thing as goOffline:
+  // a tunnel, a lift or a backgrounded app must not cost the driver their place in the index.
+  //
+  // The entry is parked instead of deleted — flagged offline so dispatch skips it (there is no
+  // socket to deliver a ride to anyway) and given a long grace TTL to come back to. Returns false
+  // if there was nothing to park, i.e. the driver never went online.
+  beginDisconnectGrace = async (driverId) => {
+    const id = String(driverId);
+    const key = metaKey(id);
+
+    if (!(await redis.exists(key))) return false;
+
+    await redis
+      .pipeline()
+      .hset(key, { isOnline: '0', disconnectedAt: String(Date.now()) })
+      .expire(key, env.DRIVER_DISCONNECT_GRACE_SECONDS)
+      .exec();
+
+    return true;
+  };
+
+  // Reconnected inside the grace window. The parked entry is reinstated with the vehicle metadata
+  // it already holds, so the app resumes pinging without walking the driver back through
+  // driver:online. Returns the recovered meta, or null if the window closed and they must re-online.
+  resumeFromGrace = async (driverId) => {
+    const id = String(driverId);
+    const meta = await this.getDriverMeta(id);
+
+    if (!meta || meta.isOnline === '1') return null;
+
+    await redis
+      .pipeline()
+      .hset(metaKey(id), { isOnline: '1', updatedAt: String(Date.now()) })
+      .hdel(metaKey(id), 'disconnectedAt')
+      .expire(metaKey(id), env.DRIVER_LOCATION_TTL_SECONDS)
+      .exec();
+
+    return meta;
   };
 
   // Rejects a fix that would require the driver to have moved impossibly fast since their last one.

@@ -4,6 +4,8 @@ import { QuickRideBidService } from '../services/quickRideBid.service.js';
 import { DriverAvailabilityService } from '../services/driverAvailability.service.js';
 import { DriverLocationService } from '../services/driverLocation.service.js';
 import { RideDispatchService } from '../services/rideDispatch.service.js';
+import { RideAudienceService } from '../services/rideAudience.service.js';
+import { PaymentDetailsService } from '../services/paymentDetails.service.js';
 import { FareService } from '../services/fare.service.js';
 import { MapsService, RouteNotFoundError } from '../services/maps.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
@@ -20,10 +22,12 @@ export class QuickRideController {
     this.driverAvailabilityService = new DriverAvailabilityService();
     this.driverLocationService = new DriverLocationService();
     this.rideDispatchService = new RideDispatchService();
+    this.rideAudienceService = new RideAudienceService();
     this.fareService = new FareService();
     this.mapsService = new MapsService();
     this.vehicleService = new VehicleService();
     this.vehicleTypeService = new VehicleTypeService();
+    this.paymentDetailsService = new PaymentDetailsService();
   }
 
   // Accepts { latitude, longitude } and reports which field is wrong
@@ -255,6 +259,31 @@ export class QuickRideController {
     }
   };
 
+  // Open rides a given driver could bid on right now, shaped for the ride cards.
+  // Shared by /available and /live so the two can never drift apart. Returns null when the driver
+  // has no vehicle, which each caller reports in its own way.
+  findOpenRidesForDriver = async (driverId, latitude, longitude) => {
+    const vehicle = await this.vehicleService.getVehicleByDriver(driverId);
+    if (!vehicle) return null;
+
+    const rides = await this.quickRideService.findOpenRidesNear({
+      latitude,
+      longitude,
+      vehicleTypeId: vehicle.vehicleTypeId?._id ?? vehicle.vehicleTypeId,
+      radiusKm: env.DRIVER_SEARCH_RADIUS_MAX_KM,
+    });
+
+    return rides.map((ride) => ({
+      ...ride,
+      startOtp: undefined,
+      trackingToken: undefined,
+      pickupCoordinates: fromGeoPoint(ride.pickupCoordinates),
+      dropCoordinates: fromGeoPoint(ride.dropCoordinates),
+      distanceFromDriverKm: Number((ride.distanceFromDriverMeters / 1000).toFixed(2)),
+      bidBounds: this.fareService.getBidBounds(ride.offeredFare),
+    }));
+  };
+
   // GET /api/v3/quick-rides/available  (protected — driver only)
   // Polling fallback for a dropped socket.
   getAvailableRides = async (req, res) => {
@@ -276,33 +305,108 @@ export class QuickRideController {
         return res.status(200).json({ busy: true, count: 0, data: [] });
       }
 
-      const vehicle = await this.vehicleService.getVehicleByDriver(driverId);
-      if (!vehicle) {
+      const data = await this.findOpenRidesForDriver(driverId, latitude, longitude);
+      if (!data) {
         return res.status(409).json({ message: 'Register a vehicle before accepting rides' });
       }
-
-      const rides = await this.quickRideService.findOpenRidesNear({
-        latitude,
-        longitude,
-        vehicleTypeId: vehicle.vehicleTypeId?._id ?? vehicle.vehicleTypeId,
-        radiusKm: env.DRIVER_SEARCH_RADIUS_MAX_KM,
-      });
-
-      const data = rides.map((ride) => ({
-        ...ride,
-        startOtp: undefined,
-        trackingToken: undefined,
-        pickupCoordinates: fromGeoPoint(ride.pickupCoordinates),
-        dropCoordinates: fromGeoPoint(ride.dropCoordinates),
-        distanceFromDriverKm: Number((ride.distanceFromDriverMeters / 1000).toFixed(2)),
-        bidBounds: this.fareService.getBidBounds(ride.offeredFare),
-      }));
 
       return res.status(200).json({ busy: false, count: data.length, data });
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Failed to fetch rides', message: 'Internal server error' });
     }
+  };
+
+  // GET /api/v3/quick-rides/live  (protected — either role)
+  //
+  // The single call an app makes when it opens or comes back from the background. It answers
+  // "where was I?" in one round trip, for both sides, so neither app has to reconstruct its
+  // screen from a ride list plus a bid list plus a status guess.
+  getLiveRides = async (req, res) => {
+    try {
+      if (req.role === 'driver') return await this.getLiveForDriver(req, res);
+      return await this.getLiveForUser(req, res);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: 'Failed to load live state', message: 'Internal server error' });
+    }
+  };
+
+  // The rider's live view: their in-flight ride and the bids currently on it.
+  getLiveForUser = async (req, res) => {
+    const ride = await this.quickRideService.getLiveRideForUser(req.user._id);
+
+    if (!ride) {
+      return res.status(200).json({ role: 'user', hasLiveRide: false, ride: null, bids: [], count: 0 });
+    }
+
+    // Bids only exist while the ride is still out for them
+    const bids =
+      ride.rideStatus === 'searching' ? await this.quickRideBidService.getActiveBidsForRide(ride._id) : [];
+
+    return res.status(200).json({
+      role: 'user',
+      hasLiveRide: true,
+      ride,
+      rideStatus: ride.rideStatus,
+      offerBounds: this.fareService.getOfferBounds(ride.suggestedFare),
+      bidBounds: this.fareService.getBidBounds(ride.offeredFare),
+      // Only ever populated once a driver is assigned — this is the rider's own view of their ride
+      startOtp: ride.rideStatus === 'assigned' ? ride.startOtp : null,
+      trackingUrl: this.buildTrackingUrl(ride.trackingToken),
+      count: bids.length,
+      bids,
+    });
+  };
+
+  // The driver's live view: the ride they are committed to, or — if free — their pending bids and
+  // the open rides around them. Location is optional so the call still works before GPS is ready.
+  getLiveForDriver = async (req, res) => {
+    const driverId = req.user._id;
+    const ride = await this.quickRideService.getLiveRideForDriver(driverId);
+
+
+    if (ride) {
+      return res.status(200).json({
+        role: 'driver',
+        busy: true,
+        hasLiveRide: true,
+        ride,
+        rideStatus: ride.rideStatus,
+        // What the details screen should navigate to for this phase
+        navigateTo: ride.rideStatus === 'assigned' ? 'pickup' : 'drop',
+        bids: [],
+        availableRides: [],
+        count: 0,
+      });
+    }
+
+
+    const bids = await this.quickRideBidService.getActiveBidsForDriver(driverId);
+
+    const latitude = Number(req.query.latitude);
+    const longitude = Number(req.query.longitude);
+    const hasLocation = isValidCoordinate(latitude, longitude);
+
+
+    
+  
+
+    const availableRides = hasLocation ? await this.findOpenRidesForDriver(driverId, latitude, longitude) : [];
+
+
+    return res.status(200).json({
+      role: 'driver',
+      busy: false,
+      hasLiveRide: false,
+      ride: null,
+      // Distinguishes "no rides nearby" from "you did not tell me where you are"
+      needsLocation: !hasLocation,
+      needsVehicle: availableRides === null,
+      count: bids.length,
+      bids,
+      availableRides: availableRides ?? [],
+    });
   };
 
   // GET /api/v3/quick-rides/my  (protected)
@@ -485,8 +589,10 @@ export class QuickRideController {
       emitToDriver(completed.assignedTo?._id ?? completed.assignedTo, 'ride:completed', payload);
 
       await closeRideRoom(completed._id, 'completed');
+      
+      const paymentDetails = await this.paymentDetailsService.getByDriver(completed.assignedTo?._id ?? completed.assignedTo);
 
-      return res.status(200).json({ message: 'Ride completed successfully.', ride: completed });
+      return res.status(200).json({ message: 'Ride completed successfully.', ride: completed, paymentDetails });
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Failed to complete ride', message: 'Internal server error' });
@@ -496,6 +602,8 @@ export class QuickRideController {
   // PATCH /api/v3/quick-rides/:id/cancel  (protected — either party)
   cancelRide = async (req, res) => {
     const { cancellationReason } = req.body;
+
+    console.log(`User ${req.user._id} (${req.role}) is cancelling ride ${req.params.id} for reason: ${cancellationReason}`);
 
     try {
       const ride = await this.quickRideService.getRideRaw(req.params.id);
@@ -529,6 +637,13 @@ export class QuickRideController {
       doomed.forEach((bid) => emitToDriver(bid.requestedBy, 'ride:cancelled', payload));
       if (isRider && cancelled.assignedTo) emitToDriver(cancelled.assignedTo?._id ?? cancelled.assignedTo, 'ride:cancelled', payload);
       if (isDriver) emitToUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'ride:cancelled', payload);
+
+      // Everyone else the ride was ever pushed to. Bidders were just told above, and the assigned
+      // driver either was too or is the one doing the cancelling — excluding both leaves exactly
+      // the drivers with a card and no other reason to hear about this.
+      await this.rideAudienceService.notifyAndDrain(cancelled._id, 'ride:cancelled', payload, {
+        exclude: [...doomed.map((bid) => bid.requestedBy), cancelled.assignedTo],
+      });
 
       await closeRideRoom(cancelled._id, 'cancelled');
 

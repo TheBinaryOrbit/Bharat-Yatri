@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>QuickRide — Rider Test Console</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1e222b; --line: #2a2f3a;
+    --text: #e6e8ee; --muted: #939aab; --accent: #4f9cf9; --ok: #3ddc97;
+    --warn: #ffb347; --err: #ff6b6b; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; align-items: start; }
+  @media (max-width: 980px) { .wrap { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .panel h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 10px; font-weight: 600;
+  }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
+  input, select {
+    width: 100%; padding: 8px 10px; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; font: inherit;
+  }
+  input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  button {
+    padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; font-weight: 600; }
+  button.danger { border-color: #5a2b2b; color: var(--err); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+  .row > * { flex: 1; min-width: 0; }
+  .row > button { flex: 0 0 auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .pill.ok { color: var(--ok); border-color: #245c45; }
+  .pill.warn { color: var(--warn); border-color: #5c4a24; }
+  .pill.err { color: var(--err); border-color: #5c2424; }
+  .card {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; margin-top: 8px;
+  }
+  .card.sel { border-color: var(--accent); }
+  .card h3 { margin: 0 0 2px; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .big { font-size: 20px; font-weight: 600; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 13px; }
+  .kv span:first-child { color: var(--muted); }
+  #log {
+    height: 260px; overflow: auto; font: 11px/1.5 ui-monospace, Menlo, Consolas, monospace;
+    background: #0b0d11; border: 1px solid var(--line); border-radius: 8px; padding: 8px;
+  }
+  #log div { padding: 1px 0; border-bottom: 1px solid #14171d; word-break: break-word; }
+  .t-in { color: var(--ok); } .t-out { color: var(--accent); } .t-err { color: var(--err); }
+  .otp {
+    font: 700 26px/1 ui-monospace, Menlo, Consolas, monospace;
+    letter-spacing: .3em; color: var(--ok); padding: 8px 0;
+  }
+  svg { width: 100%; height: 210px; background: #0b0d11; border: 1px solid var(--line); border-radius: 8px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>QuickRide — Rider Test Console</h1>
+  <span class="sub">books a real ride against the running backend</span>
+  <span id="sockState" class="pill">socket: offline</span>
+  <span id="whoami" class="pill">not signed in</span>
+</header>
+
+<div class="wrap">
+
+  <!-- ─────────────── left column ─────────────── -->
+  <div>
+    <div class="panel">
+      <h2>1 · Sign in as a rider</h2>
+      <label>API base</label>
+      <input id="base" value="" />
+      <div class="row">
+        <div><label>Phone number</label><input id="phone" placeholder="9990000001" /></div>
+        <button id="btnOtp">Send OTP</button>
+      </div>
+      <div class="row">
+        <div><label>OTP</label><input id="otp" placeholder="123456" /></div>
+        <button id="btnVerify">Verify &amp; connect</button>
+      </div>
+      <label>…or paste a rider JWT directly</label>
+      <div class="row">
+        <input id="token" placeholder="eyJhbGciOi..." />
+        <button id="btnUseToken">Use token</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>2 · Suggested fares — all vehicle types</h2>
+      <div class="row" style="margin-bottom:4px">
+        <button id="btnLocate">📍 Use my current location</button>
+        <select id="locTarget" style="flex:0 0 130px">
+          <option value="pickup">as pickup</option>
+          <option value="drop">as drop</option>
+        </select>
+      </div>
+      <div id="locMsg" class="muted"></div>
+      <div class="grid2">
+        <div><label>Pickup lat</label><input id="pLat" value="28.6315" /></div>
+        <div><label>Pickup lng</label><input id="pLng" value="77.2167" /></div>
+      </div>
+      <label>Pickup name</label><input id="pName" value="Connaught Place" />
+      <div class="grid2" style="margin-top:8px">
+        <div><label>Drop lat</label><input id="dLat" value="28.5355" /></div>
+        <div><label>Drop lng</label><input id="dLng" value="77.3910" /></div>
+      </div>
+      <label>Drop name</label><input id="dName" value="Sector 62 Noida" />
+      <div style="margin-top:12px">
+        <button id="btnEstimate" class="primary">POST /quick-rides/fare-estimate</button>
+      </div>
+      <div id="estMeta" class="muted" style="margin-top:8px"></div>
+      <div id="estList"></div>
+    </div>
+  </div>
+
+  <!-- ─────────────── right column ─────────────── -->
+  <div>
+    <div class="panel">
+      <h2>3 · Your ride</h2>
+      <div id="noRide" class="muted">No active ride. Pick a vehicle type on the left and book.</div>
+
+      <div id="rideBox" class="hidden">
+        <div class="row" style="align-items:center">
+          <div>
+            <div class="big" id="rStatus">—</div>
+            <div class="muted" id="rId"></div>
+          </div>
+          <button id="btnRefresh">Refresh</button>
+          <button id="btnCancel" class="danger">Cancel ride</button>
+        </div>
+
+        <div class="kv"><span>Offered fare</span><span id="rOffered">—</span></div>
+        <div class="kv"><span>Suggested fare</span><span id="rSuggested">—</span></div>
+        <div class="kv"><span>Allowed range</span><span id="rBand">—</span></div>
+        <div class="kv"><span>Trip</span><span id="rTrip">—</span></div>
+        <div class="kv"><span>Final fare</span><span id="rFinal">—</span></div>
+
+        <div id="raiseBox">
+          <label>Raise your offer (increase only, capped at the band max)</label>
+          <div class="row">
+            <input id="raiseFare" type="number" />
+            <button id="btnRaise">PATCH /fare</button>
+          </div>
+        </div>
+
+        <div id="otpBox" class="hidden">
+          <label>Start OTP — read this out to the driver</label>
+          <div class="otp" id="otpVal">····</div>
+          <div class="muted" id="trackUrl"></div>
+        </div>
+
+        <div id="driverBox" class="hidden card">
+          <h3 id="dvName">—</h3>
+          <div class="muted" id="dvMeta">—</div>
+          <div class="muted" id="dvLoc">waiting for location…</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>4 · Live bids</h2>
+      <div id="bidEmpty" class="muted">Bids appear here the moment a driver bids.</div>
+      <div id="bidList"></div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>Map</h2>
+      <svg id="map" viewBox="0 0 400 210" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <h2>Event log</h2>
+      <div class="row" style="margin-bottom:8px">
+        <button id="btnClear">Clear</button>
+      </div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = { token: null, socket: null, ride: null, bids: [], est: null, driverLoc: null };
+
+  $('base').value = location.origin + '/api/v3';
+
+  // ── logging ──────────────────────────────────────────────────────────────
+  const log = (kind, label, data) => {
+    const el = document.createElement('div');
+    el.className = 't-' + kind;
+    const t = new Date().toLocaleTimeString();
+    el.textContent = `${t}  ${label}` + (data === undefined ? '' : '  ' + JSON.stringify(data));
+    $('log').prepend(el);
+  };
+  $('btnClear').onclick = () => ($('log').innerHTML = '');
+
+  // ── REST helper ──────────────────────────────────────────────────────────
+  const api = async (method, path, body) => {
+    const res = await fetch($('base').value + path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const json = await res.json().catch(() => ({}));
+    log(res.ok ? 'out' : 'err', `${method} ${path} → ${res.status}`, json.message || json.error || '');
+    return { status: res.status, ok: res.ok, body: json };
+  };
+
+  const fail = (r) => {
+    const msg = r.body.message || r.body.error || 'Request failed';
+    const detail = (r.body.errors || []).map((e) => `${e.field}: ${e.message}`).join(' · ');
+    alert(`${r.status} — ${msg}${detail ? '\n' + detail : ''}`);
+  };
+
+  // ── coordinates: REST gives GeoJSON, sockets give {latitude,longitude} ────
+  const toLatLng = (c) => {
+    if (!c) return null;
+    if (Array.isArray(c.coordinates)) return { lat: c.coordinates[1], lng: c.coordinates[0] };
+    if (c.latitude != null) return { lat: c.latitude, lng: c.longitude };
+    return null;
+  };
+
+  // ── auth ─────────────────────────────────────────────────────────────────
+  let sessionId = null;
+
+  $('btnOtp').onclick = async () => {
+    const r = await api('POST', '/auth/otp', { phoneNumber: $('phone').value.trim() });
+    if (!r.ok) return fail(r);
+    sessionId = r.body.sessionId;
+    alert('OTP sent. Check the phone / the 2factor dashboard.');
+  };
+
+  $('btnVerify').onclick = async () => {
+    const r = await api('POST', '/auth/verify', {
+      phoneNumber: $('phone').value.trim(),
+      otp: $('otp').value.trim(),
+      sessionId,
+      role: 'user',
+    });
+    if (!r.ok) return fail(r);
+    if (!r.body.token) return alert('Verified, but no token came back — is this phone registered as a user?');
+    $('token').value = r.body.token;
+    signIn(r.body.token, r.body.user?.name || r.body.data?.name);
+  };
+
+  $('btnUseToken').onclick = () => {
+    const t = $('token').value.trim();
+    if (!t) return alert('Paste a token first');
+    signIn(t);
+  };
+
+  const signIn = (token, name) => {
+    state.token = token;
+    $('whoami').textContent = name ? `rider: ${name}` : 'rider: signed in';
+    $('whoami').className = 'pill ok';
+    connectSocket();
+    resumeActiveRide();
+  };
+
+  // ── socket ───────────────────────────────────────────────────────────────
+  const connectSocket = () => {
+    if (state.socket) state.socket.disconnect();
+
+    const socket = io(location.origin, { auth: { token: state.token }, transports: ['websocket'] });
+    state.socket = socket;
+
+    socket.on('connect', () => { $('sockState').textContent = 'socket: live'; $('sockState').className = 'pill ok'; log('in', 'socket connected'); });
+    socket.on('disconnect', (r) => { $('sockState').textContent = 'socket: offline'; $('sockState').className = 'pill err'; log('err', 'socket disconnected', r); });
+    socket.on('connect_error', (e) => { $('sockState').textContent = 'socket: error'; $('sockState').className = 'pill err'; log('err', 'connect_error', e.message); });
+
+    // ride lifecycle
+    socket.on('ride:no_drivers', (p) => { log('in', 'ride:no_drivers', p); toast(`No drivers within ${p.searchedRadiusKm} km yet — try raising the fare.`); });
+    socket.on('ride:assigned', (p) => {
+      log('in', 'ride:assigned', { finalFare: p.finalFare });
+      state.ride = p.ride;
+      showOtp(p.startOtp, p.trackingUrl);
+      state.bids = [];
+      renderBids();
+      renderRide();
+    });
+    socket.on('ride:started',   (p) => { log('in', 'ride:started', p);   patchRide({ rideStatus: 'in_progress', startedAt: p.startedAt }); });
+    socket.on('ride:completed', (p) => { log('in', 'ride:completed', p); patchRide({ rideStatus: 'completed', completedAt: p.completedAt, finalFare: p.finalFare }); });
+    socket.on('ride:cancelled', (p) => { log('in', 'ride:cancelled', p); patchRide({ rideStatus: 'cancelled' }); });
+    socket.on('ride:expired',   (p) => { log('in', 'ride:expired', p);   patchRide({ rideStatus: 'expired' }); });
+    socket.on('ride:ended',     (p) => log('in', 'ride:ended', p));
+    socket.on('ride:rejoined',  (p) => { log('in', 'ride:rejoined', p); resumeActiveRide(); });
+
+    // bids
+    socket.on('bid:new', (p) => {
+      log('in', 'bid:new', { fare: p.bid?.fare });
+      state.bids = [...state.bids.filter((b) => b._id !== p.bid._id), p.bid].sort((a, b) => a.fare - b.fare);
+      renderBids();
+    });
+    socket.on('bid:removed', (p) => { log('in', 'bid:removed', p); state.bids = state.bids.filter((b) => b._id !== p.bidId); renderBids(); });
+    socket.on('bid:expired', (p) => { log('in', 'bid:expired', p); state.bids = state.bids.filter((b) => b._id !== p.bidId); renderBids(); });
+
+    // live driver position, once assigned
+    socket.on('ride:location', (p) => {
+      state.driverLoc = { lat: p.latitude, lng: p.longitude, at: p.at };
+      $('dvLoc').textContent = `driver at ${p.latitude.toFixed(5)}, ${p.longitude.toFixed(5)}`;
+      drawMap();
+    });
+  };
+
+  const toast = (msg) => { const el = document.createElement('div'); el.className = 't-err'; el.textContent = msg; $('log').prepend(el); };
+
+  // ── current location ─────────────────────────────────────────────────────
+  // Geolocation needs a secure context. http://localhost counts as one; hitting this page over
+  // plain http on a LAN IP does not, and the browser blocks the call outright.
+  const GEO_ERRORS = {
+    1: 'Permission denied — allow location for this site and try again',
+    2: 'Position unavailable — no GPS/wifi fix right now',
+    3: 'Timed out waiting for a fix',
+  };
+
+  $('btnLocate').onclick = () => {
+    const msg = $('locMsg');
+
+    if (!navigator.geolocation) return (msg.textContent = 'This browser has no geolocation API');
+    if (!window.isSecureContext) {
+      return (msg.textContent = 'Blocked: geolocation needs https or localhost — you are on ' + location.origin);
+    }
+
+    msg.textContent = 'Locating…';
+    $('btnLocate').disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: c }) => {
+        const asDrop = $('locTarget').value === 'drop';
+        $(asDrop ? 'dLat' : 'pLat').value = c.latitude.toFixed(6);
+        $(asDrop ? 'dLng' : 'pLng').value = c.longitude.toFixed(6);
+        $(asDrop ? 'dName' : 'pName').value = 'Current location';
+
+        msg.textContent = `${asDrop ? 'Drop' : 'Pickup'} set to ${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)} (±${Math.round(c.accuracy)} m)`;
+        $('btnLocate').disabled = false;
+        log('out', 'geolocation fix', { latitude: c.latitude, longitude: c.longitude, accuracyM: Math.round(c.accuracy) });
+        drawMap();
+      },
+      (err) => {
+        msg.textContent = GEO_ERRORS[err.code] || err.message;
+        $('btnLocate').disabled = false;
+        log('err', 'geolocation failed', msg.textContent);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // ── fare estimate ────────────────────────────────────────────────────────
+  const coords = () => ({
+    pickup: { latitude: +$('pLat').value, longitude: +$('pLng').value },
+    drop:   { latitude: +$('dLat').value, longitude: +$('dLng').value },
+  });
+
+  $('btnEstimate').onclick = async () => {
+    if (!state.token) return alert('Sign in first');
+    const c = coords();
+    const r = await api('POST', '/quick-rides/fare-estimate', {
+      pickupCoordinates: c.pickup, dropCoordinates: c.drop,
+    });
+    if (!r.ok) { $('estList').innerHTML = ''; $('estMeta').textContent = ''; return fail(r); }
+
+    state.est = r.body;
+    $('estMeta').textContent = `${r.body.estimatedDistanceKm} km · ${r.body.estimatedDurationMin} min · ${r.body.fareOptions.length} vehicle types`;
+    renderEstimate();
+    drawMap();
+  };
+
+  const renderEstimate = () => {
+    const list = $('estList');
+    list.innerHTML = '';
+
+    state.est.fareOptions.forEach((opt, i) => {
+      const vt = opt.vehicleType;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h3>${vt.name} <span class="muted">· ${vt.capacity} seats</span></h3>
+        <div class="muted">${vt.description || vt.slug}</div>
+        <div class="kv"><span>Suggested</span><span class="big">₹${opt.suggestedFare}</span></div>
+        <div class="kv"><span>You may offer</span><span>₹${opt.offerBounds.min} – ₹${opt.offerBounds.max}</span></div>
+        <label>Your fare</label>
+        <div class="row">
+          <input type="number" id="fare_${i}" value="${opt.suggestedFare}"
+                 min="${opt.offerBounds.min}" max="${opt.offerBounds.max}" step="1" />
+          <button data-i="${i}" class="primary book">Book</button>
+        </div>
+        <div class="muted" id="warn_${i}"></div>`;
+      list.appendChild(card);
+
+      const input = card.querySelector(`#fare_${i}`);
+      input.oninput = () => {
+        const v = Number(input.value);
+        const { min, max } = opt.offerBounds;
+        $(`warn_${i}`).textContent =
+          v < min ? `Below the floor — the server will reject this (min ₹${min})` :
+          v > max ? `Above the ceiling — the server will reject this (max ₹${max})` : '';
+      };
+    });
+
+    list.querySelectorAll('button.book').forEach((btn) => {
+      btn.onclick = () => book(Number(btn.dataset.i));
+    });
+  };
+
+  // ── booking ──────────────────────────────────────────────────────────────
+  const book = async (i) => {
+    const opt = state.est.fareOptions[i];
+    const c = coords();
+    const r = await api('POST', '/quick-rides', {
+      pickupLocationName: $('pName').value,
+      dropLocationName: $('dName').value,
+      pickupCoordinates: c.pickup,
+      dropCoordinates: c.drop,
+      vehicleTypeId: opt.vehicleType._id,
+      offeredFare: Number($(`fare_${i}`).value),
+    });
+    if (!r.ok) return fail(r);   // 400 carries offerBounds, 409 = you already have a ride searching
+
+    state.ride = r.body.ride;
+    state.ride.offerBounds = r.body.offerBounds;
+    state.bids = [];
+    renderBids();
+    renderRide();
+    log('out', 'ride created', { id: state.ride._id, offeredFare: state.ride.offeredFare });
+  };
+
+  // One call restores the whole screen — ride, phase, bids, OTP and tracking link.
+  const resumeActiveRide = async () => {
+    const r = await api('GET', '/quick-rides/live');
+    if (!r.ok || !r.body.hasLiveRide) return;
+
+    state.ride = r.body.ride;
+    state.ride.offerBounds = r.body.offerBounds;
+    state.bids = r.body.bids || [];
+    showOtp(r.body.startOtp, r.body.trackingUrl);
+    renderBids();
+    renderRide();
+  };
+
+  // ── ride panel ───────────────────────────────────────────────────────────
+  const patchRide = (fields) => { if (state.ride) { Object.assign(state.ride, fields); renderRide(); } };
+
+  const renderRide = () => {
+    const ride = state.ride;
+    $('noRide').classList.toggle('hidden', !!ride);
+    $('rideBox').classList.toggle('hidden', !ride);
+    if (!ride) return;
+
+    $('rStatus').textContent = ride.rideStatus;
+    $('rId').textContent = ride._id;
+    $('rOffered').textContent = '₹' + ride.offeredFare;
+    $('rSuggested').textContent = '₹' + ride.suggestedFare;
+    $('rTrip').textContent = `${ride.estimatedDistanceKm} km · ${ride.estimatedDurationMin} min`;
+    $('rFinal').textContent = ride.finalFare ? '₹' + ride.finalFare : '—';
+
+    const band = ride.offerBounds;
+    $('rBand').textContent = band ? `₹${band.min} – ₹${band.max}` : '—';
+    if (band) { $('raiseFare').min = ride.offeredFare + 1; $('raiseFare').max = band.max; }
+
+    const searching = ride.rideStatus === 'searching';
+    $('raiseBox').classList.toggle('hidden', !searching);
+    $('btnCancel').disabled = !['searching', 'assigned'].includes(ride.rideStatus);
+
+    const dv = ride.assignedTo;
+    $('driverBox').classList.toggle('hidden', !dv || typeof dv === 'string');
+    if (dv && typeof dv === 'object') {
+      $('dvName').textContent = dv.name || 'Driver';
+      $('dvMeta').textContent = `${dv.phoneNumber || ''} · ${ride.vehicleTypeId?.name || ''}`;
+    }
+
+    if (ride.rideStatus === 'completed') {
+      $('otpBox').classList.add('hidden');
+      log('in', '🎉 ride completed', { finalFare: ride.finalFare });
+    }
+    drawMap();
+  };
+
+  const showOtp = (otp, url) => {
+    if (!otp) return;
+    $('otpBox').classList.remove('hidden');
+    $('otpVal').textContent = otp;
+    $('trackUrl').textContent = url ? 'tracking: ' + url : '';
+  };
+
+  $('btnRefresh').onclick = () => refresh();
+  const refresh = async () => {
+    const r = await api('GET', '/quick-rides/' + state.ride._id);
+    if (!r.ok) return fail(r);
+    const band = state.ride.offerBounds;
+    state.ride = r.body.ride;
+    if (band) state.ride.offerBounds = band;
+    showOtp(r.body.ride.startOtp, r.body.trackingUrl);
+    renderRide();
+  };
+
+  $('btnRaise').onclick = async () => {
+    const r = await api('PATCH', `/quick-rides/${state.ride._id}/fare`, { offeredFare: Number($('raiseFare').value) });
+    if (!r.ok) return fail(r);   // 400 = not an increase, or above the band ceiling
+    const band = r.body.offerBounds;
+    state.ride = r.body.ride;
+    state.ride.offerBounds = band;
+    renderRide();
+  };
+
+  $('btnCancel').onclick = async () => {
+    if (!confirm('Cancel this ride?')) return;
+    const r = await api('PATCH', `/quick-rides/${state.ride._id}/cancel`, { cancellationReason: 'Rider cancelled from test console' });
+    if (!r.ok) return fail(r);
+    patchRide({ rideStatus: 'cancelled' });
+  };
+
+  // ── bids ─────────────────────────────────────────────────────────────────
+  const loadBids = async () => {
+    if (!state.ride) return;
+    const r = await api('GET', `/quick-rides/${state.ride._id}/bids`);
+    if (r.ok) { state.bids = r.body.data; renderBids(); }
+  };
+
+  const renderBids = () => {
+    const list = $('bidList');
+    list.innerHTML = '';
+    $('bidEmpty').classList.toggle('hidden', state.bids.length > 0);
+
+    state.bids.forEach((bid) => {
+      const secs = Math.max(0, Math.round((new Date(bid.expiresAt) - Date.now()) / 1000));
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="row" style="align-items:center">
+          <div>
+            <h3>₹${bid.fare} <span class="muted">· ${bid.requestedBy?.name || 'Driver'}</span></h3>
+            <div class="muted">${bid.vehicleId?.vehicleName || ''} ${bid.vehicleId?.vehicleNumber || ''} · expires in ${secs}s</div>
+          </div>
+          <button class="primary acc">Accept</button>
+          <button class="danger rej">Dismiss</button>
+        </div>`;
+      card.querySelector('.acc').onclick = async () => {
+        const r = await api('PATCH', `/quick-ride-bids/${bid._id}/accept`);
+        if (!r.ok) return fail(r);   // 409 = expired, or the ride was taken/expired first
+        state.ride = r.body.ride;
+        showOtp(r.body.startOtp, r.body.trackingUrl);
+        state.bids = [];
+        renderBids();
+        renderRide();
+      };
+      card.querySelector('.rej').onclick = async () => {
+        const r = await api('DELETE', `/quick-ride-bids/${bid._id}`);
+        if (!r.ok) return fail(r);
+        state.bids = state.bids.filter((b) => b._id !== bid._id);
+        renderBids();
+      };
+      list.appendChild(card);
+    });
+  };
+
+  setInterval(() => { if (state.bids.length) renderBids(); }, 1000);  // live countdowns
+
+  // ── map ──────────────────────────────────────────────────────────────────
+  const drawMap = () => {
+    const pts = [];
+    const pick = state.ride ? toLatLng(state.ride.pickupCoordinates) : { lat: +$('pLat').value, lng: +$('pLng').value };
+    const drop = state.ride ? toLatLng(state.ride.dropCoordinates) : { lat: +$('dLat').value, lng: +$('dLng').value };
+    if (pick) pts.push({ ...pick, c: '#4f9cf9', r: 6, label: 'P' });
+    if (drop) pts.push({ ...drop, c: '#ffb347', r: 6, label: 'D' });
+    if (state.driverLoc) pts.push({ ...state.driverLoc, c: '#3ddc97', r: 7, label: '🚗' });
+    if (!pts.length) return;
+
+    const lats = pts.map((p) => p.lat), lngs = pts.map((p) => p.lng);
+    const pad = 0.01;
+    const minLat = Math.min(...lats) - pad, maxLat = Math.max(...lats) + pad;
+    const minLng = Math.min(...lngs) - pad, maxLng = Math.max(...lngs) + pad;
+    const x = (lng) => ((lng - minLng) / (maxLng - minLng || 1)) * 380 + 10;
+    const y = (lat) => 200 - ((lat - minLat) / (maxLat - minLat || 1)) * 190;
+
+    const line = pick && drop
+      ? `<line x1="${x(pick.lng)}" y1="${y(pick.lat)}" x2="${x(drop.lng)}" y2="${y(drop.lat)}"
+              stroke="#2a2f3a" stroke-width="2" stroke-dasharray="4 4" />` : '';
+
+    $('map').innerHTML = line + pts.map((p) => `
+      <circle cx="${x(p.lng)}" cy="${y(p.lat)}" r="${p.r}" fill="${p.c}" />
+      <text x="${x(p.lng) + 10}" y="${y(p.lat) + 4}" fill="#939aab" font-size="11">${p.label}</text>
+    `).join('');
+  };
+
+  drawMap();
+})();
+</script>
+</body>
+</html>

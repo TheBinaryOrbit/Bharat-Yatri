@@ -1,6 +1,7 @@
 import { DriverLocationService } from './driverLocation.service.js';
 import { DriverAvailabilityService } from './driverAvailability.service.js';
 import { FareService } from './fare.service.js';
+import { RideAudienceService } from './rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { fromGeoPoint } from '../utils/geo.js';
 
@@ -9,6 +10,7 @@ export class RideDispatchService {
     this.driverLocationService = new DriverLocationService();
     this.driverAvailabilityService = new DriverAvailabilityService();
     this.fareService = new FareService();
+    this.rideAudienceService = new RideAudienceService();
   }
 
   buildRequestPayload = (ride, distanceFromDriverKm) => {
@@ -63,6 +65,16 @@ export class RideDispatchService {
       });
       return { drivers: [], radiusKm };
     }
+
+    // Recorded BEFORE the fan-out, not after. A ride cancelled mid-dispatch drains an audience that
+    // does not yet contain these drivers, and they keep a card for a dead ride — the exact bug this
+    // set exists to prevent. Remembering first inverts the race into the harmless direction: a
+    // driver who is recorded but never reached gets a cancel event for a card they never had, and
+    // removing a card that isn't on screen is a no-op in the app.
+    await this.rideAudienceService.remember(
+      ride._id,
+      drivers.map((driver) => driver.driverId)
+    );
 
     drivers.forEach((driver) => {
       emitToDriver(driver.driverId, event, this.buildRequestPayload(ride, driver.distanceKm));

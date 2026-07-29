@@ -4,6 +4,7 @@ import { QuickRideBidService } from '../services/quickRideBid.service.js';
 import { DriverAvailabilityService } from '../services/driverAvailability.service.js';
 import { FareService } from '../services/fare.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
+import { RideAudienceService } from '../services/rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { openRideRoom } from '../socket/rideRoom.js';
 
@@ -14,6 +15,7 @@ export class QuickRideBidController {
     this.driverAvailabilityService = new DriverAvailabilityService();
     this.fareService = new FareService();
     this.vehicleService = new VehicleService();
+    this.rideAudienceService = new RideAudienceService();
   }
 
   buildTrackingUrl = (trackingToken) => {
@@ -138,6 +140,12 @@ export class QuickRideBidController {
       losers.forEach((loser) =>
         emitToDriver(loser.requestedBy, 'ride:taken', { rideId: String(ride._id), bidId: String(loser._id) })
       );
+
+      // The drivers who saw the card and never bid. They get the same event without a `bidId` —
+      // there is no bid of theirs to reference. The winner is excluded for the obvious reason.
+      await this.rideAudienceService.notifyAndDrain(ride._id, 'ride:taken', { rideId: String(ride._id) }, {
+        exclude: [...losers.map((loser) => loser.requestedBy), bid.requestedBy],
+      });
 
       // The winner is now busy, so their bids on other rides can never be fulfilled.
       // Those riders are told immediately instead of watching a dead bid sit for 60s.

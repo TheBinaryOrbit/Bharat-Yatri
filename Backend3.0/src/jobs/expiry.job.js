@@ -1,11 +1,13 @@
 import { env } from '../config/env.js';
 import { QuickRideService } from '../services/quickRide.service.js';
 import { QuickRideBidService } from '../services/quickRideBid.service.js';
+import { RideAudienceService } from '../services/rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { closeRideRoom } from '../socket/rideRoom.js';
 
 const quickRideService = new QuickRideService();
 const quickRideBidService = new QuickRideBidService();
+const rideAudienceService = new RideAudienceService();
 
 let timer = null;
 let isRunning = false;
@@ -42,6 +44,15 @@ const expireRides = async () => {
     // Bids on a dead ride are unfulfillable; their drivers are told before the rows go.
     const doomed = await quickRideBidService.deleteOtherBidsForRide(ride._id, null);
     doomed.forEach((bid) => emitToDriver(bid.requestedBy, 'ride:expired', { rideId: String(ride._id) }));
+
+    // Non-bidders were previously left to watch their own countdown run out. The card is now pulled
+    // on the same tick that kills the ride, so every screen agrees on when it died.
+    await rideAudienceService.notifyAndDrain(
+      ride._id,
+      'ride:expired',
+      { rideId: String(ride._id) },
+      { exclude: doomed.map((bid) => bid.requestedBy) }
+    );
 
     emitToUser(ride.bookedBy, 'ride:expired', { rideId: String(ride._id) });
     await closeRideRoom(ride._id, 'expired');

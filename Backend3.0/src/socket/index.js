@@ -150,9 +150,17 @@ const registerDriverHandlers = (io, socket) => {
     }
   });
 
+  // A dropped socket is not "going offline". The entry is parked for the grace window so the
+  // driver comes straight back; only an explicit driver:offline (or the window closing) evicts it.
+  //
+  // Checked against the driver's remaining sockets first: on a two-device session, one tab closing
+  // must not park a driver who is still connected elsewhere.
   socket.on('disconnect', async () => {
     try {
-      await driverLocationService.goOffline(driverId);
+      const remaining = await io.in(driverRoomName(driverId)).fetchSockets();
+      if (remaining.length) return;
+
+      await driverLocationService.beginDisconnectGrace(driverId);
     } catch (error) {
       console.error('driver disconnect cleanup error:', error.message);
     }
@@ -182,19 +190,10 @@ export const initSocket = (httpServer) => {
     if (role === 'driver') socket.join(driverRoomName(id));
     if (role === 'user') socket.join(userRoomName(id));
 
-    // A driver who lost signal mid-trip resumes broadcasting without the client re-issuing ride:join.
-    if (role === 'driver' || role === 'user') {
-      try {
-        const activeRide = await quickRideService.getActiveRideForParticipant(id);
-        if (activeRide) {
-          socket.join(rideRoomName(activeRide._id));
-          if (role === 'driver') socket.data.activeRideId = String(activeRide._id);
-          socket.emit('ride:rejoined', { rideId: String(activeRide._id), rideStatus: activeRide.rideStatus });
-        }
-      } catch (error) {
-        console.error('ride room rejoin error:', error.message);
-      }
-    }
+    // EVERY listener is registered before the first await below. Apps emit the instant they
+    // connect — an event that arrives while this handler is still awaiting a database or Redis
+    // round-trip has no listener yet and is dropped on the floor, ack and all. Registering first
+    // costs nothing and closes that window.
 
     // Late joiners: a tracking link opened mid-trip, an admin opening a ride, a reconnecting client.
     socket.on('ride:join', async ({ rideId } = {}, ack) => {
@@ -236,6 +235,44 @@ export const initSocket = (httpServer) => {
     // Only the assigned driver ever publishes into a ride room.
     if (role === 'driver' && socket.data.canPublish) {
       registerDriverHandlers(io, socket);
+    }
+
+    // ── async resume work, safe to run now that nothing can be missed ──────────────────
+
+    // Reconnected inside the grace window: reinstate the parked Redis entry and hand back the
+    // cached vehicle metadata, so the app is discoverable again without re-issuing driver:online.
+    if (role === 'driver') {
+      try {
+        const resumed = await driverLocationService.resumeFromGrace(id);
+        if (resumed) {
+          socket.data.vehicle = {
+            vehicleId: resumed.vehicleId,
+            vehicleTypeId: resumed.vehicleTypeId,
+            vehicleNumber: resumed.vehicleNumber,
+          };
+          socket.emit('driver:resumed', {
+            latitude: Number(resumed.latitude),
+            longitude: Number(resumed.longitude),
+            offlineForMs: resumed.disconnectedAt ? Date.now() - Number(resumed.disconnectedAt) : null,
+          });
+        }
+      } catch (error) {
+        console.error('driver resume error:', error.message);
+      }
+    }
+
+    // A driver who lost signal mid-trip resumes broadcasting without the client re-issuing ride:join.
+    if (role === 'driver' || role === 'user') {
+      try {
+        const activeRide = await quickRideService.getActiveRideForParticipant(id);
+        if (activeRide) {
+          socket.join(rideRoomName(activeRide._id));
+          if (role === 'driver') socket.data.activeRideId = String(activeRide._id);
+          socket.emit('ride:rejoined', { rideId: String(activeRide._id), rideStatus: activeRide.rideStatus });
+        }
+      } catch (error) {
+        console.error('ride room rejoin error:', error.message);
+      }
     }
   });
 

@@ -51,6 +51,28 @@ export class QuickRideService {
     return QuickRide.findOne({ assignedTo: driverId, rideStatus: { $in: ACTIVE_RIDE_STATUSES } });
   };
 
+  // What a reopened app has to show. Wider than "active" for the rider: a ride still out for bids
+  // is very much live to them, so 'searching' counts here and does not in ACTIVE_RIDE_STATUSES.
+  // The OTP is selected in because the rider's own live view is the one place it is meant to show.
+  getLiveRideForUser = async (userId) => {
+    return QuickRide.findOne({
+      bookedBy: userId,
+      $or: [
+        { rideStatus: 'searching', expiresAt: { $gt: new Date() } },
+        { rideStatus: { $in: ACTIVE_RIDE_STATUSES } },
+      ],
+    })
+      .sort({ createdAt: -1 })
+      .select('+startOtp')
+      .populate(RIDE_POPULATE);
+  };
+
+  getLiveRideForDriver = async (driverId) => {
+    return QuickRide.findOne({ assignedTo: driverId, rideStatus: { $in: ACTIVE_RIDE_STATUSES } })
+      .sort({ createdAt: -1 })
+      .populate(RIDE_POPULATE);
+  };
+
   // The active ride an identity participates in, either side. Used to rejoin a ride room on reconnect.
   getActiveRideForParticipant = async (id) => {
     return QuickRide.findOne({

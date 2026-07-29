@@ -43,6 +43,10 @@ export const env = {
   DRIVER_SEARCH_RADIUS_STEP_KM: Number(process.env.DRIVER_SEARCH_RADIUS_STEP_KM || 2),
   DRIVER_LOCATION_TTL_SECONDS: Number(process.env.DRIVER_LOCATION_TTL_SECONDS || 30), // app pings every 5s
 
+  // How long a disconnected driver's Redis entry is parked before it is dropped. A tunnel, a lift
+  // or a backgrounded app must not cost the driver their place — they reconnect and resume.
+  DRIVER_DISCONNECT_GRACE_SECONDS: Number(process.env.DRIVER_DISCONNECT_GRACE_SECONDS || 300),
+
   // Rider offer band, as multipliers of the system-suggested fare — how far the rider
   // may move off the suggestion in either direction
   OFFER_MIN_MULTIPLIER: Number(process.env.OFFER_MIN_MULTIPLIER || 0.8),

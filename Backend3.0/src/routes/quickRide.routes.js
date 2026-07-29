@@ -11,6 +11,8 @@ router.post('/fare-estimate', protect, authorize('user'), quickRideController.ge
 router.post('/', protect, authorize('user'), quickRideController.createRide);
 
 // Literal paths must precede '/:id' so they aren't captured as an id
+// Resume-on-open: one call that restores either app's screen
+router.get('/live', protect, quickRideController.getLiveRides);
 router.get('/available', protect, authorize('driver'), quickRideController.getAvailableRides);
 router.get('/my', protect, quickRideController.getMyRides);
 // Public: the tracking token is itself the credential, and the response is redacted
