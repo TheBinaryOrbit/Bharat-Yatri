@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from '../config/env.js';
+import { RIDE_STATUSES } from '../constants/ride.constants.js';
 
 // GeoJSON point. Mongo stores coordinates as [longitude, latitude] — not the other way round.
 const pointSchema = new mongoose.Schema(
@@ -83,7 +84,7 @@ const quickRideSchema = new mongoose.Schema(
     // 'expired' is the auto-cancel state (nobody acted); 'cancelled' is deliberate and carries cancelledBy.
     rideStatus: {
       type: String,
-      enum: ['searching', 'assigned', 'in_progress', 'completed', 'cancelled', 'expired'],
+      enum: RIDE_STATUSES,
       default: 'searching',
     },
     cancelledBy: {

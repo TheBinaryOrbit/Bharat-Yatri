@@ -65,6 +65,9 @@ export const env = {
 
   // Front-end base for the shareable live-tracking link
   TRACKING_LINK_BASE_URL: process.env.TRACKING_LINK_BASE_URL || '',
+
+  // The zone a bare YYYY-MM-DD date filter means, as minutes ahead of UTC. 330 = IST.
+  APP_UTC_OFFSET_MINUTES: Number(process.env.APP_UTC_OFFSET_MINUTES || 330),
 };
 
 // Fail fast if critical env vars are missing

@@ -8,6 +8,14 @@ const RIDE_POPULATE = [
   { path: 'bookedBy', select: 'name phoneNumber profileImageUrl' },
 ];
 
+// Lays the optional history filters over an ownership query. Both filtered fields sit in the
+// { bookedBy | assignedTo, createdAt } indexes, so a filtered history costs no extra scan.
+const withHistoryFilters = (base, { statuses, createdAt } = {}) => ({
+  ...base,
+  ...(statuses?.length && { rideStatus: { $in: statuses } }),
+  ...(createdAt && { createdAt }),
+});
+
 export class QuickRideService {
   createRide = async (data) => {
     return QuickRide.create(data);
@@ -33,12 +41,18 @@ export class QuickRideService {
       .populate('assignedTo', 'name profileImageUrl');
   };
 
-  getRidesForUser = async (userId) => {
-    return QuickRide.find({ bookedBy: userId }).sort({ createdAt: -1 }).populate(RIDE_POPULATE);
+  // Ride history, newest first. `filters` is optional: { statuses, createdAt } as built by the
+  // controller — an absent filter simply narrows nothing.
+  getRidesForUser = async (userId, filters) => {
+    return QuickRide.find(withHistoryFilters({ bookedBy: userId }, filters))
+      .sort({ createdAt: -1 })
+      .populate(RIDE_POPULATE);
   };
 
-  getRidesForDriver = async (driverId) => {
-    return QuickRide.find({ assignedTo: driverId }).sort({ createdAt: -1 }).populate(RIDE_POPULATE);
+  getRidesForDriver = async (driverId, filters) => {
+    return QuickRide.find(withHistoryFilters({ assignedTo: driverId }, filters))
+      .sort({ createdAt: -1 })
+      .populate(RIDE_POPULATE);
   };
 
   // A rider may only have one ride out for bids at a time.

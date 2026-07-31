@@ -9,6 +9,10 @@ export const CANCELLABLE_RIDE_STATUSES = ['searching', 'assigned'];
 // Terminal states. Reaching any of these tears down the ride room and frees the driver.
 export const TERMINAL_RIDE_STATUSES = ['completed', 'cancelled', 'expired'];
 
+// Every status a ride can hold. This IS the model's rideStatus enum, and the list a history
+// filter is validated against, so the two can never drift.
+export const RIDE_STATUSES = ['searching', 'assigned', 'in_progress', 'completed', 'cancelled', 'expired'];
+
 // Socket room names. Identity rooms let a user/driver be reached across devices and reconnects.
 export const rideRoomName = (rideId) => `ride:${rideId}`;
 export const driverRoomName = (driverId) => `driver:${driverId}`;

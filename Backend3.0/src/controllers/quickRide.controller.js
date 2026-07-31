@@ -12,6 +12,8 @@ import { VehicleService } from '../services/vehicle.service.js';
 import { VehicleTypeService } from '../services/vehicleType.service.js';
 import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 import { isValidCoordinate, toGeoPoint, fromGeoPoint } from '../utils/geo.js';
+import { parseDateRange } from '../utils/dateRange.js';
+import { RIDE_STATUSES } from '../constants/ride.constants.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { openRideRoom, closeRideRoom } from '../socket/rideRoom.js';
 
@@ -409,15 +411,69 @@ export class QuickRideController {
     });
   };
 
+  // Accepts one status or a comma-separated list, and rejects anything outside the enum rather
+  // than silently returning an empty history for a typo.
+  parseRideStatuses = (raw, errors) => {
+    if (raw === undefined || raw === null || raw === '') return null;
+
+    if (typeof raw !== 'string') {
+      errors.push({ field: 'status', message: 'status must be a single value or a comma-separated list' });
+      return null;
+    }
+
+    const statuses = raw
+      .split(',')
+      .map((status) => status.trim())
+      .filter(Boolean);
+
+    const unknown = statuses.filter((status) => !RIDE_STATUSES.includes(status));
+    if (unknown.length) {
+      errors.push({
+        field: 'status',
+        message: `Unknown status: ${unknown.join(', ')}. Allowed: ${RIDE_STATUSES.join(', ')}`,
+      });
+      return null;
+    }
+
+    return statuses.length ? statuses : null;
+  };
+
   // GET /api/v3/quick-rides/my  (protected)
+  //
+  // Ride history for whichever side is calling, newest first. All filters are optional and combine:
+  //   ?status=completed,cancelled       one status or a list
+  //   ?date=2026-07-30                  a single calendar day
+  //   ?from=2026-07-01&to=2026-07-30    an inclusive range; either bound works on its own
+  // Bare dates are calendar days in the app's zone (env.APP_UTC_OFFSET_MINUTES, IST by default);
+  // send a full ISO timestamp when the client needs an exact instant. Filtering is on booking
+  // time (createdAt), which is what a history list is ordered by.
   getMyRides = async (req, res) => {
+    const errors = [];
+    const statuses = this.parseRideStatuses(req.query.status, errors);
+    const createdAt = parseDateRange(req.query, errors);
+
+    if (errors.length) {
+      return res.status(400).json({ message: 'Invalid ride filters', errors });
+    }
+
     try {
+      const filters = { statuses, createdAt };
+
       const rides =
         req.role === 'driver'
-          ? await this.quickRideService.getRidesForDriver(req.user._id)
-          : await this.quickRideService.getRidesForUser(req.user._id);
+          ? await this.quickRideService.getRidesForDriver(req.user._id, filters)
+          : await this.quickRideService.getRidesForUser(req.user._id, filters);
 
-      return res.status(200).json({ count: rides.length, data: rides });
+      return res.status(200).json({
+        count: rides.length,
+        // Echoed back so the app can label the list with the window it actually got
+        filters: {
+          status: statuses ?? [],
+          from: createdAt?.$gte ?? null,
+          to: createdAt?.$lte ?? null,
+        },
+        data: rides,
+      });
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Failed to fetch rides', message: 'Internal server error' });
