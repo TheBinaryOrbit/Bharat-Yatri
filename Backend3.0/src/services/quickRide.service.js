@@ -50,6 +50,26 @@ export class QuickRideService {
       .populate(RIDE_POPULATE);
   };
 
+  // Has this rider ever finished a trip with this driver? The gate on leaving a review.
+  // exists() over findOne() because the answer is a boolean and there is no reason to ship a
+  // document back to decide it. Covered by the {assignedTo, rideStatus} index.
+  hasCompletedRideTogether = async (userId, driverId) => {
+    return QuickRide.exists({ bookedBy: userId, assignedTo: driverId, rideStatus: 'completed' });
+  };
+
+  // Drop locations from this rider's recent bookings, newest first, for the search bar's
+  // suggestions. Every status counts: where a rider tried to go is a suggestion even if that
+  // particular ride was cancelled or found no driver.
+  //
+  // The caller asks for more rows than it will show, because the two ride histories are merged and
+  // de-duplicated by name afterwards — see RECENT_DESTINATION_SCAN_FACTOR.
+  getRecentDropLocations = async (userId, limit) => {
+    return QuickRide.find({ bookedBy: userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('dropLocationName dropCoordinates createdAt');
+  };
+
   // A rider may only have one ride out for bids at a time.
   getSearchingRideForUser = async (userId) => {
     return QuickRide.findOne({ bookedBy: userId, rideStatus: 'searching', expiresAt: { $gt: new Date() } });

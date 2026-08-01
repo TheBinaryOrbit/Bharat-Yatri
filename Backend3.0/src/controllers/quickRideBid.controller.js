@@ -4,6 +4,7 @@ import { DriverAvailabilityService } from '../services/driverAvailability.servic
 import { FareService } from '../services/fare.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
+import { DriverProfileService } from '../services/driverProfile.service.js';
 import { buildTrackingUrl } from '../utils/trackingUrl.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { openRideRoom } from '../socket/rideRoom.js';
@@ -16,6 +17,7 @@ export class QuickRideBidController {
     this.fareService = new FareService();
     this.vehicleService = new VehicleService();
     this.rideAudienceService = new RideAudienceService();
+    this.driverProfileService = new DriverProfileService();
   }
 
   // POST /api/v3/quick-ride-bids  (protected — driver only)
@@ -88,7 +90,11 @@ export class QuickRideBidController {
         });
       }
 
-      const populated = await this.quickRideBidService.getBidByIdPopulated(bid._id);
+      // The rider chooses between bids on price AND on who is offering, so every bid that reaches
+      // them carries the driver card: name, rating, recent reviews, vehicle photo.
+      const populated = await this.driverProfileService.attachToBid(
+        await this.quickRideBidService.getBidByIdPopulated(bid._id)
+      );
       emitToUser(ride.bookedBy, 'bid:new', { quickRideId: String(ride._id), bid: populated });
 
       return res.status(201).json({ message: 'Bid placed successfully.', bid: populated });
@@ -146,7 +152,9 @@ export class QuickRideBidController {
         return res.status(409).json({ message: 'This ride is no longer available' });
       }
 
-      const accepted = await this.quickRideBidService.acceptBid(bid._id);
+      const accepted = await this.driverProfileService.attachToBid(
+        await this.quickRideBidService.acceptBid(bid._id)
+      );
 
       // Losing bids are deleted, not marked rejected
       const losers = await this.quickRideBidService.deleteOtherBidsForRide(ride._id, bid._id);

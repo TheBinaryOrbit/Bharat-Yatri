@@ -6,6 +6,7 @@ import { DriverLocationService } from '../services/driverLocation.service.js';
 import { RideDispatchService } from '../services/rideDispatch.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
 import { PaymentDetailsService } from '../services/paymentDetails.service.js';
+import { DriverProfileService } from '../services/driverProfile.service.js';
 import { FareService } from '../services/fare.service.js';
 import { MapsService, RouteNotFoundError } from '../services/maps.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
@@ -32,6 +33,7 @@ export class QuickRideController {
     this.vehicleService = new VehicleService();
     this.vehicleTypeService = new VehicleTypeService();
     this.paymentDetailsService = new PaymentDetailsService();
+    this.driverProfileService = new DriverProfileService();
   }
 
   // POST /api/v3/quick-rides/fare-estimate  (protected — user only)
@@ -333,9 +335,14 @@ export class QuickRideController {
       return res.status(200).json({ role: 'user', hasLiveRide: false, ride: null, bids: [], count: 0 });
     }
 
-    // Bids only exist while the ride is still out for them
+    // Bids only exist while the ride is still out for them. Each carries the driver card, so a
+    // rider resuming the app sees the same bid list they were looking at before it backgrounded.
     const bids =
-      ride.rideStatus === 'searching' ? await this.quickRideBidService.getActiveBidsForRide(ride._id) : [];
+      ride.rideStatus === 'searching'
+        ? await this.driverProfileService.attachToBids(
+            await this.quickRideBidService.getActiveBidsForRide(ride._id)
+          )
+        : [];
 
     return res.status(200).json({
       role: 'user',
@@ -545,7 +552,9 @@ export class QuickRideController {
         return res.status(403).json({ error: 'Forbidden: this ride belongs to another user' });
       }
 
-      const bids = await this.quickRideBidService.getActiveBidsForRide(ride._id);
+      const bids = await this.driverProfileService.attachToBids(
+        await this.quickRideBidService.getActiveBidsForRide(ride._id)
+      );
       return res.status(200).json({ count: bids.length, data: bids });
     } catch (error) {
       console.log(error);

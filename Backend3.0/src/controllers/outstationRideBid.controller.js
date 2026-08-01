@@ -4,6 +4,7 @@ import { DriverAvailabilityService } from '../services/driverAvailability.servic
 import { FareService } from '../services/fare.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
+import { DriverProfileService } from '../services/driverProfile.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 
 export class OutstationRideBidController {
@@ -14,6 +15,7 @@ export class OutstationRideBidController {
     this.fareService = new FareService();
     this.vehicleService = new VehicleService();
     this.rideAudienceService = new RideAudienceService();
+    this.driverProfileService = new DriverProfileService();
   }
 
   // POST /api/v3/outstation-ride-bids  (protected — driver only)
@@ -98,7 +100,11 @@ export class OutstationRideBidController {
         });
       }
 
-      const populated = await this.outstationRideBidService.getBidByIdPopulated(bid._id);
+      // Same driver card as a QuickRide bid, and for a stronger reason: an outstation bid sits on
+      // the rider's screen for hours while they compare, so who is offering matters more than ever.
+      const populated = await this.driverProfileService.attachToBid(
+        await this.outstationRideBidService.getBidByIdPopulated(bid._id)
+      );
       emitToUser(ride.bookedBy, 'outstation:bid_new', { outstationRideId: String(ride._id), bid: populated });
 
       return res.status(201).json({ message: 'Bid placed successfully.', bid: populated });
@@ -167,7 +173,9 @@ export class OutstationRideBidController {
         return res.status(409).json({ message: 'This ride is no longer available' });
       }
 
-      const accepted = await this.outstationRideBidService.acceptBid(bid._id);
+      const accepted = await this.driverProfileService.attachToBid(
+        await this.outstationRideBidService.acceptBid(bid._id)
+      );
 
       // Losing bids are deleted, not marked rejected
       const losers = await this.outstationRideBidService.deleteOtherBidsForRide(ride._id, bid._id);

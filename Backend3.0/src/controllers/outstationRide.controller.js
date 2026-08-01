@@ -6,6 +6,7 @@ import { DriverLocationService } from '../services/driverLocation.service.js';
 import { RideDispatchService } from '../services/rideDispatch.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
 import { PaymentDetailsService } from '../services/paymentDetails.service.js';
+import { DriverProfileService } from '../services/driverProfile.service.js';
 import { FareService } from '../services/fare.service.js';
 import { MapsService, RouteNotFoundError } from '../services/maps.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
@@ -37,6 +38,7 @@ export class OutstationRideController {
     this.driverLocationService = new DriverLocationService();
     this.rideDispatchService = new RideDispatchService();
     this.rideAudienceService = new RideAudienceService();
+    this.driverProfileService = new DriverProfileService();
     this.fareService = new FareService();
     this.mapsService = new MapsService();
     this.vehicleService = new VehicleService();
@@ -386,7 +388,12 @@ export class OutstationRideController {
     // Bids for every searching ride in ONE query, then grouped here. A per-ride query in this loop
     // would be an N+1 that grows with how many trips the rider is planning.
     const searchingIds = rides.filter((ride) => ride.rideStatus === 'searching').map((ride) => ride._id);
-    const allBids = await this.outstationRideBidService.getActiveBidsForRides(searchingIds);
+
+    // Decorated flat, before grouping, for the same reason the bids are fetched flat: one ratings
+    // lookup covers every bidding driver across every trip the rider has out.
+    const allBids = await this.driverProfileService.attachToBids(
+      await this.outstationRideBidService.getActiveBidsForRides(searchingIds)
+    );
 
     const bidsByRide = new Map();
     allBids.forEach((bid) => {
@@ -623,7 +630,9 @@ export class OutstationRideController {
         return res.status(403).json({ error: 'Forbidden: this ride belongs to another user' });
       }
 
-      const bids = await this.outstationRideBidService.getActiveBidsForRide(ride._id);
+      const bids = await this.driverProfileService.attachToBids(
+        await this.outstationRideBidService.getActiveBidsForRide(ride._id)
+      );
       return res.status(200).json({ count: bids.length, data: bids });
     } catch (error) {
       console.log(error);

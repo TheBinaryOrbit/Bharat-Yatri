@@ -62,6 +62,23 @@ export class OutstationRideService {
       .populate(RIDE_POPULATE);
   };
 
+  // Has this rider ever finished a trip with this driver? The gate on leaving a review — the
+  // outstation half of it, asked alongside the QuickRide one. Covered by the
+  // {assignedTo, rideStatus, pickupAt} index, whose first two fields are exactly this predicate.
+  hasCompletedRideTogether = async (userId, driverId) => {
+    return OutstationRide.exists({ bookedBy: userId, assignedTo: driverId, rideStatus: 'completed' });
+  };
+
+  // Drop locations from this rider's recent bookings, for the search bar's suggestions.
+  // Ordered by createdAt, not pickupAt: a suggestion is about what the rider last searched for,
+  // and a trip booked this morning for next month is the more recent intention.
+  getRecentDropLocations = async (userId, limit) => {
+    return OutstationRide.find({ bookedBy: userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .select('dropLocationName dropCoordinates createdAt');
+  };
+
   // Plural, unlike QuickRide's single-ride equivalent. A QuickRide rider is hailing and two open
   // hails is a double-tap; an outstation rider is planning, and next Friday's trip and next
   // month's trip are two intentions that must be able to sit out for bids at the same time.
