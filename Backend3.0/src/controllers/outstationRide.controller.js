@@ -1,6 +1,6 @@
 import { env } from '../config/env.js';
-import { QuickRideService } from '../services/quickRide.service.js';
-import { QuickRideBidService } from '../services/quickRideBid.service.js';
+import { OutstationRideService } from '../services/outstationRide.service.js';
+import { OutstationRideBidService } from '../services/outstationRideBid.service.js';
 import { DriverAvailabilityService } from '../services/driverAvailability.service.js';
 import { DriverLocationService } from '../services/driverLocation.service.js';
 import { RideDispatchService } from '../services/rideDispatch.service.js';
@@ -13,16 +13,26 @@ import { VehicleTypeService } from '../services/vehicleType.service.js';
 import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 import { isValidCoordinate, toGeoPoint, fromGeoPoint } from '../utils/geo.js';
 import { parseDateRange } from '../utils/dateRange.js';
+import { parsePickupAt } from '../utils/pickupTime.js';
 import { validateCoordinates, parseRideStatuses } from '../utils/validate.js';
 import { buildTrackingUrl } from '../utils/trackingUrl.js';
-import { RIDE_STATUSES } from '../constants/ride.constants.js';
+import { OUTSTATION_RIDE_STATUSES } from '../constants/ride.constants.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { openRideRoom, closeRideRoom } from '../socket/rideRoom.js';
 
-export class QuickRideController {
+// A single fixed sweep rather than the expanding rings QuickRide uses. Expressed in the ring
+// machinery's own shape so there is no second code path: start = max = step means the loop body
+// runs exactly once. See findNearbyDriversExpanding for why widening would be wrong here.
+const OUTSTATION_RADIUS = {
+  startKm: env.OUTSTATION_SEARCH_RADIUS_KM,
+  maxKm: env.OUTSTATION_SEARCH_RADIUS_KM,
+  stepKm: env.OUTSTATION_SEARCH_RADIUS_KM,
+};
+
+export class OutstationRideController {
   constructor() {
-    this.quickRideService = new QuickRideService();
-    this.quickRideBidService = new QuickRideBidService();
+    this.outstationRideService = new OutstationRideService();
+    this.outstationRideBidService = new OutstationRideBidService();
     this.driverAvailabilityService = new DriverAvailabilityService();
     this.driverLocationService = new DriverLocationService();
     this.rideDispatchService = new RideDispatchService();
@@ -34,11 +44,25 @@ export class QuickRideController {
     this.paymentDetailsService = new PaymentDetailsService();
   }
 
-  // POST /api/v3/quick-rides/fare-estimate  (protected — user only)
+  // The audience set has to outlive the ride it describes, or the cards it exists to pull back are
+  // orphaned. QuickRide's default is its 5-minute ride plus a minute; an outstation auction runs
+  // for up to 24 hours, so it passes its own remaining lifetime.
+  audienceTtlFor = (ride) => Math.max(60, Math.ceil((new Date(ride.expiresAt) - Date.now()) / 1000) + 60);
+
+  dispatchOptions = (ride, event) => ({
+    event,
+    rideType: 'outstation',
+    buildPayload: this.rideDispatchService.buildOutstationRequestPayload,
+    radius: OUTSTATION_RADIUS,
+    audienceTtlSeconds: this.audienceTtlFor(ride),
+    noDriversEvent: 'outstation:no_drivers',
+  });
+
+  // POST /api/v3/outstation-rides/fare-estimate  (protected — user only)
   //
   // Prices one trip across every active vehicle type, and returns the band each suggestion may be
-  // nudged within. The rider picks a type and a fare from this response; createRide recomputes and
-  // re-checks the same band, so a hand-rolled offer never gets through.
+  // nudged within. createRide recomputes and re-checks the same band, so a hand-rolled offer never
+  // gets through.
   getFareEstimate = async (req, res) => {
     const { pickupCoordinates, dropCoordinates } = req.body;
 
@@ -58,9 +82,11 @@ export class QuickRideController {
 
       const { distanceKm, durationMin } = await this.mapsService.getDistanceAndDuration(pickup, drop);
 
-      if (distanceKm > env.MAX_RIDE_DISTANCE_KM) {
+      // The mirror image of QuickRide's cap, and inclusive on this side too, so a trip of exactly
+      // OUTSTATION_MIN_DISTANCE_KM is bookable either way.
+      if (distanceKm < env.OUTSTATION_MIN_DISTANCE_KM) {
         return res.status(400).json({
-          message: `QuickRide is available for trips up to ${env.MAX_RIDE_DISTANCE_KM} km. This trip is ${distanceKm} km.`,
+          message: `Outstation rides are for trips of at least ${env.OUTSTATION_MIN_DISTANCE_KM} km. This trip is ${distanceKm} km — book it as a QuickRide.`,
         });
       }
 
@@ -68,6 +94,9 @@ export class QuickRideController {
         estimatedDistanceKm: distanceKm,
         estimatedDurationMin: durationMin,
         fareOptions: this.fareService.computeFareOptions(vehicleTypes, distanceKm, durationMin),
+        // So the app can bound its date picker without a second config call
+        minPickupAt: new Date(Date.now() + env.OUTSTATION_MIN_LEAD_MINUTES * 60 * 1000),
+        maxPickupAt: new Date(Date.now() + env.OUTSTATION_MAX_ADVANCE_DAYS * 24 * 60 * 60 * 1000),
       });
     } catch (error) {
       console.log(error);
@@ -78,7 +107,7 @@ export class QuickRideController {
     }
   };
 
-  // POST /api/v3/quick-rides  (protected — user only)
+  // POST /api/v3/outstation-rides  (protected — user only)
   createRide = async (req, res) => {
     // Rider is taken from the auth token, never the request body
     const bookedBy = req.user._id;
@@ -93,19 +122,20 @@ export class QuickRideController {
 
     const pickup = validateCoordinates(pickupCoordinates, 'pickupCoordinates', errors);
     const drop = validateCoordinates(dropCoordinates, 'dropCoordinates', errors);
+    const schedule = parsePickupAt(req.body, errors);
 
     if (errors.length) {
       return res.status(400).json({ message: 'All fields are required', errors });
     }
 
     try {
-      const existing = await this.quickRideService.getSearchingRideForUser(bookedBy);
-      if (existing) {
-        return res.status(409).json({
-          message: 'You already have a ride searching for drivers. Cancel it before booking another.',
-          rideId: existing._id,
-        });
-      }
+      // NOTE: there is deliberately no "you already have a ride searching" 409 here, and this is
+      // the one place create diverges from QuickRide's. A QuickRide rider is hailing: two open
+      // hails is almost always a double-tap, and the 409 protects them from it. An outstation
+      // rider is PLANNING — next Friday's Delhi trip and next month's Jaipur trip are two
+      // different intentions that must be able to sit out for bids at the same time. Rider-side
+      // the two products are fully independent too: a live QuickRide has no bearing on booking an
+      // outstation trip, and vice versa.
 
       const vehicleType = await resolveVehicleType(vehicleTypeId);
       if (!vehicleType) {
@@ -114,9 +144,9 @@ export class QuickRideController {
 
       const { distanceKm, durationMin } = await this.mapsService.getDistanceAndDuration(pickup, drop);
 
-      if (distanceKm > env.MAX_RIDE_DISTANCE_KM) {
+      if (distanceKm < env.OUTSTATION_MIN_DISTANCE_KM) {
         return res.status(400).json({
-          message: `QuickRide is available for trips up to ${env.MAX_RIDE_DISTANCE_KM} km. This trip is ${distanceKm} km.`,
+          message: `Outstation rides are for trips of at least ${env.OUTSTATION_MIN_DISTANCE_KM} km. This trip is ${distanceKm} km — book it as a QuickRide.`,
         });
       }
 
@@ -144,7 +174,18 @@ export class QuickRideController {
 
       const finalOffer = omitted ? suggestedFare : Math.round(requested);
 
-      const ride = await this.quickRideService.createRide({
+      // The pickup cap only means something for a SCHEDULED trip. For 'now', pickupAt is the
+      // moment the ride was created, so min(now + 24h, now) would make the ride BORN EXPIRED and
+      // the sweeper would kill it on the next tick, before any driver could bid. 'later' is
+      // guaranteed non-degenerate by the minimum-lead-time check inside parsePickupAt.
+      const ttlExpiry = Date.now() + env.OUTSTATION_RIDE_TTL_HOURS * 60 * 60 * 1000;
+      const expiresAt = new Date(
+        schedule.bookingType === 'later'
+          ? Math.min(ttlExpiry, schedule.pickupAt.getTime())
+          : ttlExpiry
+      );
+
+      const ride = await this.outstationRideService.createRide({
         pickupLocationName,
         dropLocationName,
         pickupCoordinates: toGeoPoint(pickup.latitude, pickup.longitude),
@@ -154,14 +195,17 @@ export class QuickRideController {
         estimatedDurationMin: durationMin,
         suggestedFare,
         offeredFare: finalOffer,
+        bookingType: schedule.bookingType,
+        pickupAt: schedule.pickupAt,
         bookedBy,
-        expiresAt: new Date(Date.now() + env.RIDE_PENDING_TTL_SECONDS * 1000),
+        expiresAt,
       });
 
-      // Fire-and-forget: the rider gets their ride back immediately and hears about drivers
-      // over their socket
+      // Fire-and-forget: the rider gets their ride back immediately and hears about drivers over
+      // their socket. Push reaches whoever is online now; the /available browse list is what
+      // catches drivers who were offline when a next-Friday trip was booked.
       this.rideDispatchService
-        .dispatchRide(ride)
+        .dispatchRide(ride, this.dispatchOptions(ride, 'outstation:request'))
         .catch((error) => console.error('dispatchRide error:', error.message));
 
       return res.status(201).json({
@@ -178,7 +222,7 @@ export class QuickRideController {
     }
   };
 
-  // PATCH /api/v3/quick-rides/:id/fare  (protected — user only)
+  // PATCH /api/v3/outstation-rides/:id/fare  (protected — user only)
   // The rider raises their offer to attract drivers. Increase-only.
   updateFare = async (req, res) => {
     const offeredFare = Number(req.body.offeredFare);
@@ -191,7 +235,7 @@ export class QuickRideController {
     }
 
     try {
-      const ride = await this.quickRideService.getRideRaw(req.params.id);
+      const ride = await this.outstationRideService.getRideRaw(req.params.id);
       if (!ride) return res.status(404).json({ message: 'Ride not found' });
 
       if (String(ride.bookedBy) !== String(req.user._id)) {
@@ -208,7 +252,7 @@ export class QuickRideController {
         });
       }
 
-      const updated = await this.quickRideService.raiseOfferedFare(ride._id, req.user._id, offeredFare);
+      const updated = await this.outstationRideService.raiseOfferedFare(ride._id, req.user._id, offeredFare);
 
       // The conditional update also guards increase-only, so a null return needs disambiguating
       if (!updated) {
@@ -222,14 +266,14 @@ export class QuickRideController {
 
       // Re-dispatch reaches drivers who came online after the ride was created too
       this.rideDispatchService
-        .dispatchRide(updated, { event: 'ride:fare_updated' })
+        .dispatchRide(updated, this.dispatchOptions(updated, 'outstation:fare_updated'))
         .catch((error) => console.error('dispatchRide error:', error.message));
 
       // Drivers already holding a bid need to know the ceiling moved
-      const bids = await this.quickRideBidService.getActiveBidsForRide(updated._id);
+      const bids = await this.outstationRideBidService.getActiveBidsForRide(updated._id);
       const bidBounds = this.fareService.getBidBounds(updated.offeredFare);
       bids.forEach((bid) =>
-        emitToDriver(bid.requestedBy?._id ?? bid.requestedBy, 'ride:fare_updated', {
+        emitToDriver(bid.requestedBy?._id ?? bid.requestedBy, 'outstation:fare_updated', {
           rideId: String(updated._id),
           offeredFare: updated.offeredFare,
           bidBounds,
@@ -246,15 +290,16 @@ export class QuickRideController {
   // Open rides a given driver could bid on right now, shaped for the ride cards.
   // Shared by /available and /live so the two can never drift apart. Returns null when the driver
   // has no vehicle, which each caller reports in its own way.
-  findOpenRidesForDriver = async (driverId, latitude, longitude) => {
+  findOpenRidesForDriver = async (driverId, latitude, longitude, bookingType) => {
     const vehicle = await this.vehicleService.getVehicleByDriver(driverId);
     if (!vehicle) return null;
 
-    const rides = await this.quickRideService.findOpenRidesNear({
+    const rides = await this.outstationRideService.findOpenRidesNear({
       latitude,
       longitude,
       vehicleTypeId: vehicle.vehicleTypeId?._id ?? vehicle.vehicleTypeId,
-      radiusKm: env.DRIVER_SEARCH_RADIUS_MAX_KM,
+      radiusKm: env.OUTSTATION_SEARCH_RADIUS_KM,
+      bookingType,
     });
 
     return rides.map((ride) => ({
@@ -268,11 +313,15 @@ export class QuickRideController {
     }));
   };
 
-  // GET /api/v3/quick-rides/available  (protected — driver only)
-  // Polling fallback for a dropped socket.
+  // GET /api/v3/outstation-rides/available  (protected — driver only)
+  //
+  // Not just a polling fallback like QuickRide's. A trip booked for next Friday will never reach a
+  // driver who is offline today, so this browse list is a first-class way of finding outstation
+  // work — hence the wider radius and the optional bookingType filter.
   getAvailableRides = async (req, res) => {
     const latitude = Number(req.query.latitude);
     const longitude = Number(req.query.longitude);
+    const { bookingType } = req.query;
 
     if (!isValidCoordinate(latitude, longitude)) {
       return res.status(400).json({
@@ -284,10 +333,12 @@ export class QuickRideController {
     try {
       const driverId = req.user._id;
 
-      // Same gate as dispatch and bidding — a busy driver sees nothing. The default context is
-      // 'quickride', so this also covers a driver whose outstation pickup is now imminent, and
-      // busyReason tells the app which of the two it was.
-      const availability = await this.driverAvailabilityService.checkDriverAvailability(driverId);
+      // Same gate as dispatch and bidding — a driver who could not take the ride sees nothing,
+      // and busyReason tells the app which of the rules stopped them.
+      const availability = await this.driverAvailabilityService.checkDriverAvailability(driverId, {
+        rideType: 'outstation',
+      });
+
       if (!availability.available) {
         return res.status(200).json({
           busy: true,
@@ -298,23 +349,21 @@ export class QuickRideController {
         });
       }
 
-      const data = await this.findOpenRidesForDriver(driverId, latitude, longitude);
+      const data = await this.findOpenRidesForDriver(driverId, latitude, longitude, bookingType);
       if (!data) {
         return res.status(409).json({ message: 'Register a vehicle before accepting rides' });
       }
 
-      return res.status(200).json({ busy: false, count: data.length, data });
+      return res.status(200).json({ busy: false, busyReason: null, count: data.length, data });
     } catch (error) {
       console.log(error);
       return res.status(500).json({ error: 'Failed to fetch rides', message: 'Internal server error' });
     }
   };
 
-  // GET /api/v3/quick-rides/live  (protected — either role)
+  // GET /api/v3/outstation-rides/live  (protected — either role)
   //
-  // The single call an app makes when it opens or comes back from the background. It answers
-  // "where was I?" in one round trip, for both sides, so neither app has to reconstruct its
-  // screen from a ride list plus a bid list plus a status guess.
+  // The single call an app makes when it opens or comes back from the background.
   getLiveRides = async (req, res) => {
     try {
       if (req.role === 'driver') return await this.getLiveForDriver(req, res);
@@ -325,59 +374,79 @@ export class QuickRideController {
     }
   };
 
-  // The rider's live view: their in-flight ride and the bids currently on it.
+  // The rider's live view. PLURAL, unlike QuickRide's: a planner can have several trips out for
+  // bids at once, so this returns a list rather than one ride plus one bid array.
   getLiveForUser = async (req, res) => {
-    const ride = await this.quickRideService.getLiveRideForUser(req.user._id);
+    const rides = await this.outstationRideService.getLiveRidesForUser(req.user._id);
 
-    if (!ride) {
-      return res.status(200).json({ role: 'user', hasLiveRide: false, ride: null, bids: [], count: 0 });
+    if (!rides.length) {
+      return res.status(200).json({ role: 'user', hasLiveRides: false, count: 0, rides: [] });
     }
 
-    // Bids only exist while the ride is still out for them
-    const bids =
-      ride.rideStatus === 'searching' ? await this.quickRideBidService.getActiveBidsForRide(ride._id) : [];
+    // Bids for every searching ride in ONE query, then grouped here. A per-ride query in this loop
+    // would be an N+1 that grows with how many trips the rider is planning.
+    const searchingIds = rides.filter((ride) => ride.rideStatus === 'searching').map((ride) => ride._id);
+    const allBids = await this.outstationRideBidService.getActiveBidsForRides(searchingIds);
+
+    const bidsByRide = new Map();
+    allBids.forEach((bid) => {
+      const key = String(bid.outstationRideId?._id ?? bid.outstationRideId);
+      bidsByRide.set(key, [...(bidsByRide.get(key) || []), bid]);
+    });
 
     return res.status(200).json({
       role: 'user',
-      hasLiveRide: true,
-      ride,
-      rideStatus: ride.rideStatus,
-      offerBounds: this.fareService.getOfferBounds(ride.suggestedFare),
-      bidBounds: this.fareService.getBidBounds(ride.offeredFare),
-      // Only ever populated once a driver is assigned — this is the rider's own view of their ride
-      startOtp: ride.rideStatus === 'assigned' ? ride.startOtp : null,
-      trackingUrl: buildTrackingUrl(ride.trackingToken),
-      count: bids.length,
-      bids,
+      hasLiveRides: true,
+      count: rides.length,
+      rides: rides.map((ride) => {
+        const bids = bidsByRide.get(String(ride._id)) || [];
+
+        return {
+          ride,
+          rideStatus: ride.rideStatus,
+          offerBounds: this.fareService.getOfferBounds(ride.suggestedFare),
+          bidBounds: this.fareService.getBidBounds(ride.offeredFare),
+          // The driver needs the OTP once they are committed; the rider reads it out at pickup.
+          startOtp: ride.rideStatus === 'assigned' || ride.rideStatus === 'arriving' ? ride.startOtp : null,
+          // Only ever non-null while 'arriving' — the token is minted when the driver sets off and
+          // nulled the instant the rider is aboard.
+          trackingUrl: buildTrackingUrl(ride.trackingToken),
+          bidCount: bids.length,
+          bids,
+        };
+      }),
     });
   };
 
-  // The driver's live view: the ride they are committed to, or — if free — their pending bids and
-  // the open rides around them. Location is optional so the call still works before GPS is ready.
+  // The driver's live view: the trip they are committed to, or — if free — their pending bids and
+  // the open trips around them. Location is optional so the call still works before GPS is ready.
   getLiveForDriver = async (req, res) => {
     const driverId = req.user._id;
-    const ride = await this.quickRideService.getLiveRideForDriver(driverId);
-
+    const ride = await this.outstationRideService.getLiveRideForDriver(driverId);
 
     if (ride) {
       return res.status(200).json({
         role: 'driver',
         busy: true,
+        busyReason: 'active_outstation_ride',
         hasLiveRide: true,
         ride,
         rideStatus: ride.rideStatus,
-        // What the details screen should navigate to for this phase
-        navigateTo: ride.rideStatus === 'assigned' ? 'pickup' : 'drop',
+        // What the details screen should navigate to for this phase. 'assigned' and 'arriving' are
+        // both the approach; only once the rider is aboard does the destination change.
+        navigateTo: ride.rideStatus === 'in_progress' ? 'drop' : 'pickup',
+        trackingUrl: null, // the driver never gets the share link — it is the rider's to hand out
         bids: [],
         availableRides: [],
         count: 0,
       });
     }
 
-    // No live QuickRide, but an outstation trip whose pickup is within the block window still
-    // reserves this driver. Without this they would get busy:false and a list of cards that all
-    // 409 on bid.
-    const availability = await this.driverAvailabilityService.checkDriverAvailability(driverId);
+    // Free of outstation work, but a live QuickRide still blocks them from taking a trip.
+    const availability = await this.driverAvailabilityService.checkDriverAvailability(driverId, {
+      rideType: 'outstation',
+    });
+
     if (!availability.available) {
       return res.status(200).json({
         role: 'driver',
@@ -392,25 +461,21 @@ export class QuickRideController {
       });
     }
 
-    const bids = await this.quickRideBidService.getActiveBidsForDriver(driverId);
+    const bids = await this.outstationRideBidService.getActiveBidsForDriver(driverId);
 
     const latitude = Number(req.query.latitude);
     const longitude = Number(req.query.longitude);
     const hasLocation = isValidCoordinate(latitude, longitude);
 
-
-    
-  
-
     const availableRides = hasLocation ? await this.findOpenRidesForDriver(driverId, latitude, longitude) : [];
-
 
     return res.status(200).json({
       role: 'driver',
       busy: false,
+      busyReason: null,
       hasLiveRide: false,
       ride: null,
-      // Distinguishes "no rides nearby" from "you did not tell me where you are"
+      // Distinguishes "no trips nearby" from "you did not tell me where you are"
       needsLocation: !hasLocation,
       needsVehicle: availableRides === null,
       count: bids.length,
@@ -419,39 +484,47 @@ export class QuickRideController {
     });
   };
 
-  // GET /api/v3/quick-rides/my  (protected)
+  // GET /api/v3/outstation-rides/my  (protected)
   //
-  // Ride history for whichever side is calling, newest first. All filters are optional and combine:
+  // Ride history for whichever side is calling. All filters are optional and combine:
   //   ?status=completed,cancelled       one status or a list
-  //   ?date=2026-07-30                  a single calendar day
-  //   ?from=2026-07-01&to=2026-07-30    an inclusive range; either bound works on its own
-  // Bare dates are calendar days in the app's zone (env.APP_UTC_OFFSET_MINUTES, IST by default);
-  // send a full ISO timestamp when the client needs an exact instant. Filtering is on booking
-  // time (createdAt), which is what a history list is ordered by.
+  //   ?date=2026-08-05                  a single calendar day
+  //   ?from=2026-08-01&to=2026-08-30    an inclusive range; either bound works on its own
+  //   ?by=pickupAt                      filter and sort on the DEPARTURE instead of the booking
+  //
+  // `by` is the one thing QuickRide's history does not have, and it is what a scheduled product
+  // needs: a trip booked last month for next Friday belongs in next Friday's list, not last
+  // month's. Both fields are indexed, so either choice is a seek.
   getMyRides = async (req, res) => {
     const errors = [];
-    const statuses = parseRideStatuses(req.query.status, errors, RIDE_STATUSES);
-    const createdAt = parseDateRange(req.query, errors);
+    const statuses = parseRideStatuses(req.query.status, errors, OUTSTATION_RIDE_STATUSES);
+    const dateRange = parseDateRange(req.query, errors);
+
+    const by = req.query.by ?? 'createdAt';
+    if (!['createdAt', 'pickupAt'].includes(by)) {
+      errors.push({ field: 'by', message: 'by must be createdAt or pickupAt' });
+    }
 
     if (errors.length) {
       return res.status(400).json({ message: 'Invalid ride filters', errors });
     }
 
     try {
-      const filters = { statuses, dateRange: createdAt };
+      const filters = { statuses, dateRange };
 
       const rides =
         req.role === 'driver'
-          ? await this.quickRideService.getRidesForDriver(req.user._id, filters)
-          : await this.quickRideService.getRidesForUser(req.user._id, filters);
+          ? await this.outstationRideService.getRidesForDriver(req.user._id, filters, by)
+          : await this.outstationRideService.getRidesForUser(req.user._id, filters, by);
 
       return res.status(200).json({
         count: rides.length,
         // Echoed back so the app can label the list with the window it actually got
         filters: {
           status: statuses ?? [],
-          from: createdAt?.$gte ?? null,
-          to: createdAt?.$lte ?? null,
+          by,
+          from: dateRange?.$gte ?? null,
+          to: dateRange?.$lte ?? null,
         },
         data: rides,
       });
@@ -461,14 +534,16 @@ export class QuickRideController {
     }
   };
 
-  // GET /api/v3/quick-rides/track/:token
-  // The token IS the credential. Deliberately redacted: no phone numbers, no OTP, no fare,
-  // no rider identity — a shared link must not leak either party.
+  // GET /api/v3/outstation-rides/track/:token
+  //
+  // The token IS the credential. Deliberately redacted: no phone numbers, no OTP, no fare, no
+  // rider identity — a shared link must not leak either party. Resolves only while the ride is
+  // 'arriving', so the link covers the approach and stops working the moment the rider is aboard.
   trackRide = async (req, res) => {
     try {
-      const ride = await this.quickRideService.getRideByTrackingToken(req.params.token);
+      const ride = await this.outstationRideService.getRideByTrackingToken(req.params.token);
 
-      // An unknown token and an ended ride are intentionally indistinguishable
+      // An unknown token, a started trip and an ended ride are intentionally indistinguishable
       if (!ride) return res.status(404).json({ message: 'This tracking link is no longer valid' });
 
       const lastLocation = ride.assignedTo
@@ -482,6 +557,8 @@ export class QuickRideController {
       return res.status(200).json({
         rideId: String(ride._id),
         rideStatus: ride.rideStatus,
+        bookingType: ride.bookingType,
+        pickupAt: ride.pickupAt,
         pickupLocationName: ride.pickupLocationName,
         dropLocationName: ride.dropLocationName,
         pickupCoordinates: fromGeoPoint(ride.pickupCoordinates),
@@ -506,10 +583,10 @@ export class QuickRideController {
     }
   };
 
-  // GET /api/v3/quick-rides/:id  (protected — participants only)
+  // GET /api/v3/outstation-rides/:id  (protected — participants only)
   getRideById = async (req, res) => {
     try {
-      const ride = await this.quickRideService.getRideById(req.params.id);
+      const ride = await this.outstationRideService.getRideById(req.params.id);
       if (!ride) return res.status(404).json({ message: 'Ride not found' });
 
       const isRider = String(ride.bookedBy?._id ?? ride.bookedBy) === String(req.user._id);
@@ -520,10 +597,11 @@ export class QuickRideController {
       }
 
       // Only the rider ever sees the start OTP — the driver has to be told it out loud.
-      if (isRider && ride.rideStatus === 'assigned') {
-        const withOtp = await this.quickRideService.getRideWithOtp(ride._id);
+      if (isRider && (ride.rideStatus === 'assigned' || ride.rideStatus === 'arriving')) {
+        const withOtp = await this.outstationRideService.getRideWithOtp(ride._id);
         return res.status(200).json({
           ride: withOtp,
+          // null until the driver sets off; there is nothing to watch before that
           trackingUrl: buildTrackingUrl(withOtp.trackingToken),
         });
       }
@@ -535,17 +613,17 @@ export class QuickRideController {
     }
   };
 
-  // GET /api/v3/quick-rides/:id/bids  (protected — user only)
+  // GET /api/v3/outstation-rides/:id/bids  (protected — user only)
   getRideBids = async (req, res) => {
     try {
-      const ride = await this.quickRideService.getRideRaw(req.params.id);
+      const ride = await this.outstationRideService.getRideRaw(req.params.id);
       if (!ride) return res.status(404).json({ message: 'Ride not found' });
 
       if (String(ride.bookedBy) !== String(req.user._id)) {
         return res.status(403).json({ error: 'Forbidden: this ride belongs to another user' });
       }
 
-      const bids = await this.quickRideBidService.getActiveBidsForRide(ride._id);
+      const bids = await this.outstationRideBidService.getActiveBidsForRide(ride._id);
       return res.status(200).json({ count: bids.length, data: bids });
     } catch (error) {
       console.log(error);
@@ -553,9 +631,56 @@ export class QuickRideController {
     }
   };
 
-  // PATCH /api/v3/quick-rides/:id/start  (protected — driver only)
-  // The rider reads the OTP out; the driver types it in. Proof the rider is actually in the vehicle.
+  // PATCH /api/v3/outstation-rides/:id/start  (protected — driver only)
+  //
+  // "I'm setting off." No OTP — the rider is not here yet. This is the step QuickRide does not
+  // have, and it exists to make the tracking window narrow: a trip accepted three days ago streams
+  // nothing until the driver actually departs, and the driver's own tap is the trigger, so no
+  // scheduler is involved.
   startRide = async (req, res) => {
+    try {
+      const ride = await this.outstationRideService.getRideRaw(req.params.id);
+      if (!ride) return res.status(404).json({ message: 'Ride not found' });
+
+      if (String(ride.assignedTo) !== String(req.user._id)) {
+        return res.status(403).json({ error: 'Forbidden: this ride is assigned to another driver' });
+      }
+
+      const started = await this.outstationRideService.startRide(ride._id, req.user._id);
+      if (!started) {
+        return res.status(409).json({ message: `Ride cannot be started while it is ${ride.rideStatus}` });
+      }
+
+      // The server puts both parties in the room rather than waiting for them to ask — a
+      // client-initiated join would race the driver's first location ping.
+      await openRideRoom(started);
+
+      // Two payloads: only the rider's carries the share link.
+      emitToUser(started.bookedBy?._id ?? started.bookedBy, 'outstation:started', {
+        rideId: String(started._id),
+        arrivingAt: started.arrivingAt,
+        trackingUrl: buildTrackingUrl(started.trackingToken),
+      });
+      emitToDriver(started.assignedTo?._id ?? started.assignedTo, 'outstation:started', {
+        rideId: String(started._id),
+        arrivingAt: started.arrivingAt,
+      });
+
+      return res.status(200).json({
+        message: 'On your way. The rider can now track you.',
+        ride: started,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: 'Failed to start ride', message: 'Internal server error' });
+    }
+  };
+
+  // PATCH /api/v3/outstation-rides/:id/pickup  (protected — driver only)
+  //
+  // The rider reads the OTP out; the driver types it in. Proof the rider is actually in the
+  // vehicle — and the moment the tracking window shuts.
+  pickupRide = async (req, res) => {
     const { startOtp } = req.body;
 
     if (!startOtp) {
@@ -566,15 +691,20 @@ export class QuickRideController {
     }
 
     try {
-      const ride = await this.quickRideService.getRideRaw(req.params.id);
+      const ride = await this.outstationRideService.getRideRaw(req.params.id);
       if (!ride) return res.status(404).json({ message: 'Ride not found' });
 
       if (String(ride.assignedTo) !== String(req.user._id)) {
         return res.status(403).json({ error: 'Forbidden: this ride is assigned to another driver' });
       }
 
-      if (ride.rideStatus !== 'assigned') {
-        return res.status(409).json({ message: `Ride cannot be started while it is ${ride.rideStatus}` });
+      if (ride.rideStatus !== 'arriving') {
+        return res.status(409).json({
+          message:
+            ride.rideStatus === 'assigned'
+              ? 'Start the ride before confirming the pickup'
+              : `Pickup cannot be confirmed while the ride is ${ride.rideStatus}`,
+        });
       }
 
       if (ride.startOtpAttempts >= env.RIDE_START_OTP_MAX_ATTEMPTS) {
@@ -583,33 +713,41 @@ export class QuickRideController {
         });
       }
 
-      const started = await this.quickRideService.startRide(ride._id, req.user._id, startOtp);
+      const pickedUp = await this.outstationRideService.pickupRide(ride._id, req.user._id, startOtp);
 
-      if (!started) {
-        const updated = await this.quickRideService.recordFailedStartOtp(ride._id);
+      if (!pickedUp) {
+        const updated = await this.outstationRideService.recordFailedStartOtp(ride._id);
         const remaining = Math.max(0, env.RIDE_START_OTP_MAX_ATTEMPTS - updated.startOtpAttempts);
         return res.status(400).json({ message: 'Incorrect OTP', attemptsRemaining: remaining });
       }
 
-      const payload = { rideId: String(started._id), startedAt: started.startedAt };
-      emitToUser(started.bookedBy?._id ?? started.bookedBy, 'ride:started', payload);
-      emitToDriver(started.assignedTo?._id ?? started.assignedTo, 'ride:started', payload);
+      const payload = { rideId: String(pickedUp._id), startedAt: pickedUp.startedAt };
+      emitToUser(pickedUp.bookedBy?._id ?? pickedUp.bookedBy, 'outstation:picked_up', payload);
+      emitToDriver(pickedUp.assignedTo?._id ?? pickedUp.assignedTo, 'outstation:picked_up', payload);
 
-      return res.status(200).json({ message: 'Ride started successfully.', ride: started });
+      // The approach leg is over, so the tracking window closes with it. The service already
+      // nulled the token inside the atomic update; this tears down the room, which does three
+      // things at once — it tells any share-link viewer the trip has started, evicts them, and
+      // clears this ride from the driver's activeRideIds so their 5s pings stop feeding a room
+      // nobody should be in. Emitted to the identity rooms first: those are unaffected by the
+      // teardown, but reading them in this order is the only way the sequence is obvious.
+      await closeRideRoom(pickedUp._id, 'picked_up');
+
+      return res.status(200).json({ message: 'Pickup confirmed. Ride started.', ride: pickedUp });
     } catch (error) {
       console.log(error);
-      return res.status(500).json({ error: 'Failed to start ride', message: 'Internal server error' });
+      return res.status(500).json({ error: 'Failed to confirm pickup', message: 'Internal server error' });
     }
   };
 
-  // PATCH /api/v3/quick-rides/:id/complete  (protected — driver only)
-  // Also what releases the driver from the busy gate.
+  // PATCH /api/v3/outstation-rides/:id/complete  (protected — driver only)
+  // Also what releases the driver's single outstation slot and reopens QuickRide dispatch.
   completeRide = async (req, res) => {
     try {
-      const completed = await this.quickRideService.completeRide(req.params.id, req.user._id);
+      const completed = await this.outstationRideService.completeRide(req.params.id, req.user._id);
 
       if (!completed) {
-        const ride = await this.quickRideService.getRideRaw(req.params.id);
+        const ride = await this.outstationRideService.getRideRaw(req.params.id);
         if (!ride) return res.status(404).json({ message: 'Ride not found' });
         if (String(ride.assignedTo) !== String(req.user._id)) {
           return res.status(403).json({ error: 'Forbidden: this ride is assigned to another driver' });
@@ -622,12 +760,15 @@ export class QuickRideController {
         completedAt: completed.completedAt,
         finalFare: completed.finalFare,
       };
-      emitToUser(completed.bookedBy?._id ?? completed.bookedBy, 'ride:completed', payload);
-      emitToDriver(completed.assignedTo?._id ?? completed.assignedTo, 'ride:completed', payload);
+      emitToUser(completed.bookedBy?._id ?? completed.bookedBy, 'outstation:completed', payload);
+      emitToDriver(completed.assignedTo?._id ?? completed.assignedTo, 'outstation:completed', payload);
 
+      // Already torn down at pickup — kept so a future status change cannot leave a room open.
       await closeRideRoom(completed._id, 'completed');
-      
-      const paymentDetails = await this.paymentDetailsService.getByDriver(completed.assignedTo?._id ?? completed.assignedTo);
+
+      const paymentDetails = await this.paymentDetailsService.getByDriver(
+        completed.assignedTo?._id ?? completed.assignedTo
+      );
 
       return res.status(200).json({ message: 'Ride completed successfully.', ride: completed, paymentDetails });
     } catch (error) {
@@ -636,14 +777,12 @@ export class QuickRideController {
     }
   };
 
-  // PATCH /api/v3/quick-rides/:id/cancel  (protected — either party)
+  // PATCH /api/v3/outstation-rides/:id/cancel  (protected — either party)
   cancelRide = async (req, res) => {
     const { cancellationReason } = req.body;
 
-    console.log(`User ${req.user._id} (${req.role}) is cancelling ride ${req.params.id} for reason: ${cancellationReason}`);
-
     try {
-      const ride = await this.quickRideService.getRideRaw(req.params.id);
+      const ride = await this.outstationRideService.getRideRaw(req.params.id);
       if (!ride) return res.status(404).json({ message: 'Ride not found' });
 
       const isRider = String(ride.bookedBy) === String(req.user._id);
@@ -654,7 +793,7 @@ export class QuickRideController {
       }
 
       // cancelledBy comes from the token's role, never the body
-      const cancelled = await this.quickRideService.cancelRide(ride._id, {
+      const cancelled = await this.outstationRideService.cancelRide(ride._id, {
         cancelledBy: req.role,
         cancellationReason,
       });
@@ -663,7 +802,7 @@ export class QuickRideController {
         return res.status(409).json({ message: `A ride that is ${ride.rideStatus} cannot be cancelled` });
       }
 
-      const doomed = await this.quickRideBidService.deleteOtherBidsForRide(cancelled._id, null);
+      const doomed = await this.outstationRideBidService.deleteOtherBidsForRide(cancelled._id, null);
 
       const payload = {
         rideId: String(cancelled._id),
@@ -671,14 +810,16 @@ export class QuickRideController {
         cancellationReason: cancelled.cancellationReason,
       };
 
-      doomed.forEach((bid) => emitToDriver(bid.requestedBy, 'ride:cancelled', payload));
-      if (isRider && cancelled.assignedTo) emitToDriver(cancelled.assignedTo?._id ?? cancelled.assignedTo, 'ride:cancelled', payload);
-      if (isDriver) emitToUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'ride:cancelled', payload);
+      doomed.forEach((bid) => emitToDriver(bid.requestedBy, 'outstation:ride_cancelled', payload));
+      if (isRider && cancelled.assignedTo) {
+        emitToDriver(cancelled.assignedTo?._id ?? cancelled.assignedTo, 'outstation:ride_cancelled', payload);
+      }
+      if (isDriver) emitToUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'outstation:ride_cancelled', payload);
 
       // Everyone else the ride was ever pushed to. Bidders were just told above, and the assigned
       // driver either was too or is the one doing the cancelling — excluding both leaves exactly
       // the drivers with a card and no other reason to hear about this.
-      await this.rideAudienceService.notifyAndDrain(cancelled._id, 'ride:cancelled', payload, {
+      await this.rideAudienceService.notifyAndDrain(cancelled._id, 'outstation:ride_cancelled', payload, {
         exclude: [...doomed.map((bid) => bid.requestedBy), cancelled.assignedTo],
       });
 

@@ -1,20 +1,15 @@
 import { QuickRide } from '../models/quickRide.model.js';
 import { ACTIVE_RIDE_STATUSES, CANCELLABLE_RIDE_STATUSES } from '../constants/ride.constants.js';
 import { generateStartOtp, generateTrackingToken } from '../utils/generateOtp.js';
+import { withHistoryFilters } from '../utils/historyFilters.js';
 
+// Not shared with the outstation service on purpose: these name collection-specific ref paths and
+// projections, and they will drift the moment one module wants a different shape.
 const RIDE_POPULATE = [
   { path: 'vehicleTypeId' },
   { path: 'assignedTo', select: 'name phoneNumber profileImageUrl' },
   { path: 'bookedBy', select: 'name phoneNumber profileImageUrl' },
 ];
-
-// Lays the optional history filters over an ownership query. Both filtered fields sit in the
-// { bookedBy | assignedTo, createdAt } indexes, so a filtered history costs no extra scan.
-const withHistoryFilters = (base, { statuses, createdAt } = {}) => ({
-  ...base,
-  ...(statuses?.length && { rideStatus: { $in: statuses } }),
-  ...(createdAt && { createdAt }),
-});
 
 export class QuickRideService {
   createRide = async (data) => {

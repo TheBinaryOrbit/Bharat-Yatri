@@ -33,11 +33,36 @@ export class RideDispatchService {
     };
   };
 
+  // The outstation card. Same core payload plus what only a scheduled trip has — and rideType,
+  // which makes the payload self-describing in a log even though the event name already says it.
+  buildOutstationRequestPayload = (ride, distanceFromDriverKm) => ({
+    ...this.buildRequestPayload(ride, distanceFromDriverKm),
+    rideType: 'outstation',
+    bookingType: ride.bookingType,
+    pickupAt: ride.pickupAt,
+  });
+
   // Finds nearby, eligible drivers and pushes the ride to them.
   //
   // Reused verbatim for fare raises with event:'ride:fare_updated' — re-dispatching also reaches
   // drivers who came online after the ride was created, which is what raising the price is for.
-  dispatchRide = async (ride, { event = 'ride:request' } = {}) => {
+  //
+  // Every option defaults to the QuickRide behaviour, so both of its call sites are untouched:
+  //   rideType   selects the availability constraint set
+  //   buildPayload / event   shape and name the card the driver app receives
+  //   radius     overrides the expanding ring (outstation uses one fixed sweep)
+  //   audienceTtlSeconds     keeps the audience set alive as long as the ride itself
+  dispatchRide = async (
+    ride,
+    {
+      event = 'ride:request',
+      rideType = 'quickride',
+      buildPayload = this.buildRequestPayload,
+      radius = null,
+      audienceTtlSeconds = null,
+      noDriversEvent = 'ride:no_drivers',
+    } = {}
+  ) => {
     const pickup = fromGeoPoint(ride.pickupCoordinates);
     if (!pickup) return { drivers: [], radiusKm: 0 };
 
@@ -46,7 +71,7 @@ export class RideDispatchService {
     const filter = async (found) => {
       const ids = found.map((d) => d.driverId);
       const available = new Set(
-        (await this.driverAvailabilityService.filterAvailableDrivers(ids, { ride })).map(String)
+        (await this.driverAvailabilityService.filterAvailableDrivers(ids, { ride, rideType })).map(String)
       );
       return found.filter((d) => available.has(String(d.driverId)));
     };
@@ -56,10 +81,11 @@ export class RideDispatchService {
       longitude: pickup.longitude,
       vehicleTypeId: String(ride.vehicleTypeId?._id ?? ride.vehicleTypeId),
       filter,
+      radius,
     });
 
     if (!drivers.length) {
-      emitToUser(ride.bookedBy?._id ?? ride.bookedBy, 'ride:no_drivers', {
+      emitToUser(ride.bookedBy?._id ?? ride.bookedBy, noDriversEvent, {
         rideId: String(ride._id),
         searchedRadiusKm: radiusKm,
       });
@@ -73,11 +99,12 @@ export class RideDispatchService {
     // removing a card that isn't on screen is a no-op in the app.
     await this.rideAudienceService.remember(
       ride._id,
-      drivers.map((driver) => driver.driverId)
+      drivers.map((driver) => driver.driverId),
+      { ttlSeconds: audienceTtlSeconds }
     );
 
     drivers.forEach((driver) => {
-      emitToDriver(driver.driverId, event, this.buildRequestPayload(ride, driver.distanceKm));
+      emitToDriver(driver.driverId, event, buildPayload(ride, driver.distanceKm));
     });
 
     return { drivers, radiusKm };

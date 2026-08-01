@@ -133,7 +133,12 @@ quickRideSchema.index({ pickupCoordinates: '2dsphere' });
 quickRideSchema.index({ rideStatus: 1, vehicleTypeId: 1, createdAt: -1 });
 quickRideSchema.index({ rideStatus: 1, expiresAt: 1 }); // drives the expiry sweeper
 quickRideSchema.index({ bookedBy: 1, createdAt: -1 });
-quickRideSchema.index({ assignedTo: 1, createdAt: -1 }); // also serves the busy check
+quickRideSchema.index({ assignedTo: 1, createdAt: -1 }); // driver history
+// The busy check: distinct('assignedTo', {assignedTo:{$in},rideStatus:{$in}}). The history index
+// above can seek on assignedTo but cannot satisfy rideStatus from the key, so it has to fetch
+// every matched document — tolerable when this ran once per QuickRide dispatch, not now that the
+// outstation dispatch path hits it too. With rideStatus in the key this becomes a DISTINCT_SCAN.
+quickRideSchema.index({ assignedTo: 1, rideStatus: 1 });
 quickRideSchema.index({ trackingToken: 1 }, { sparse: true });
 
 export const QuickRide = mongoose.model('QuickRide', quickRideSchema);

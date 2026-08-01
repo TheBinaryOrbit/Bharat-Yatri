@@ -1,12 +1,16 @@
 import { env } from '../config/env.js';
 import { QuickRideService } from '../services/quickRide.service.js';
 import { QuickRideBidService } from '../services/quickRideBid.service.js';
+import { OutstationRideService } from '../services/outstationRide.service.js';
+import { OutstationRideBidService } from '../services/outstationRideBid.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { closeRideRoom } from '../socket/rideRoom.js';
 
 const quickRideService = new QuickRideService();
 const quickRideBidService = new QuickRideBidService();
+const outstationRideService = new OutstationRideService();
+const outstationRideBidService = new OutstationRideBidService();
 const rideAudienceService = new RideAudienceService();
 
 let timer = null;
@@ -59,6 +63,44 @@ const expireRides = async () => {
   }
 };
 
+// Outstation rides expire on min(createdAt + OUTSTATION_RIDE_TTL_HOURS, pickupAt) — same sweeper,
+// same fan-out, same reasons as above.
+//
+// What is deliberately absent is an outstation BID expiry pass. QuickRide bids die in 60 seconds
+// because a rider staring at a map wants a short, live auction. An outstation bid may be placed on
+// a trip three days out and has to still be there when the rider opens the app that evening. So
+// outstation bids have no expiresAt, no TTL index and no sweep: they are deleted only when the
+// ride is assigned, cancelled or expires, when the driver withdraws, or when the rider dismisses
+// them. Every one of those is an explicit action by someone.
+const expireOutstationRides = async () => {
+  const expired = await outstationRideService.findExpiredSearchingRides();
+  if (!expired.length) return;
+
+  const rideIds = expired.map((ride) => ride._id);
+  await outstationRideService.markRidesExpired(rideIds);
+
+  for (const ride of expired) {
+    const doomed = await outstationRideBidService.deleteOtherBidsForRide(ride._id, null);
+    doomed.forEach((bid) =>
+      emitToDriver(bid.requestedBy, 'outstation:ride_expired', { rideId: String(ride._id) })
+    );
+
+    await rideAudienceService.notifyAndDrain(
+      ride._id,
+      'outstation:ride_expired',
+      { rideId: String(ride._id) },
+      { exclude: doomed.map((bid) => bid.requestedBy) }
+    );
+
+    emitToUser(ride.bookedBy, 'outstation:ride_expired', { rideId: String(ride._id) });
+
+    // A 'searching' outstation ride never had a room — the window only opens when the driver sets
+    // off — so this is a no-op. Kept for symmetry with the QuickRide sweep, and so a future status
+    // change here cannot leave a room open.
+    await closeRideRoom(ride._id, 'expired');
+  }
+};
+
 const tick = async () => {
   if (isRunning) return; // a slow tick must not overlap the next one
   isRunning = true;
@@ -66,6 +108,7 @@ const tick = async () => {
   try {
     await expireBids();
     await expireRides();
+    await expireOutstationRides();
   } catch (error) {
     // Swallowed deliberately: one bad tick must not kill the interval
     console.error('Expiry sweep error:', error.message);

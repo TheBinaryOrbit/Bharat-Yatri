@@ -14,8 +14,16 @@ const audienceKey = (rideId) => `ride:dispatched:${rideId}`;
 // Redis rather than Mongo because the set is short-lived, write-heavy during the fan-out, and
 // worthless once the ride is over. It expires on its own, so nothing accumulates if a ride ends
 // through a path that forgets to drain it.
+// One key namespace for both ride types, on purpose. ObjectIds do not collide in practice, and the
+// real argument is at the call sites: notifyAndDrain is invoked from every terminal transition in
+// both modules, and a caller that forgot to pass a ride type would drain the wrong (empty) set and
+// silently leave stale cards on driver screens — a failure invisible in testing. A shared namespace
+// makes that class of bug impossible.
 export class RideAudienceService {
-  remember = async (rideId, driverIds) => {
+  // `ttlSeconds` lets a caller keep the set alive as long as the ride it describes. QuickRide's
+  // default (its 5-minute ride plus a minute) would drop an outstation audience six minutes into a
+  // 24-hour auction, orphaning exactly the cards this set exists to pull back.
+  remember = async (rideId, driverIds, { ttlSeconds = null } = {}) => {
     const ids = (driverIds || []).map(String).filter(Boolean);
     if (!ids.length) return;
 
@@ -26,7 +34,7 @@ export class RideAudienceService {
     await redis
       .pipeline()
       .sadd(key, ...ids)
-      .expire(key, env.RIDE_PENDING_TTL_SECONDS + 60)
+      .expire(key, ttlSeconds ?? env.RIDE_PENDING_TTL_SECONDS + 60)
       .exec();
   };
 

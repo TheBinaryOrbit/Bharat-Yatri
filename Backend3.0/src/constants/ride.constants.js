@@ -13,6 +13,40 @@ export const TERMINAL_RIDE_STATUSES = ['completed', 'cancelled', 'expired'];
 // filter is validated against, so the two can never drift.
 export const RIDE_STATUSES = ['searching', 'assigned', 'in_progress', 'completed', 'cancelled', 'expired'];
 
+// The two booking flows. Passed as context to the shared availability, dispatch and socket layers,
+// which behave differently depending on which kind of ride a driver is being considered for.
+export const RIDE_TYPES = ['quickride', 'outstation'];
+
+// Outstation only. 'now' is a hail; 'later' carries a real future pickupAt.
+export const BOOKING_TYPES = ['now', 'later'];
+
+// Outstation runs a longer lifecycle than QuickRide: 'arriving' is the leg between the driver
+// setting off and the rider getting in, and it is the ONLY window in which an outstation ride has
+// a room, a tracking token and a live position.
+//
+// Deliberately kept OUT of RIDE_STATUSES above — that list is QuickRide's schema enum, and adding
+// 'arriving' to it would make QuickRide accept a status it has no transition into or out of.
+export const OUTSTATION_RIDE_STATUSES = [
+  'searching',
+  'assigned',
+  'arriving',
+  'in_progress',
+  'completed',
+  'cancelled',
+  'expired',
+];
+
+// A driver holding an outstation ride in any of these is committed to it.
+export const OUTSTATION_ACTIVE_RIDE_STATUSES = ['assigned', 'arriving', 'in_progress'];
+
+// An outstation ride is still cancellable while the driver is on their way; once the rider is in
+// the vehicle (in_progress) it is a completion or a support case, exactly as with QuickRide.
+export const OUTSTATION_CANCELLABLE_RIDE_STATUSES = ['searching', 'assigned', 'arriving'];
+
+// The one status with a room. Used by the socket join guard and the tracking-token lookups, so
+// the tracking window is defined in a single place rather than restated at each gate.
+export const OUTSTATION_TRACKABLE_RIDE_STATUSES = ['arriving'];
+
 // Socket room names. Identity rooms let a user/driver be reached across devices and reconnects.
 export const rideRoomName = (rideId) => `ride:${rideId}`;
 export const driverRoomName = (driverId) => `driver:${driverId}`;

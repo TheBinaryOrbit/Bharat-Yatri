@@ -5,14 +5,17 @@ import { verifyToken } from '../utils/token.js';
 import { User } from '../models/user.model.js';
 import { Driver } from '../models/driver.model.js';
 import { QuickRide } from '../models/quickRide.model.js';
+import { OutstationRide } from '../models/outstationRide.model.js';
 import { Vehicle } from '../models/vehicle.model.js';
 import { DriverLocationService } from '../services/driverLocation.service.js';
 import { QuickRideService } from '../services/quickRide.service.js';
+import { OutstationRideService } from '../services/outstationRide.service.js';
 import { isValidCoordinate } from '../utils/geo.js';
 import { setIO } from './io.js';
 import { joinRideRoom } from './rideRoom.js';
 import {
   ACTIVE_RIDE_STATUSES,
+  OUTSTATION_TRACKABLE_RIDE_STATUSES,
   rideRoomName,
   driverRoomName,
   userRoomName,
@@ -20,6 +23,7 @@ import {
 
 const driverLocationService = new DriverLocationService();
 const quickRideService = new QuickRideService();
+const outstationRideService = new OutstationRideService();
 
 // Resolves whichever credential the client presented onto socket.data.
 //
@@ -49,12 +53,31 @@ const authenticate = async (socket) => {
     return { id: 'admin', role: 'admin', canPublish: false };
   }
 
-  // A shared tracking link is scoped to exactly one ride, for as long as that ride is active.
+  // A shared tracking link is scoped to exactly one ride, for as long as that ride is trackable.
+  //
+  // This is the ONE place the ride type cannot be supplied by the client — a share link is an
+  // opaque token and nothing more. (The REST side has no such problem: /quick-rides/track/:token
+  // and /outstation-rides/track/:token are separate routes.) So both collections are tried,
+  // QuickRide first because it is far more common, which means the second query is usually never
+  // issued. Both have a sparse trackingToken index, so a miss is one index probe.
   if (trackingToken) {
-    const ride = await QuickRide.findOne({
+    let ride = await QuickRide.findOne({
       trackingToken,
       rideStatus: { $in: ACTIVE_RIDE_STATUSES },
     }).select('_id');
+    let trackingRideType = 'quickride';
+
+    if (!ride) {
+      // 'arriving' only. An outstation ride nulls its token at pickup so an in_progress row could
+      // never match anyway; naming the status makes the invariant explicit rather than relying on
+      // a field being cleared somewhere else.
+      ride = await OutstationRide.findOne({
+        trackingToken,
+        rideStatus: { $in: OUTSTATION_TRACKABLE_RIDE_STATUSES },
+      }).select('_id');
+      trackingRideType = 'outstation';
+    }
+
     if (!ride) throw new Error('Invalid or expired tracking link');
 
     return {
@@ -62,6 +85,7 @@ const authenticate = async (socket) => {
       role: 'viewer',
       canPublish: false,
       trackingRideId: String(ride._id),
+      trackingRideType,
     };
   }
 
@@ -124,16 +148,22 @@ const registerDriverHandlers = (io, socket) => {
         meta: { name: socket.data.name, ...(socket.data.vehicle || {}) },
       });
 
-      const rideId = socket.data.activeRideId;
-      if (!rideId) return;
+      // Plural: a driver can be inside two ride rooms at once — an outstation trip they are
+      // driving to and a QuickRide accepted before the outstation block window closed. Each room
+      // gets the same fix, tagged with its own rideId.
+      const rideIds = socket.data.activeRideIds || [];
+      if (!rideIds.length) return;
 
-      io.to(rideRoomName(rideId)).emit('ride:location', {
-        rideId,
-        latitude,
-        longitude,
-        heading: heading ?? null,
-        speed: speed ?? null,
-        at: Date.now(),
+      const at = Date.now();
+      rideIds.forEach((rideId) => {
+        io.to(rideRoomName(rideId)).emit('ride:location', {
+          rideId,
+          latitude,
+          longitude,
+          heading: heading ?? null,
+          speed: speed ?? null,
+          at,
+        });
       });
     } catch (error) {
       console.error('driver:location error:', error.message);
@@ -196,11 +226,15 @@ export const initSocket = (httpServer) => {
     // costs nothing and closes that window.
 
     // Late joiners: a tracking link opened mid-trip, an admin opening a ride, a reconnecting client.
-    socket.on('ride:join', async ({ rideId } = {}, ack) => {
+    //
+    // `rideType` is optional and defaults to 'quickride', so already-shipped apps keep working.
+    // An outstation client must send 'outstation' — a mismatched type resolves to "Ride not found"
+    // rather than being silently absorbed, which is the behaviour we want from a client bug.
+    socket.on('ride:join', async ({ rideId, rideType } = {}, ack) => {
       try {
         if (!rideId) return ack?.({ ok: false, message: 'rideId is required' });
 
-        const result = await joinRideRoom(socket, rideId);
+        const result = await joinRideRoom(socket, rideId, rideType);
         if (!result.ok) {
           socket.emit('ride:join_error', { rideId, message: result.message });
           return ack?.(result);
@@ -261,14 +295,34 @@ export const initSocket = (httpServer) => {
       }
     }
 
-    // A driver who lost signal mid-trip resumes broadcasting without the client re-issuing ride:join.
+    // A driver who lost signal mid-trip resumes broadcasting without the client re-issuing
+    // ride:join. Both products are checked, and both rooms are rejoined if both apply — the
+    // rideType field on the event tells the app which screen to restore. Adding a field is
+    // backwards-compatible; an older client simply ignores it.
     if (role === 'driver' || role === 'user') {
       try {
-        const activeRide = await quickRideService.getActiveRideForParticipant(id);
-        if (activeRide) {
-          socket.join(rideRoomName(activeRide._id));
-          if (role === 'driver') socket.data.activeRideId = String(activeRide._id);
-          socket.emit('ride:rejoined', { rideId: String(activeRide._id), rideStatus: activeRide.rideStatus });
+        const [quickRide, outstationRide] = await Promise.all([
+          quickRideService.getActiveRideForParticipant(id),
+          // 'arriving' only — an assigned-but-not-departed or in_progress outstation ride has no
+          // room to rejoin.
+          outstationRideService.getRoomEligibleRideForParticipant(id),
+        ]);
+
+        for (const [ride, rideType] of [
+          [quickRide, 'quickride'],
+          [outstationRide, 'outstation'],
+        ]) {
+          if (!ride) continue;
+
+          socket.join(rideRoomName(ride._id));
+          if (role === 'driver') {
+            socket.data.activeRideIds = [...(socket.data.activeRideIds || []), String(ride._id)];
+          }
+          socket.emit('ride:rejoined', {
+            rideId: String(ride._id),
+            rideType,
+            rideStatus: ride.rideStatus,
+          });
         }
       } catch (error) {
         console.error('ride room rejoin error:', error.message);

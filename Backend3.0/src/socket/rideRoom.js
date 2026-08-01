@@ -1,8 +1,6 @@
 import { maybeGetIO } from './io.js';
-import { QuickRideService } from '../services/quickRide.service.js';
-import { ACTIVE_RIDE_STATUSES, rideRoomName, driverRoomName, userRoomName } from '../constants/ride.constants.js';
-
-const quickRideService = new QuickRideService();
+import { resolveRideForRoom } from './rideResolver.js';
+import { rideRoomName, driverRoomName, userRoomName } from '../constants/ride.constants.js';
 
 // Every active ride owns a room. All in-ride traffic goes driver → server → room;
 // there is no direct driver-to-passenger socket path.
@@ -16,19 +14,31 @@ const quickRideService = new QuickRideService();
 //         v              v              v
 //    Passenger      Admin panel   Tracking link
 //    (read-only)    (read-only)    (read-only)
+//
+// The room itself is ride-type agnostic on purpose: the events inside it (ride:location,
+// ride:ended) only ever reach sockets already in the room and carry a rideId, so nothing in this
+// file needs to branch on ride type. That is the single biggest simplification in the socket
+// layer, and the reason the outstation controllers reuse open/close verbatim.
 
-// Tags the driver's local sockets with the ride they are on, so the location handler knows
-// where to broadcast without a database round-trip on every 5s ping.
-const tagActiveRide = async (io, room, rideId) => {
-  const sockets = await io.in(room).fetchSockets();
-  sockets.forEach((s) => {
-    s.data.activeRideId = rideId;
-  });
+// A driver may be in more than one ride room at a time — an outstation trip they are driving to
+// and a QuickRide accepted before the outstation block window closed. So this is a SET of ids,
+// not one, and the location handler fans out to all of them.
+const addActiveRide = (socketLike, rideId) => {
+  const current = socketLike.data.activeRideIds || [];
+  if (!current.includes(rideId)) socketLike.data.activeRideIds = [...current, rideId];
 };
 
-// Called when a bid is accepted. The SERVER puts both parties in the room rather than waiting
-// for them to ask — a client-initiated join would leave a race where the driver's first
-// location ping lands before the rider has joined.
+// Tags the driver's local sockets with the rides they are on, so the location handler knows where
+// to broadcast without a database round-trip on every 5s ping.
+const tagActiveRide = async (io, room, rideId) => {
+  const sockets = await io.in(room).fetchSockets();
+  sockets.forEach((s) => addActiveRide(s, rideId));
+};
+
+// Called when the tracking window opens — on bid accept for QuickRide, on the driver setting off
+// for outstation. The SERVER puts both parties in the room rather than waiting for them to ask: a
+// client-initiated join would leave a race where the driver's first location ping lands before the
+// rider has joined.
 export const openRideRoom = async (ride) => {
   const io = maybeGetIO();
   if (!io) return;
@@ -44,17 +54,19 @@ export const openRideRoom = async (ride) => {
   await tagActiveRide(io, driverRoom, rideId);
 };
 
-// Authorises a join. The client supplies only a rideId — identity always comes from the
-// handshake, never from the payload.
-export const joinRideRoom = async (socket, rideId) => {
-  const ride = await quickRideService.getRideRaw(rideId);
+// Authorises a join. The client supplies a rideId and a rideType; identity always comes from the
+// handshake, never from the payload — and a viewer's type comes from their tracking token, so a
+// share-link holder cannot change which collection they are authorised against.
+export const joinRideRoom = async (socket, rideId, rideType) => {
+  const { role, id, trackingRideId, trackingRideType } = socket.data;
+
+  const { ride, joinable } = await resolveRideForRoom(
+    rideId,
+    role === 'viewer' ? trackingRideType : rideType
+  );
+
   if (!ride) return { ok: false, message: 'Ride not found' };
-
-  if (!ACTIVE_RIDE_STATUSES.includes(ride.rideStatus)) {
-    return { ok: false, message: 'This ride is no longer active' };
-  }
-
-  const { role, id, trackingRideId } = socket.data;
+  if (!joinable) return { ok: false, message: 'This ride is no longer active' };
 
   const allowed =
     (role === 'driver' && String(ride.assignedTo) === String(id)) ||
@@ -65,12 +77,13 @@ export const joinRideRoom = async (socket, rideId) => {
   if (!allowed) return { ok: false, message: 'Not a participant in this ride' };
 
   socket.join(rideRoomName(ride._id));
-  if (role === 'driver') socket.data.activeRideId = String(ride._id);
+  if (role === 'driver') addActiveRide(socket, String(ride._id));
 
   return { ok: true, ride };
 };
 
-// Called on EVERY terminal transition — completed, cancelled and expired alike.
+// Called on EVERY transition that closes the tracking window — completed, cancelled and expired
+// for both products, plus 'picked_up' for outstation, where the window shuts mid-ride.
 //
 // This is security-relevant, not housekeeping: a socket left in an ended ride's room would keep
 // receiving that driver's next trip's location.
@@ -84,7 +97,8 @@ export const closeRideRoom = async (rideId, reason) => {
 
   const sockets = await io.in(room).fetchSockets();
   sockets.forEach((s) => {
-    if (String(s.data.activeRideId) === String(rideId)) s.data.activeRideId = null;
+    // Drop just this ride — a driver still running another one must keep broadcasting into it.
+    s.data.activeRideIds = (s.data.activeRideIds || []).filter((id) => String(id) !== String(rideId));
   });
 
   io.in(room).socketsLeave(room);

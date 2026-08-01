@@ -1,10 +1,10 @@
-import { env } from '../config/env.js';
 import { QuickRideService } from '../services/quickRide.service.js';
 import { QuickRideBidService } from '../services/quickRideBid.service.js';
 import { DriverAvailabilityService } from '../services/driverAvailability.service.js';
 import { FareService } from '../services/fare.service.js';
 import { VehicleService } from '../services/vehicle.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
+import { buildTrackingUrl } from '../utils/trackingUrl.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
 import { openRideRoom } from '../socket/rideRoom.js';
 
@@ -17,11 +17,6 @@ export class QuickRideBidController {
     this.vehicleService = new VehicleService();
     this.rideAudienceService = new RideAudienceService();
   }
-
-  buildTrackingUrl = (trackingToken) => {
-    if (!trackingToken) return null;
-    return env.TRACKING_LINK_BASE_URL ? `${env.TRACKING_LINK_BASE_URL}/${trackingToken}` : trackingToken;
-  };
 
   // POST /api/v3/quick-ride-bids  (protected — driver only)
   createBid = async (req, res) => {
@@ -120,6 +115,24 @@ export class QuickRideBidController {
         return res.status(409).json({ message: 'This bid has expired' });
       }
 
+      // A 60-second bid used to make this safe to skip: the driver who placed it was free a moment
+      // ago and almost certainly still is. Outstation changed that — a driver can win an outstation
+      // trip, or cross into its pickup block window, in the seconds between bidding and being
+      // accepted. Their bid is deleted on the way out so the rider's list self-corrects.
+      const availability = await this.driverAvailabilityService.checkDriverAvailability(bid.requestedBy);
+      if (!availability.available) {
+        await this.quickRideBidService.deleteBid(bid._id);
+        emitToDriver(bid.requestedBy, 'bid:removed', {
+          bidId: String(bid._id),
+          quickRideId: String(ride._id),
+        });
+
+        return res.status(409).json({
+          message: 'This driver is no longer available. Their bid has been removed — please pick another.',
+          reason: availability.reason,
+        });
+      }
+
       // Assign FIRST — the conditional update is the lock. If the sweeper expired the ride a
       // moment earlier, or another accept already won, this returns null and the rider gets a
       // clean 409 rather than a half-assigned ride. Only then do we touch the bids.
@@ -170,7 +183,7 @@ export class QuickRideBidController {
         rideId: String(assigned._id),
         ride: full,
         startOtp: assigned.startOtp,
-        trackingUrl: this.buildTrackingUrl(assigned.trackingToken),
+        trackingUrl: buildTrackingUrl(assigned.trackingToken),
         finalFare: assigned.finalFare,
       });
 
@@ -185,7 +198,7 @@ export class QuickRideBidController {
         ride: full,
         bid: accepted,
         startOtp: assigned.startOtp,
-        trackingUrl: this.buildTrackingUrl(assigned.trackingToken),
+        trackingUrl: buildTrackingUrl(assigned.trackingToken),
       });
     } catch (error) {
       console.log(error);

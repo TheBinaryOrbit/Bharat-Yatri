@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Outstation — Rider Test Console</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-2: #1e222b; --line: #2a2f3a;
+    --text: #e6e8ee; --muted: #939aab; --accent: #4f9cf9; --ok: #3ddc97;
+    --warn: #ffb347; --err: #ff6b6b; --violet: #b07cf7; --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; margin-right: auto; }
+  .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; align-items: start; }
+  @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .panel + .panel { margin-top: 16px; }
+  .panel h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 10px; font-weight: 600;
+  }
+  label { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 3px; }
+  input, select {
+    width: 100%; padding: 8px 10px; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 7px; font: inherit;
+  }
+  input:focus, select:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  input[readonly] { color: var(--muted); }
+  button {
+    padding: 8px 14px; border-radius: 7px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--text); font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; font-weight: 600; }
+  button.danger { border-color: #5a2b2b; color: var(--err); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: end; }
+  .row > * { flex: 1; min-width: 0; }
+  .row > button { flex: 0 0 auto; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; background: var(--panel-2); border: 1px solid var(--line);
+  }
+  .pill.ok { color: var(--ok); border-color: #245c45; }
+  .pill.warn { color: var(--warn); border-color: #5c4a24; }
+  .pill.err { color: var(--err); border-color: #5c2424; }
+  .pill.violet { color: var(--violet); border-color: #4a2f66; }
+  .card {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; margin-top: 8px;
+  }
+  .card.sel { border-color: var(--accent); }
+  .card.hot { border-color: var(--ok); }
+  .card.pick { cursor: pointer; }
+  .card.pick:hover { border-color: var(--accent); }
+  .card h3 { margin: 0 0 2px; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .big { font-size: 20px; font-weight: 600; }
+  .kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; font-size: 13px; }
+  .kv span:first-child { color: var(--muted); }
+  #log {
+    height: 260px; overflow: auto; font: 11px/1.5 ui-monospace, Menlo, Consolas, monospace;
+    background: #0b0d11; border: 1px solid var(--line); border-radius: 8px; padding: 8px;
+  }
+  #log div { padding: 1px 0; border-bottom: 1px solid #14171d; word-break: break-word; }
+  .t-in { color: var(--ok); } .t-out { color: var(--accent); } .t-err { color: var(--err); }
+  .t-view { color: var(--violet); }
+  .otp {
+    font: 700 26px/1 ui-monospace, Menlo, Consolas, monospace;
+    letter-spacing: .3em; color: var(--ok); padding: 8px 0;
+  }
+  svg { width: 100%; height: 210px; background: #0b0d11; border: 1px solid var(--line); border-radius: 8px; }
+  .hidden { display: none !important; }
+  .track-box { border-radius: 8px; padding: 10px; border: 1px solid var(--line); }
+  .track-box.live { border-color: var(--ok); background: #0d1a15; }
+  .track-box.dead { border-color: #3a2020; background: #170f0f; }
+  code { font: 11px ui-monospace, Menlo, Consolas, monospace; color: var(--muted); word-break: break-all; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Outstation — Rider Test Console</h1>
+  <span class="sub">books a real &gt;100 km trip against the running backend</span>
+  <span id="sockState" class="pill">socket: offline</span>
+  <span id="sockV" class="pill">viewer: not connected</span>
+  <span id="whoami" class="pill">not signed in</span>
+</header>
+
+<div class="wrap">
+
+  <!-- ─────────────── left column ─────────────── -->
+  <div>
+    <div class="panel">
+      <h2>1 · Sign in as a rider</h2>
+      <label>API base</label>
+      <input id="base" value="" />
+      <div class="row">
+        <div><label>Phone number</label><input id="phone" placeholder="9990000001" /></div>
+        <button id="btnOtp">Send OTP</button>
+      </div>
+      <div class="row">
+        <div><label>OTP</label><input id="otp" placeholder="123456" /></div>
+        <button id="btnVerify">Verify &amp; connect</button>
+      </div>
+      <label>…or paste a rider JWT directly</label>
+      <div class="row">
+        <input id="token" placeholder="eyJhbGciOi..." />
+        <button id="btnUseToken">Use token</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>2 · Where</h2>
+      <div class="muted" style="margin-bottom:8px">
+        Outstation needs <strong>≥ 100 km</strong>. Your current location is almost certainly
+        under that from anywhere nearby — pair it with a far drop, or use a preset.
+      </div>
+
+      <div class="row" style="margin-bottom:4px">
+        <button id="btnLocate">📍 Use my current location</button>
+        <select id="locTarget" style="flex:0 0 130px">
+          <option value="pickup">as pickup</option>
+          <option value="drop">as drop</option>
+        </select>
+      </div>
+      <div id="locMsg" class="muted"></div>
+
+      <div class="row" style="margin-top:8px">
+        <button id="btnPresetJaipur">Delhi → Jaipur (~270 km)</button>
+        <button id="btnPresetNoida">Delhi → Noida (~30 km, should 400)</button>
+      </div>
+
+      <div class="grid2" style="margin-top:8px">
+        <div><label>Pickup lat</label><input id="pLat" value="28.6315" /></div>
+        <div><label>Pickup lng</label><input id="pLng" value="77.2167" /></div>
+      </div>
+      <label>Pickup name</label><input id="pName" value="Connaught Place, Delhi" />
+
+      <div class="grid2" style="margin-top:8px">
+        <div><label>Drop lat</label><input id="dLat" value="26.9124" /></div>
+        <div><label>Drop lng</label><input id="dLng" value="75.7873" /></div>
+      </div>
+      <label>Drop name</label><input id="dName" value="Jaipur" />
+
+      <div id="distHint" class="muted" style="margin-top:8px"></div>
+
+      <div style="margin-top:12px">
+        <button id="btnEstimate" class="primary">POST /outstation-rides/fare-estimate</button>
+      </div>
+      <div id="estMeta" class="muted" style="margin-top:8px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>3 · When</h2>
+      <label>Booking type</label>
+      <select id="bookingType">
+        <option value="now">now — hail it (pickupAt = server time)</option>
+        <option value="later" selected>later — schedule it</option>
+      </select>
+
+      <div id="laterBox">
+        <div class="grid2">
+          <div><label>Pickup date</label><input id="pickupDate" type="date" /></div>
+          <div><label>Pickup time</label><input id="pickupTime" type="time" value="09:30" /></div>
+        </div>
+        <label>Send it as — the API accepts either form, never both</label>
+        <select id="pickupForm">
+          <option value="pair">pickupDate + pickupTime (native picker)</option>
+          <option value="iso">pickupAt as an ISO instant (web client)</option>
+          <option value="both">BOTH — expect a 400</option>
+        </select>
+      </div>
+      <div id="pickupPreview" class="muted" style="margin-top:6px"></div>
+    </div>
+
+    <div class="panel">
+      <h2>4 · Pick a vehicle &amp; book</h2>
+      <div id="estEmpty" class="muted">Run the fare estimate above first.</div>
+      <div id="estList"></div>
+    </div>
+  </div>
+
+  <!-- ─────────────── right column ─────────────── -->
+  <div>
+    <div class="panel">
+      <h2>5 · Your trips <span id="rideCount" class="pill">0</span></h2>
+      <div class="muted" style="margin-bottom:6px">
+        Plural on purpose — a planner may have several trips out for bids at once. There is no
+        one-open-ride 409 here, unlike QuickRide. <strong>Click a trip</strong> to show its bids below.
+      </div>
+      <div class="row">
+        <button id="btnLive">GET /outstation-rides/live</button>
+        <span id="pollState" class="pill">polling: off</span>
+      </div>
+      <div id="noRides" class="muted" style="margin-top:8px">No live trips yet.</div>
+      <div id="rideList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>6 · Live bids <span id="bidCount" class="pill">0</span></h2>
+      <div class="row" style="margin-bottom:6px">
+        <div class="muted" id="bidFor">no trip selected</div>
+        <button id="btnBids">GET /:id/bids</button>
+      </div>
+      <div id="bidEmpty" class="muted">
+        Bids appear here the moment a driver bids. Unlike QuickRide there is no countdown —
+        outstation bids never expire.
+      </div>
+      <div id="bidList"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Tracking window</h2>
+      <div class="muted" style="margin-bottom:8px">
+        The driver's two-step start is what makes this narrow. Drive those steps from a driver
+        client; this panel is the rider's view of them.
+      </div>
+      <div class="grid3">
+        <div class="track-box dead" id="tw1">
+          <div><strong>assigned</strong></div>
+          <div class="muted">No room, no token, no link. May sit for days.</div>
+        </div>
+        <div class="track-box dead" id="tw2">
+          <div><strong>arriving</strong></div>
+          <div class="muted">Room open, location live, share link works.</div>
+        </div>
+        <div class="track-box dead" id="tw3">
+          <div><strong>in_progress</strong></div>
+          <div class="muted">Room torn down, token nulled, link dead.</div>
+        </div>
+      </div>
+
+      <label>Share link — appears only at <code>arriving</code></label>
+      <input id="shareUrl" readonly placeholder="nothing to track yet" />
+      <div class="row" style="margin-top:8px">
+        <button id="btnViewer" class="primary">Connect as share-link viewer</button>
+        <button id="btnTrackRest">GET /track/:token</button>
+      </div>
+
+      <div class="muted" style="margin-top:10px">
+        <code>ride:location</code> received: <strong id="locCount">0</strong> ·
+        last <span id="locLast">never</span>
+      </div>
+      <div class="muted" style="margin-top:4px">
+        While the trip is <code>assigned</code> this counter must stay at <strong>0</strong> —
+        that is the guarantee a trip booked for next week does not broadcast the driver all week.
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Map</h2>
+      <svg id="map" viewBox="0 0 400 210" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="panel">
+      <h2>Event log <span class="pill violet">V viewer</span></h2>
+      <div class="row" style="margin-bottom:8px"><button id="btnClear">Clear</button></div>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const state = {
+    token: null, socket: null, session: null,
+    rides: [], est: null,
+    selectedRideId: null, bids: [],
+    viewer: null, poll: null,
+    driverLoc: null, locEvents: 0,
+  };
+
+  $('base').value = location.origin + '/api/v3';
+
+  // Default the picker to tomorrow morning — comfortably past the 60-minute lead time and
+  // well inside the 30-day horizon.
+  $('pickupDate').value = new Date(Date.now() + 24 * 3600e3).toISOString().slice(0, 10);
+
+  // ── logging ──────────────────────────────────────────────────────────────
+  const log = (kind, label, data) => {
+    const el = document.createElement('div');
+    el.className = 't-' + kind;
+    el.textContent = `${new Date().toLocaleTimeString()}  ${label}` +
+      (data === undefined ? '' : '  ' + (typeof data === 'string' ? data : JSON.stringify(data)));
+    $('log').prepend(el);
+  };
+  $('btnClear').onclick = () => ($('log').innerHTML = '');
+
+  // ── REST helper ──────────────────────────────────────────────────────────
+  // `quiet` keeps the 2-second poll from burying real events in the log.
+  const api = async (method, path, body, quiet) => {
+    const res = await fetch($('base').value + path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(state.token ? { Authorization: 'Bearer ' + state.token } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!quiet || !res.ok) {
+      log(res.ok ? 'out' : 'err', `${method} ${path} → ${res.status}`, json.message || json.error || '');
+    }
+    return { status: res.status, ok: res.ok, body: json };
+  };
+
+  const fail = (r) => {
+    const msg = r.body.message || r.body.error || 'Request failed';
+    const detail = (r.body.errors || []).map((e) => `${e.field}: ${e.message}`).join('\n');
+    const reason = r.body.reason ? `\n\nreason: ${r.body.reason}` : '';
+    alert(`${r.status} — ${msg}${detail ? '\n\n' + detail : ''}${reason}`);
+  };
+
+  // REST gives GeoJSON, sockets give { latitude, longitude }
+  const toLatLng = (c) => {
+    if (!c) return null;
+    if (Array.isArray(c?.coordinates)) return { lat: c.coordinates[1], lng: c.coordinates[0] };
+    if (c.latitude != null) return { lat: c.latitude, lng: c.longitude };
+    return null;
+  };
+
+  const fmt = (d) => (d ? new Date(d).toLocaleString() : '—');
+  const idOf = (v) => String(v?._id ?? v ?? '');
+
+  // ── auth ─────────────────────────────────────────────────────────────────
+  $('btnOtp').onclick = async () => {
+    const r = await api('POST', '/auth/otp', { phoneNumber: $('phone').value.trim() });
+    if (!r.ok) return fail(r);
+    state.session = r.body.sessionId;
+    alert('OTP sent. Check the phone / the 2factor dashboard.');
+  };
+
+  $('btnVerify').onclick = async () => {
+    const r = await api('POST', '/auth/verify', {
+      phoneNumber: $('phone').value.trim(),
+      otp: $('otp').value.trim(),
+      sessionId: state.session,
+      role: 'user',
+    });
+    if (!r.ok) return fail(r);
+    if (!r.body.token) return alert('Verified, but no token came back — is this phone registered as a user?');
+    $('token').value = r.body.token;
+    signIn(r.body.token, r.body.user?.name || r.body.data?.name);
+  };
+
+  $('btnUseToken').onclick = () => {
+    const t = $('token').value.trim();
+    if (!t) return alert('Paste a token first');
+    signIn(t);
+  };
+
+  const signIn = (token, name) => {
+    state.token = token;
+    $('whoami').textContent = name ? `rider: ${name}` : 'rider: signed in';
+    $('whoami').className = 'pill ok';
+    connectSocket();
+    loadLive();
+  };
+
+  // ── socket ───────────────────────────────────────────────────────────────
+  const connectSocket = () => {
+    if (state.socket) state.socket.disconnect();
+
+    const socket = io(location.origin, { auth: { token: state.token }, transports: ['websocket'] });
+    state.socket = socket;
+
+    const pill = (text, cls) => { $('sockState').textContent = text; $('sockState').className = 'pill ' + cls; };
+    socket.on('connect',       () => { pill('socket: live', 'ok'); log('in', 'socket connected'); });
+    socket.on('disconnect',    (r) => { pill('socket: offline', 'err'); log('err', 'socket disconnected', r); });
+    socket.on('connect_error', (e) => { pill('socket: error', 'err'); log('err', 'connect_error', e.message); });
+
+    // ── bids: applied to local state immediately, exactly as the QuickRide console does.
+    //    The poll below is only a safety net; a dropped event must not mean a missing bid.
+    socket.on('outstation:bid_new', (p) => {
+      log('in', 'outstation:bid_new', { fare: p.bid?.fare, rideId: p.outstationRideId });
+
+      // First bid on a trip nobody has clicked yet — select it, or the bid lands nowhere visible.
+      if (!state.selectedRideId) selectRide(p.outstationRideId);
+
+      if (idOf(p.outstationRideId) === state.selectedRideId && p.bid) {
+        state.bids = [...state.bids.filter((b) => idOf(b) !== idOf(p.bid)), p.bid].sort((a, b) => a.fare - b.fare);
+        renderBids();
+      }
+      loadLive({ quiet: true });   // keeps the per-trip bidCount honest
+    });
+
+    socket.on('outstation:bid_removed', (p) => {
+      log('in', 'outstation:bid_removed', p);
+      state.bids = state.bids.filter((b) => idOf(b) !== idOf(p.bidId));
+      renderBids();
+      loadLive({ quiet: true });
+    });
+
+    socket.on('outstation:no_drivers',   (p) => log('err', 'outstation:no_drivers', p));
+    socket.on('outstation:fare_updated', (p) => log('in', 'outstation:fare_updated', p));
+
+    socket.on('outstation:assigned', (p) => {
+      // trackingUrl is deliberately null here — nothing to watch until the driver sets off.
+      log('in', 'outstation:assigned', { finalFare: p.finalFare, trackingUrl: p.trackingUrl });
+      state.bids = [];
+      renderBids();
+      loadLive();
+    });
+    socket.on('outstation:started', (p) => {
+      log('in', 'outstation:started — TRACKING OPENS', { trackingUrl: p.trackingUrl });
+      if (p.trackingUrl) $('shareUrl').value = p.trackingUrl;
+      loadLive();
+    });
+    socket.on('outstation:picked_up',      (p) => { log('in', 'outstation:picked_up — TRACKING CLOSES', p); loadLive(); });
+    socket.on('outstation:completed',      (p) => { log('in', 'outstation:completed', p); loadLive(); });
+    socket.on('outstation:ride_cancelled', (p) => { log('in', 'outstation:ride_cancelled', p); loadLive(); });
+    socket.on('outstation:ride_expired',   (p) => { log('in', 'outstation:ride_expired', p); loadLive(); });
+
+    // ── room-scoped events, deliberately NOT namespaced: they only ever reach
+    //    sockets already inside ride:{id} and the payload carries rideId.
+    socket.on('ride:location', (p) => {
+      state.driverLoc = { lat: p.latitude, lng: p.longitude, at: p.at };
+      state.locEvents++;
+      $('locCount').textContent = state.locEvents;
+      $('locLast').textContent = new Date(p.at).toLocaleTimeString();
+      log('in', 'ride:location', { lat: p.latitude, lng: p.longitude });
+      drawMap();
+    });
+    socket.on('ride:ended',      (p) => log('in', 'ride:ended', p));
+    socket.on('ride:rejoined',   (p) => { log('in', 'ride:rejoined', p); loadLive(); });
+    socket.on('ride:join_error', (p) => log('err', 'ride:join_error', p));
+
+    // QuickRide's own feed. Seeing one of these here means the two have crossed.
+    ['ride:request', 'bid:new', 'bid:accepted', 'ride:assigned', 'ride:started'].forEach((ev) =>
+      socket.on(ev, (p) => log('err', `⚠ QUICKRIDE ${ev} — not an outstation event`, { rideId: p.rideId }))
+    );
+  };
+
+  // ── current location ─────────────────────────────────────────────────────
+  // Geolocation needs a secure context. http://localhost counts as one; hitting this page over
+  // plain http on a LAN IP does not, and the browser blocks the call outright.
+  const GEO_ERRORS = {
+    1: 'Permission denied — allow location for this site and try again',
+    2: 'Position unavailable — no GPS/wifi fix right now',
+    3: 'Timed out waiting for a fix',
+  };
+
+  $('btnLocate').onclick = () => {
+    const msg = $('locMsg');
+
+    if (!navigator.geolocation) return (msg.textContent = 'This browser has no geolocation API');
+    if (!window.isSecureContext) {
+      return (msg.textContent = 'Blocked: geolocation needs https or localhost — you are on ' + location.origin);
+    }
+
+    msg.textContent = 'Locating…';
+    $('btnLocate').disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+      ({ coords: c }) => {
+        const asDrop = $('locTarget').value === 'drop';
+        $(asDrop ? 'dLat' : 'pLat').value = c.latitude.toFixed(6);
+        $(asDrop ? 'dLng' : 'pLng').value = c.longitude.toFixed(6);
+        $(asDrop ? 'dName' : 'pName').value = 'Current location';
+
+        msg.textContent = `${asDrop ? 'Drop' : 'Pickup'} set to ${c.latitude.toFixed(5)}, ${c.longitude.toFixed(5)} (±${Math.round(c.accuracy)} m)`;
+        $('btnLocate').disabled = false;
+        log('out', 'geolocation fix', { latitude: c.latitude, longitude: c.longitude, accuracyM: Math.round(c.accuracy) });
+        hintDistance();
+        drawMap();
+      },
+      (err) => {
+        msg.textContent = GEO_ERRORS[err.code] || err.message;
+        $('btnLocate').disabled = false;
+        log('err', 'geolocation failed', msg.textContent);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // ── presets & the distance hint ──────────────────────────────────────────
+  const setTrip = (p, d) => {
+    $('pLat').value = p.lat; $('pLng').value = p.lng; $('pName').value = p.name;
+    $('dLat').value = d.lat; $('dLng').value = d.lng; $('dName').value = d.name;
+    $('locMsg').textContent = '';
+    hintDistance();
+    drawMap();
+  };
+
+  $('btnPresetJaipur').onclick = () =>
+    setTrip({ lat: '28.6315', lng: '77.2167', name: 'Connaught Place, Delhi' },
+            { lat: '26.9124', lng: '75.7873', name: 'Jaipur' });
+
+  $('btnPresetNoida').onclick = () =>
+    setTrip({ lat: '28.6315', lng: '77.2167', name: 'Connaught Place, Delhi' },
+            { lat: '28.5355', lng: '77.3910', name: 'Sector 62 Noida' });
+
+  // Straight-line distance, purely so you know before you call whether the gate will bite.
+  // The server prices the ROAD distance, which is always longer — this is a floor, not the answer.
+  const haversineKm = (a, b) => {
+    const R = 6371, rad = (x) => (x * Math.PI) / 180;
+    const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+    const h = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(rad(a.lat)) * Math.cos(rad(b.lat));
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
+  function hintDistance() {
+    const p = { lat: +$('pLat').value, lng: +$('pLng').value };
+    const d = { lat: +$('dLat').value, lng: +$('dLng').value };
+    if ([p.lat, p.lng, d.lat, d.lng].some((n) => !Number.isFinite(n))) return ($('distHint').textContent = '');
+
+    const km = haversineKm(p, d);
+    const el = $('distHint');
+    el.textContent = km < 100
+      ? `~${km.toFixed(0)} km as the crow flies — under the 100 km floor. The road distance is longer, so this may still pass, but expect a 400.`
+      : `~${km.toFixed(0)} km as the crow flies — comfortably over the 100 km floor.`;
+    el.style.color = km < 100 ? 'var(--warn)' : 'var(--muted)';
+  }
+
+  ['pLat', 'pLng', 'dLat', 'dLng'].forEach((id) => ($(id).oninput = () => { hintDistance(); drawMap(); }));
+  hintDistance();
+
+  // ── fare estimate ────────────────────────────────────────────────────────
+  const coords = () => ({
+    pickup: { latitude: +$('pLat').value, longitude: +$('pLng').value },
+    drop:   { latitude: +$('dLat').value, longitude: +$('dLng').value },
+  });
+
+  $('btnEstimate').onclick = async () => {
+    if (!state.token) return alert('Sign in first');
+    const c = coords();
+    const r = await api('POST', '/outstation-rides/fare-estimate', {
+      pickupCoordinates: c.pickup, dropCoordinates: c.drop,
+    });
+    if (!r.ok) {
+      state.est = null;
+      $('estList').innerHTML = '';
+      $('estEmpty').classList.remove('hidden');
+      $('estMeta').textContent = '';
+      return fail(r);   // 400 here is the distance gate doing its job
+    }
+
+    state.est = r.body;
+    $('estMeta').innerHTML =
+      `${r.body.estimatedDistanceKm} km road distance · ${r.body.estimatedDurationMin} min · ${r.body.fareOptions.length} vehicle types<br>` +
+      `bookable window: ${fmt(r.body.minPickupAt)} → ${fmt(r.body.maxPickupAt)}`;
+    renderEstimate();
+    drawMap();
+  };
+
+  const renderEstimate = () => {
+    const list = $('estList');
+    list.innerHTML = '';
+    $('estEmpty').classList.add('hidden');
+
+    state.est.fareOptions.forEach((opt, i) => {
+      const vt = opt.vehicleType;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <h3>${vt.name} <span class="muted">· ${vt.capacity} seats</span></h3>
+        <div class="muted">${vt.description || vt.slug}</div>
+        <div class="kv"><span>Suggested</span><span class="big">₹${opt.suggestedFare}</span></div>
+        <div class="kv"><span>You may offer</span><span>₹${opt.offerBounds.min} – ₹${opt.offerBounds.max}</span></div>
+        <label>Your fare</label>
+        <div class="row">
+          <input type="number" id="fare_${i}" value="${opt.suggestedFare}"
+                 min="${opt.offerBounds.min}" max="${opt.offerBounds.max}" step="1" />
+          <button data-i="${i}" class="primary book">Book</button>
+        </div>
+        <div class="muted" id="warn_${i}"></div>`;
+      list.appendChild(card);
+
+      const input = card.querySelector(`#fare_${i}`);
+      input.oninput = () => {
+        const v = Number(input.value);
+        const { min, max } = opt.offerBounds;
+        $(`warn_${i}`).textContent =
+          v < min ? `Below the floor — the server will reject this (min ₹${min})` :
+          v > max ? `Above the ceiling — the server will reject this (max ₹${max})` : '';
+      };
+    });
+
+    list.querySelectorAll('button.book').forEach((b) => (b.onclick = () => book(Number(b.dataset.i))));
+  };
+
+  // ── pickup time ──────────────────────────────────────────────────────────
+  $('bookingType').onchange = () => {
+    $('laterBox').classList.toggle('hidden', $('bookingType').value === 'now');
+    previewPickup();
+  };
+  ['pickupDate', 'pickupTime', 'pickupForm'].forEach((id) => ($(id).oninput = previewPickup));
+
+  function previewPickup() {
+    if ($('bookingType').value === 'now') {
+      $('pickupPreview').textContent = 'pickupAt will be the server clock at creation. No expiry cap applies to a "now" booking.';
+      return;
+    }
+    const d = $('pickupDate').value, t = $('pickupTime').value;
+    if (!d || !t) return ($('pickupPreview').textContent = '');
+    // The pair is anchored server-side to APP_UTC_OFFSET_MINUTES (IST by default); this browser's
+    // own zone produces the same instant only when the two happen to agree.
+    $('pickupPreview').textContent =
+      `${d} ${t} in the app's zone. As an ISO instant from THIS browser: ${new Date(`${d}T${t}`).toISOString()}`;
+  }
+  previewPickup();
+
+  const pickupFields = () => {
+    if ($('bookingType').value === 'now') return { bookingType: 'now' };
+
+    const d = $('pickupDate').value, t = $('pickupTime').value;
+    const iso = new Date(`${d}T${t}`).toISOString();
+
+    switch ($('pickupForm').value) {
+      case 'pair': return { bookingType: 'later', pickupDate: d, pickupTime: t };
+      case 'iso':  return { bookingType: 'later', pickupAt: iso };
+      default:     return { bookingType: 'later', pickupDate: d, pickupTime: t, pickupAt: iso }; // expect 400
+    }
+  };
+
+  // ── booking ──────────────────────────────────────────────────────────────
+  const book = async (i) => {
+    const opt = state.est.fareOptions[i];
+    const c = coords();
+    const r = await api('POST', '/outstation-rides', {
+      pickupLocationName: $('pName').value,
+      dropLocationName: $('dName').value,
+      pickupCoordinates: c.pickup,
+      dropCoordinates: c.drop,
+      vehicleTypeId: opt.vehicleType._id,
+      offeredFare: Number($(`fare_${i}`).value),
+      ...pickupFields(),
+    });
+    if (!r.ok) return fail(r);
+
+    log('out', 'trip created', {
+      id: r.body.ride._id,
+      bookingType: r.body.ride.bookingType,
+      pickupAt: r.body.ride.pickupAt,
+      expiresAt: r.body.ride.expiresAt,
+    });
+    selectRide(r.body.ride._id);   // the trip you just booked is the one you want to watch
+    loadLive();
+  };
+
+  // ── live trips ───────────────────────────────────────────────────────────
+  $('btnLive').onclick = () => loadLive();
+
+  async function loadLive({ quiet } = {}) {
+    if (!state.token) return;
+    const r = await api('GET', '/outstation-rides/live', null, quiet);
+    if (!r.ok) return;
+
+    state.rides = r.body.rides || [];
+    $('rideCount').textContent = state.rides.length;
+
+    // Keep a selection alive: default to the first trip still taking bids.
+    const stillThere = state.rides.some((e) => idOf(e.ride) === state.selectedRideId);
+    if (!stillThere) {
+      const first = state.rides.find((e) => e.rideStatus === 'searching') || state.rides[0];
+      state.selectedRideId = first ? idOf(first.ride) : null;
+    }
+
+    // The live payload already carries each trip's bids — trust it over local state, since it is
+    // the same list the server would return from /:id/bids.
+    const sel = state.rides.find((e) => idOf(e.ride) === state.selectedRideId);
+    state.bids = sel?.bids || [];
+
+    renderRides();
+    renderBids();
+    syncTrackingWindow();
+    syncPoll();
+    drawMap();
+  }
+
+  const selectRide = (rideId) => {
+    state.selectedRideId = idOf(rideId);
+    const sel = state.rides.find((e) => idOf(e.ride) === state.selectedRideId);
+    state.bids = sel?.bids || [];
+    renderRides();
+    renderBids();
+  };
+
+  const renderRides = () => {
+    const list = $('rideList');
+    list.innerHTML = '';
+    $('noRides').classList.toggle('hidden', state.rides.length > 0);
+
+    state.rides.forEach((entry) => {
+      const ride = entry.ride;
+      const selected = idOf(ride) === state.selectedRideId;
+      const tracking = entry.rideStatus === 'arriving';
+
+      const card = document.createElement('div');
+      card.className = 'card pick' + (selected ? ' sel' : '') + (tracking ? ' hot' : '');
+      card.innerHTML = `
+        <div class="row" style="align-items:center">
+          <div>
+            <h3>${ride.pickupLocationName} → ${ride.dropLocationName}</h3>
+            <div class="muted">${ride._id}</div>
+          </div>
+          <span class="pill">${entry.bidCount} bid(s)</span>
+          <span class="pill ${tracking ? 'ok' : ''}">${entry.rideStatus}</span>
+        </div>
+        <div class="kv"><span>Departs</span><span>${fmt(ride.pickupAt)} <span class="muted">(${ride.bookingType})</span></span></div>
+        <div class="kv"><span>Expires</span><span>${fmt(ride.expiresAt)}</span></div>
+        <div class="kv"><span>Offered / final</span><span>₹${ride.offeredFare}${ride.finalFare ? ' → ₹' + ride.finalFare : ''}</span></div>
+        <div class="kv"><span>Trip</span><span>${ride.estimatedDistanceKm} km · ${ride.estimatedDurationMin} min</span></div>
+        <div class="kv"><span>Driver</span><span>${ride.assignedTo?.name || '—'}</span></div>
+        ${entry.startOtp ? `<label>Start OTP — read it out at pickup</label><div class="otp">${entry.startOtp}</div>` : ''}
+        ${entry.trackingUrl
+          ? `<div class="muted">tracking: <code>${entry.trackingUrl}</code></div>`
+          : `<div class="muted">no tracking link${entry.rideStatus === 'assigned' ? ' — the driver has not set off yet' : ''}</div>`}
+        <div class="row" style="margin-top:10px">
+          <input type="number" class="raise" value="${ride.offeredFare + 100}" />
+          <button class="doRaise">PATCH /fare</button>
+          <button class="danger doCancel">Cancel</button>
+        </div>`;
+
+      // Clicking the card selects it; the controls inside must not trigger that.
+      card.onclick = () => selectRide(ride._id);
+      card.querySelectorAll('input, button').forEach((el) => el.addEventListener('click', (e) => e.stopPropagation()));
+
+      const searching = entry.rideStatus === 'searching';
+      card.querySelector('.raise').disabled = !searching;
+      card.querySelector('.doRaise').disabled = !searching;
+      card.querySelector('.doCancel').disabled = !['searching', 'assigned', 'arriving'].includes(entry.rideStatus);
+
+      card.querySelector('.doRaise').onclick = async () => {
+        const r = await api('PATCH', `/outstation-rides/${ride._id}/fare`,
+          { offeredFare: Number(card.querySelector('.raise').value) });
+        if (!r.ok) return fail(r);   // 400 = not an increase, or above the band ceiling
+        loadLive();
+      };
+      card.querySelector('.doCancel').onclick = async () => {
+        if (!confirm('Cancel this trip?')) return;
+        const r = await api('PATCH', `/outstation-rides/${ride._id}/cancel`,
+          { cancellationReason: 'Rider cancelled from test console' });
+        if (!r.ok) return fail(r);
+        loadLive();
+      };
+
+      list.appendChild(card);
+    });
+  };
+
+  // ── bids ─────────────────────────────────────────────────────────────────
+  $('btnBids').onclick = () => loadBids();
+
+  async function loadBids() {
+    if (!state.selectedRideId) return alert('Select a trip first');
+    const r = await api('GET', `/outstation-rides/${state.selectedRideId}/bids`);
+    if (!r.ok) return fail(r);
+    state.bids = r.body.data || [];
+    renderBids();
+  }
+
+  const renderBids = () => {
+    const list = $('bidList');
+    list.innerHTML = '';
+    $('bidCount').textContent = state.bids.length;
+    $('bidEmpty').classList.toggle('hidden', state.bids.length > 0);
+    $('btnBids').disabled = !state.selectedRideId;
+
+    const sel = state.rides.find((e) => idOf(e.ride) === state.selectedRideId);
+    $('bidFor').textContent = sel
+      ? `${sel.ride.pickupLocationName} → ${sel.ride.dropLocationName} · ${sel.rideStatus}`
+      : 'no trip selected';
+
+    state.bids.forEach((bid) => {
+      const ageMin = Math.round((Date.now() - new Date(bid.createdAt)) / 60000);
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="row" style="align-items:center">
+          <div>
+            <h3>₹${bid.fare} <span class="muted">· ${bid.requestedBy?.name || 'Driver'}</span></h3>
+            <div class="muted">${bid.vehicleId?.vehicleName || ''} ${bid.vehicleId?.vehicleNumber || ''}
+              · placed ${ageMin} min ago · <strong>no expiry</strong></div>
+          </div>
+          <button class="primary acc">Accept</button>
+          <button class="danger rej">Dismiss</button>
+        </div>`;
+      card.querySelector('.acc').onclick = async () => {
+        const r = await api('PATCH', `/outstation-ride-bids/${bid._id}/accept`);
+        if (!r.ok) return fail(r);   // 409 + reason = that driver is no longer available
+        state.bids = [];
+        renderBids();
+        loadLive();
+      };
+      card.querySelector('.rej').onclick = async () => {
+        const r = await api('DELETE', `/outstation-ride-bids/${bid._id}`);
+        if (!r.ok) return fail(r);
+        state.bids = state.bids.filter((b) => idOf(b) !== idOf(bid));
+        renderBids();
+      };
+      list.appendChild(card);
+    });
+  };
+
+  // A slow poll while any trip is taking bids. Sockets are the real delivery path — this exists so
+  // one dropped event never leaves the screen quietly wrong, which is impossible to tell apart from
+  // "no driver bid yet" when you are testing.
+  const syncPoll = () => {
+    const wants = state.rides.some((e) => ['searching', 'assigned', 'arriving'].includes(e.rideStatus));
+
+    if (wants && !state.poll) {
+      state.poll = setInterval(() => loadLive({ quiet: true }), 5000);
+      $('pollState').textContent = 'polling: 5s';
+      $('pollState').className = 'pill ok';
+    } else if (!wants && state.poll) {
+      clearInterval(state.poll);
+      state.poll = null;
+      $('pollState').textContent = 'polling: off';
+      $('pollState').className = 'pill';
+    }
+  };
+
+  // ── tracking window ──────────────────────────────────────────────────────
+  const syncTrackingWindow = () => {
+    const entry = state.rides.find((e) => ['assigned', 'arriving', 'in_progress'].includes(e.rideStatus));
+    const status = entry?.rideStatus || null;
+
+    [['tw1', 'assigned'], ['tw2', 'arriving'], ['tw3', 'in_progress']].forEach(([id, s]) => {
+      $(id).className = 'track-box' + (status === s ? ' live' : ' dead');
+    });
+
+    if (entry?.trackingUrl) $('shareUrl').value = entry.trackingUrl;
+    else if (status && status !== 'arriving') $('shareUrl').value = '';
+  };
+
+  // A second socket authenticating with ONLY the tracking token — the same credential anyone the
+  // rider forwarded the link to would present. This is the whole third-party tracking contract:
+  //
+  //   1. GET /outstation-rides/track/:token   → the redacted snapshot, and the rideId
+  //   2. connect with auth: { trackingToken }  → role 'viewer', read-only, scoped to that one ride
+  //   3. emit ride:join { rideId }             → REQUIRED. A viewer joins no room on connect, so
+  //                                              without this step no ride:location ever arrives.
+  //
+  // The server ignores a viewer's `rideType` and uses the one its token resolved to, so a
+  // share-link holder cannot point themselves at a different collection.
+  $('btnViewer').onclick = async () => {
+    const url = $('shareUrl').value.trim();
+    if (!url) return alert('No share link yet — the driver has to tap start first.');
+    const trackingToken = url.split('/').filter(Boolean).pop();
+
+    const pill = (t, c) => { $('sockV').textContent = t; $('sockV').className = 'pill ' + c; };
+
+    // Step 1 — the snapshot is also how a viewer learns the rideId it must join.
+    const res = await fetch($('base').value + '/outstation-rides/track/' + trackingToken);
+    const snap = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      pill('viewer: link dead', 'err');
+      log('err', `[V] GET /track → ${res.status}`, snap.message);
+      return alert(`${res.status} — ${snap.message}`);
+    }
+    log('view', '[V] track snapshot', { rideId: snap.rideId, rideStatus: snap.rideStatus, driver: snap.driver?.name });
+
+    // Step 2
+    if (state.viewer) state.viewer.disconnect();
+    const socket = io(location.origin, { auth: { trackingToken }, transports: ['websocket'], forceNew: true });
+    state.viewer = socket;
+
+    socket.on('connect', () => {
+      pill('viewer: joining…', 'violet');
+      log('view', '[V] connected with a tracking token only');
+
+      // Step 3 — without this the viewer is authenticated but in no room, and silent.
+      socket.emit('ride:join', { rideId: snap.rideId, rideType: 'outstation' }, (ack) => {
+        if (ack?.ok) { pill('viewer: watching', 'violet'); log('view', '[V] ride:join ok — in the ride room'); }
+        else { pill('viewer: join failed', 'err'); log('err', '[V] ride:join refused', ack?.message); }
+      });
+    });
+
+    socket.on('connect_error',   (e) => { pill('viewer: rejected', 'err'); log('err', '[V] connect_error', e.message); });
+    socket.on('disconnect',      () => pill('viewer: offline', 'err'));
+    socket.on('ride:join_error', (p) => { pill('viewer: join failed', 'err'); log('err', '[V] ride:join_error', p); });
+    socket.on('ride:location',   (p) => log('view', '[V] ride:location', { lat: p.latitude, lng: p.longitude }));
+    socket.on('ride:ended',      (p) => { pill('viewer: evicted', 'err'); log('view', `[V] ride:ended — evicted (reason: ${p.reason})`, p); });
+  };
+
+  $('btnTrackRest').onclick = async () => {
+    const url = $('shareUrl').value.trim();
+    if (!url) return alert('No share link yet.');
+    const token = url.split('/').filter(Boolean).pop();
+
+    const res = await fetch($('base').value + '/outstation-rides/track/' + token);
+    const json = await res.json().catch(() => ({}));
+    log(res.ok ? 'view' : 'err', `[V] GET /track/${token.slice(0, 8)}… → ${res.status}`, json.rideStatus || json.message);
+    if (!res.ok) {
+      alert(`${res.status} — ${json.message}\n\nExpected once the rider is aboard: the token is nulled at pickup.`);
+    }
+  };
+
+  // ── map ──────────────────────────────────────────────────────────────────
+  const drawMap = () => {
+    const sel = state.rides.find((e) => idOf(e.ride) === state.selectedRideId);
+    const ride = sel?.ride;
+
+    const pick = ride ? toLatLng(ride.pickupCoordinates) : { lat: +$('pLat').value, lng: +$('pLng').value };
+    const drop = ride ? toLatLng(ride.dropCoordinates) : { lat: +$('dLat').value, lng: +$('dLng').value };
+
+    const pts = [];
+    if (pick && Number.isFinite(pick.lat)) pts.push({ ...pick, c: '#4f9cf9', r: 6, label: 'P' });
+    if (drop && Number.isFinite(drop.lat)) pts.push({ ...drop, c: '#ffb347', r: 6, label: 'D' });
+    if (state.driverLoc) pts.push({ ...state.driverLoc, c: '#3ddc97', r: 7, label: '🚗' });
+    if (!pts.length) return;
+
+    const lats = pts.map((p) => p.lat), lngs = pts.map((p) => p.lng);
+    const pad = 0.05;
+    const minLat = Math.min(...lats) - pad, maxLat = Math.max(...lats) + pad;
+    const minLng = Math.min(...lngs) - pad, maxLng = Math.max(...lngs) + pad;
+    const x = (lng) => ((lng - minLng) / (maxLng - minLng || 1)) * 380 + 10;
+    const y = (lat) => 200 - ((lat - minLat) / (maxLat - minLat || 1)) * 190;
+
+    const line = pts.length >= 2
+      ? `<line x1="${x(pick.lng)}" y1="${y(pick.lat)}" x2="${x(drop.lng)}" y2="${y(drop.lat)}"
+              stroke="#2a2f3a" stroke-width="2" stroke-dasharray="4 4" />` : '';
+
+    $('map').innerHTML = line + pts.map((p) => `
+      <circle cx="${x(p.lng)}" cy="${y(p.lat)}" r="${p.r}" fill="${p.c}" />
+      <text x="${x(p.lng) + 10}" y="${y(p.lat) + 4}" fill="#939aab" font-size="11">${p.label}</text>
+    `).join('');
+  };
+
+  // Bid ages tick without a countdown, on purpose.
+  setInterval(() => { if (state.bids.length) renderBids(); }, 30000);
+
+  renderBids();
+  drawMap();
+})();
+</script>
+</body>
+</html>

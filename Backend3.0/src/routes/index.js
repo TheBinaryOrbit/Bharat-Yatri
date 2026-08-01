@@ -8,6 +8,8 @@ import paymentDetailsRoutes from './paymentDetails.routes.js';
 import appContentRoutes from './appContent.routes.js';
 import quickRideRoutes from './quickRide.routes.js';
 import quickRideBidRoutes from './quickRideBid.routes.js';
+import outstationRideRoutes from './outstationRide.routes.js';
+import outstationRideBidRoutes from './outstationRideBid.routes.js';
 
 const router = Router();
 
@@ -20,5 +22,7 @@ router.use('/payment-details', paymentDetailsRoutes);
 router.use('/app-content', appContentRoutes);
 router.use('/quick-rides', quickRideRoutes);
 router.use('/quick-ride-bids', quickRideBidRoutes);
+router.use('/outstation-rides', outstationRideRoutes);
+router.use('/outstation-ride-bids', outstationRideBidRoutes);
 
 export default router;

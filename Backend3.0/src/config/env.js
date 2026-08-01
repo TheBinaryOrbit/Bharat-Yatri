@@ -68,6 +68,37 @@ export const env = {
 
   // The zone a bare YYYY-MM-DD date filter means, as minutes ahead of UTC. 330 = IST.
   APP_UTC_OFFSET_MINUTES: Number(process.env.APP_UTC_OFFSET_MINUTES || 330),
+
+  // Outstation rides — long-distance, schedulable trips. A separate collection and lifecycle from
+  // QuickRide; these six numbers are very nearly the whole of what differs between the two.
+  //
+  // The minimum is deliberately equal to MAX_RIDE_DISTANCE_KM by default, and the two checks are
+  // inclusive on both sides (QuickRide rejects `> max`, outstation rejects `< min`), so a trip of
+  // exactly 100 km can be booked either way. A gap here would produce routes that are "too long"
+  // for one product and "too short" for the other.
+  OUTSTATION_MIN_DISTANCE_KM: Number(process.env.OUTSTATION_MIN_DISTANCE_KM || 100),
+
+  // How long an unclaimed outstation ride stays out for bids. Capped by pickupAt for 'later'
+  // bookings — a trip cannot still be looking for a driver after it was due to leave.
+  OUTSTATION_RIDE_TTL_HOURS: Number(process.env.OUTSTATION_RIDE_TTL_HOURS || 24),
+
+  // Minimum notice for a 'later' booking. Also what stops a scheduled ride being created with an
+  // expiry window too short for any driver to see it, let alone bid on it.
+  OUTSTATION_MIN_LEAD_MINUTES: Number(process.env.OUTSTATION_MIN_LEAD_MINUTES || 60),
+
+  // Upper bound on how far ahead a trip may be booked. Not a correctness requirement — the TTL
+  // above already kills an unclaimed far-future ride — but an ACCEPTED one holds its driver's
+  // single outstation slot until it happens, so an unbounded horizon is an unbounded lockout.
+  OUTSTATION_MAX_ADVANCE_DAYS: Number(process.env.OUTSTATION_MAX_ADVANCE_DAYS || 30),
+
+  // A single fixed sweep, not an expanding ring. QuickRide widens from 2km because it needs the
+  // nearest driver in seconds; an outstation ride has hours and is chosen on price, so the ring
+  // machinery's "stop at the first non-empty radius" rule would only shrink the bid pool.
+  OUTSTATION_SEARCH_RADIUS_KM: Number(process.env.OUTSTATION_SEARCH_RADIUS_KM || 20),
+
+  // How long before an outstation pickup a driver stops being offered QuickRides. They keep
+  // earning right up to this line, then they are reserved until the outstation ride is terminal.
+  OUTSTATION_QUICKRIDE_BLOCK_MINUTES: Number(process.env.OUTSTATION_QUICKRIDE_BLOCK_MINUTES || 120),
 };
 
 // Fail fast if critical env vars are missing

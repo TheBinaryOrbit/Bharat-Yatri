@@ -156,20 +156,24 @@ export class DriverLocationService {
   //
   // `filter` is injected rather than applied by the caller afterwards: a 2km ring full of busy
   // drivers must widen to 4km, not end the search with an empty result.
-  findNearbyDriversExpanding = async ({ latitude, longitude, vehicleTypeId, filter }) => {
-    const { DRIVER_SEARCH_RADIUS_START_KM, DRIVER_SEARCH_RADIUS_MAX_KM, DRIVER_SEARCH_RADIUS_STEP_KM } = env;
+  //
+  // `radius` overrides the QuickRide envs. Outstation passes start = max = step, which makes this
+  // a single fixed sweep — the loop body runs exactly once. Deliberate: the ring exists to find
+  // the NEAREST driver in seconds, and it returns at the first non-empty radius, so on a 450km
+  // trip it would push to the three drivers inside 2km and never tell the forty at 15km.
+  // Outstation is chosen on bid price, not proximity, so a small bid pool is a loss to the rider.
+  findNearbyDriversExpanding = async ({ latitude, longitude, vehicleTypeId, filter, radius = null }) => {
+    const startKm = radius?.startKm ?? env.DRIVER_SEARCH_RADIUS_START_KM;
+    const maxKm = radius?.maxKm ?? env.DRIVER_SEARCH_RADIUS_MAX_KM;
+    const stepKm = radius?.stepKm ?? env.DRIVER_SEARCH_RADIUS_STEP_KM;
 
-    for (
-      let radiusKm = DRIVER_SEARCH_RADIUS_START_KM;
-      radiusKm <= DRIVER_SEARCH_RADIUS_MAX_KM;
-      radiusKm += DRIVER_SEARCH_RADIUS_STEP_KM
-    ) {
+    for (let radiusKm = startKm; radiusKm <= maxKm; radiusKm += stepKm) {
       const found = await this.findNearbyDrivers({ latitude, longitude, radiusKm, vehicleTypeId });
       const eligible = filter ? await filter(found) : found;
 
       if (eligible.length) return { drivers: eligible, radiusKm };
     }
 
-    return { drivers: [], radiusKm: DRIVER_SEARCH_RADIUS_MAX_KM };
+    return { drivers: [], radiusKm: maxKm };
   };
 }
