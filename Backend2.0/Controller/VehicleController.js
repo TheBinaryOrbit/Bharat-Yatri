@@ -118,6 +118,11 @@ export const getVehiclesByUserId = async (req, res) => {
       if(!userVehile){
         return res.status(404).json({ error: "No vehicle found for this user." });
       }
+
+      return res.status(200).json({
+        message: "Vehicle fetched successfully.",
+        vehicle: userVehile
+      });
     }catch(error){
       console.error("Get Vehicle By Phone Number Error:", error);
       return res.status(500).json({ error: "Internal Server Error" });
