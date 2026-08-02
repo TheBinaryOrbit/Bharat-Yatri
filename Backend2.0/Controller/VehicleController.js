@@ -97,3 +97,22 @@ export const getVehiclesByUserId = async (req, res) => {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 };
+
+
+
+ export const getVehicleByPhoneNumber = async (req, res) => {
+    try{
+      // get the user by phone number
+      const { phone } = req.params;
+      const user = await User.findOne({ phone });
+
+      const userVehile = await Vehicle.findOne({ userId: user._id });
+
+      if(!userVehile){
+        return res.status(404).json({ error: "No vehicle found for this user." });
+      }
+    }catch(error){
+      console.error("Get Vehicle By Phone Number Error:", error);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
