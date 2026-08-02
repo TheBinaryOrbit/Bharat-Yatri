@@ -103,13 +103,17 @@ export const getVehiclesByUserId = async (req, res) => {
  export const getVehicleByPhoneNumber = async (req, res) => {
     try{
       // get the user by phone number
+
+      console.log(req.params);
       const { phone } = req.params;
-      const user = await User.findOne({phoneNumber : phone });
+      console.log(phone);
+      const user = await User.findOne({ phoneNumber : phone });
 
       console.log(user);
-
+      console.log(user._id);
 
       const userVehile = await Vehicle.findOne({ userId: user._id });
+
 
       if(!userVehile){
         return res.status(404).json({ error: "No vehicle found for this user." });
