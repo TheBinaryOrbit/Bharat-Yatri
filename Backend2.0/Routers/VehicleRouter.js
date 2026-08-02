@@ -6,4 +6,4 @@ export const VehicleRouter = express.Router();
 VehicleRouter.post('/add' , addVehicle);
 VehicleRouter.delete('/delete/:id' , deleteVehicle);
 VehicleRouter.get('/get/:userId' , getVehiclesByUserId);
-VehicleRouter.get('/get/:phone' , getVehicleByPhoneNumber);  
+VehicleRouter.get('/get/driver/:phone' , getVehicleByPhoneNumber);  
