@@ -112,7 +112,7 @@ export const getVehiclesByUserId = async (req, res) => {
       console.log(user);
       console.log(user._id);
 
-      const userVehile = await Vehicle.findOne({ userId: user._id });
+      const userVehile = await Vehicle.find({ userId: user._id });
 
 
       if(!userVehile){
