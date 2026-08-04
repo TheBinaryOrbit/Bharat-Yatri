@@ -83,6 +83,7 @@
   <h1>QuickRide — Rider Test Console</h1>
   <span class="sub">books a real ride against the running backend</span>
   <span id="sockState" class="pill">socket: offline</span>
+  <span id="pollState" class="pill">polling: off</span>
   <span id="whoami" class="pill">not signed in</span>
 </header>
 
@@ -183,6 +184,10 @@
 
     <div class="panel" style="margin-top:16px">
       <h2>4 · Live bids</h2>
+      <div class="row" style="margin-bottom:8px">
+        <span id="bidCount" class="pill">0 bids</span>
+        <button id="btnBids">Refresh bids</button>
+      </div>
       <div id="bidEmpty" class="muted">Bids appear here the moment a driver bids.</div>
       <div id="bidList"></div>
     </div>
@@ -206,7 +211,7 @@
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const state = { token: null, socket: null, ride: null, bids: [], est: null, driverLoc: null };
+  const state = { token: null, socket: null, ride: null, bids: [], est: null, driverLoc: null, poll: null };
 
   $('base').value = location.origin + '/api/v3';
 
@@ -221,7 +226,8 @@
   $('btnClear').onclick = () => ($('log').innerHTML = '');
 
   // ── REST helper ──────────────────────────────────────────────────────────
-  const api = async (method, path, body) => {
+  // `quiet` keeps the background bid poll from burying real events in the log.
+  const api = async (method, path, body, { quiet = false } = {}) => {
     const res = await fetch($('base').value + path, {
       method,
       headers: {
@@ -231,7 +237,9 @@
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const json = await res.json().catch(() => ({}));
-    log(res.ok ? 'out' : 'err', `${method} ${path} → ${res.status}`, json.message || json.error || '');
+    if (!quiet || !res.ok) {
+      log(res.ok ? 'out' : 'err', `${method} ${path} → ${res.status}`, json.message || json.error || '');
+    }
     return { status: res.status, ok: res.ok, body: json };
   };
 
@@ -314,14 +322,18 @@
     socket.on('ride:ended',     (p) => log('in', 'ride:ended', p));
     socket.on('ride:rejoined',  (p) => { log('in', 'ride:rejoined', p); resumeActiveRide(); });
 
-    // bids
+    // bids — the socket is the delivery path; the poll further down is only a safety net.
+    // Events are ignored unless they name the ride currently on screen, so a bid left over
+    // from a previous ride can never land in this list.
+    const forThisRide = (p) => state.ride && String(p.quickRideId) === String(state.ride._id);
+
     socket.on('bid:new', (p) => {
-      log('in', 'bid:new', { fare: p.bid?.fare });
-      state.bids = [...state.bids.filter((b) => b._id !== p.bid._id), p.bid].sort((a, b) => a.fare - b.fare);
-      renderBids();
+      log('in', 'bid:new', { fare: p.bid?.fare, driver: p.bid?.requestedBy?.name });
+      if (!p.bid || !forThisRide(p)) return log('err', 'bid:new ignored — not the ride on screen', p.quickRideId);
+      upsertBid(p.bid);
     });
-    socket.on('bid:removed', (p) => { log('in', 'bid:removed', p); state.bids = state.bids.filter((b) => b._id !== p.bidId); renderBids(); });
-    socket.on('bid:expired', (p) => { log('in', 'bid:expired', p); state.bids = state.bids.filter((b) => b._id !== p.bidId); renderBids(); });
+    socket.on('bid:removed', (p) => { log('in', 'bid:removed', p); dropBid(p.bidId); });
+    socket.on('bid:expired', (p) => { log('in', 'bid:expired', p); dropBid(p.bidId); });
 
     // live driver position, once assigned
     socket.on('ride:location', (p) => {
@@ -473,6 +485,7 @@
     const ride = state.ride;
     $('noRide').classList.toggle('hidden', !!ride);
     $('rideBox').classList.toggle('hidden', !ride);
+    syncPoll();                       // the bid poll follows the ride's phase
     if (!ride) return;
 
     $('rStatus').textContent = ride.rideStatus;
@@ -539,16 +552,41 @@
   };
 
   // ── bids ─────────────────────────────────────────────────────────────────
-  const loadBids = async () => {
+  // Cheapest first. Keyed on _id, so a driver undercutting themselves replaces their own row
+  // whichever order the removed/new pair arrives in.
+  const sortBids = () => state.bids.sort((a, b) => a.fare - b.fare);
+
+  const upsertBid = (bid) => {
+    state.bids = [...state.bids.filter((b) => String(b._id) !== String(bid._id)), bid];
+    sortBids();
+    renderBids();
+  };
+
+  const dropBid = (bidId) => {
+    state.bids = state.bids.filter((b) => String(b._id) !== String(bidId));
+    renderBids();
+  };
+
+  $('btnBids').onclick = () => loadBids();
+
+  const loadBids = async ({ quiet = false } = {}) => {
     if (!state.ride) return;
-    const r = await api('GET', `/quick-rides/${state.ride._id}/bids`);
-    if (r.ok) { state.bids = r.body.data; renderBids(); }
+    const r = await api('GET', `/quick-rides/${state.ride._id}/bids`, null, { quiet });
+    if (!r.ok) return;
+
+    // The server list is authoritative — it replaces local state rather than merging into it,
+    // so a bid that expired while a socket event went missing disappears here.
+    state.bids = r.body.data || [];
+    sortBids();
+    renderBids();
   };
 
   const renderBids = () => {
     const list = $('bidList');
     list.innerHTML = '';
     $('bidEmpty').classList.toggle('hidden', state.bids.length > 0);
+    $('bidCount').textContent = `${state.bids.length} bid${state.bids.length === 1 ? '' : 's'}`;
+    $('bidCount').className = state.bids.length ? 'pill ok' : 'pill';
 
     state.bids.forEach((bid) => {
       const secs = Math.max(0, Math.round((new Date(bid.expiresAt) - Date.now()) / 1000));
@@ -583,6 +621,24 @@
   };
 
   setInterval(() => { if (state.bids.length) renderBids(); }, 1000);  // live countdowns
+
+  // A slow poll while the ride is taking bids. Sockets remain the real delivery path — this exists
+  // because a dropped event looks exactly like "no driver has bid yet", and while testing the two
+  // must not be confusable. It stops the moment the ride leaves `searching`.
+  const syncPoll = () => {
+    const wants = state.ride && state.ride.rideStatus === 'searching';
+
+    if (wants && !state.poll) {
+      state.poll = setInterval(() => loadBids({ quiet: true }), 5000);
+      $('pollState').textContent = 'polling: 5s';
+      $('pollState').className = 'pill ok';
+    } else if (!wants && state.poll) {
+      clearInterval(state.poll);
+      state.poll = null;
+      $('pollState').textContent = 'polling: off';
+      $('pollState').className = 'pill';
+    }
+  };
 
   // ── map ──────────────────────────────────────────────────────────────────
   const drawMap = () => {

@@ -117,9 +117,9 @@ export class DriverController {
   onboardDriver = async (req, res) => {
     const {
       // driver
-      name, email, phoneNumber, dob, gender, address, aadharCardNumber, dlNumber,
+      name, email, phoneNumber, dob, gender, address, dlNumber,
       // vehicle
-      vehicleTypeId, vehicleNumber, vehicleName, ownerName, seatingCapacity,
+      vehicleTypeId, vehicleNumber, vehicleName, seatingCapacity,
       manufactureYear, insuranceExpiryMonth, insuranceExpiryYear,
     } = req.body;
 
@@ -169,7 +169,7 @@ export class DriverController {
       const fileUrl = (field) => (files[field]?.[0] ? buildFileUrl(req, files[field][0].filename) : '');
       const vehicleImages = (files.vehicleImages || []).map((f) => buildFileUrl(req, f.filename));
 
-      // 1) Create the driver
+      // 1) update the driver
       const driver = await this.driverService.updateDriver(userid, {
         name,
         email,
@@ -177,7 +177,7 @@ export class DriverController {
         dob,
         gender: gender?.toLowerCase(),
         address,
-        aadharCardNumber: aadharCardNumber || undefined,
+        isProfileComplete : true,
         profileImageUrl: fileUrl('profileImage'),
         dlDetails: {
           dlNumber: dlNumber || undefined,
@@ -194,7 +194,6 @@ export class DriverController {
           vehicleTypeId: vehicleType._id,
           vehicleNumber,
           vehicleName,
-          ownerName,
           seatingCapacity,
           manufactureYear,
           insuranceExpiry: {

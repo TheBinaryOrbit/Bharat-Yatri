@@ -75,7 +75,7 @@ export class AuthController {
       const account = await resolved.findByPhone(phoneNumber);
 
 
-      if(role =='driver' && account?.isKycCompleted == true && String(account?.aadharCardNumber).startsWith("XXXXXXXX")){
+      if(role =='driver' && account?.isKycCompleted == true && account?.isProfileComplete == false){
         return res.status(200).json({
           message: 'OTP verified successfully, but Setup Incomplete.',
           userStatus: 404,
