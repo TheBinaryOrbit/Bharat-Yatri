@@ -21,8 +21,7 @@ export const RIDE_TYPES = ['quickride', 'outstation'];
 export const BOOKING_TYPES = ['now', 'later'];
 
 // Outstation runs a longer lifecycle than QuickRide: 'arriving' is the leg between the driver
-// setting off and the rider getting in, and it is the ONLY window in which an outstation ride has
-// a room, a tracking token and a live position.
+// setting off and the rider getting in, which QuickRide has no equivalent of.
 //
 // Deliberately kept OUT of RIDE_STATUSES above — that list is QuickRide's schema enum, and adding
 // 'arriving' to it would make QuickRide accept a status it has no transition into or out of.
@@ -43,9 +42,19 @@ export const OUTSTATION_ACTIVE_RIDE_STATUSES = ['assigned', 'arriving', 'in_prog
 // the vehicle (in_progress) it is a completion or a support case, exactly as with QuickRide.
 export const OUTSTATION_CANCELLABLE_RIDE_STATUSES = ['searching', 'assigned', 'arriving'];
 
-// The one status with a room. Used by the socket join guard and the tracking-token lookups, so
-// the tracking window is defined in a single place rather than restated at each gate.
-export const OUTSTATION_TRACKABLE_RIDE_STATUSES = ['arriving'];
+// The statuses with a room. Used by the socket join guard, the reconnect rejoin and the
+// tracking-token lookups, so the tracking window is defined in a single place rather than restated
+// at each gate — widen it here and every gate widens with it.
+//
+// The window opens when the driver taps start, NOT at assignment: an outstation trip can sit
+// assigned for days, and a link that resolves for three days while the driver goes about other
+// work is exactly what a departure-triggered window prevents. It then runs unbroken through the
+// journey to a terminal status, which is why 'in_progress' is here and why the token survives
+// pickup — the long leg is the one a rider actually wants their family watching.
+//
+// 'assigned' must never join this list: there is no token minted in that status, so a room would
+// have no way to be shared and the driver is not yet committed to moving.
+export const OUTSTATION_TRACKABLE_RIDE_STATUSES = ['arriving', 'in_progress'];
 
 // Socket room names. Identity rooms let a user/driver be reached across devices and reconnects.
 export const rideRoomName = (rideId) => `ride:${rideId}`;

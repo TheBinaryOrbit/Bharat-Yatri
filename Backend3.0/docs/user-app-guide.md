@@ -878,14 +878,18 @@ Accept errors are the same set as QuickRide's ([§6.6](#66-accept-a-bid)).
 
 ```
 assigned ──(driver taps "setting off")──► arriving ──(driver enters OTP)──► in_progress ──► completed
-             socket 'outstation:started'      socket 'outstation:picked_up'
-             + trackingUrl arrives            + tracking window CLOSES
+             socket 'outstation:started'      socket 'outstation:picked_up'      window CLOSES
+             + trackingUrl arrives            window stays OPEN, same link
 ```
 
-`arriving` is **the only window an outstation ride is trackable.** The moment the rider is aboard
-the token is destroyed, the room is torn down (`ride:ended` with `reason: 'picked_up'`), and any
-share link stops working. Handle `outstation:picked_up` by swapping the live map for a trip-in-
-progress screen.
+`arriving` is the extra leg — the driver on their way to you, which QuickRide has no equivalent of.
+**Tracking spans it and the journey as one window:** it opens when the driver taps "setting off"
+and runs unbroken to `completed` / `cancelled` / `expired`. The token is *not* rotated at pickup,
+so a link already shared with family keeps working for the drive itself.
+
+`outstation:picked_up` is therefore a **label change, not a teardown** — swap "your driver is
+arriving" for "on the way", keep the map. It arrives on your own socket *and* inside the ride room,
+so share-link viewers get it too.
 
 ### 7.5 Resume — `GET /outstation-rides/live`
 
@@ -902,7 +906,7 @@ progress screen.
       "rideStatus": "searching",
       "offerBounds": {...}, "bidBounds": {...},
       "startOtp": null,                 // set once 'assigned' or 'arriving'
-      "trackingUrl": null,              // non-null ONLY while 'arriving'
+      "trackingUrl": null,              // non-null from 'arriving' through 'in_progress'
       "bidCount": 3,
       "bids": [ /* with driver cards */ ]
     }
@@ -927,7 +931,11 @@ a rider can legitimately have a QuickRide in progress *and* outstation trips out
 | | Window opens | Window closes |
 | --- | --- | --- |
 | QuickRide | bid accepted (`assigned`) | ride completed / cancelled / expired |
-| Outstation | driver sets off (`arriving`) | rider picked up, or cancelled |
+| Outstation | driver sets off (`arriving`) | trip completed / cancelled / expired |
+
+Both products track continuously through `in_progress`. They differ only at the front: a QuickRide
+driver is minutes away when the bid is accepted, whereas an outstation trip may be accepted days
+ahead — so its window waits for the driver to actually depart rather than opening at `assigned`.
 
 ### In-app tracking (the rider is logged in)
 
@@ -941,7 +949,7 @@ socket.on('ride:location', ({ rideId, latitude, longitude, heading, speed, at })
 });
 
 socket.on('ride:ended', ({ rideId, reason }) => {
-  // reason: 'completed' | 'cancelled' | 'expired' | 'picked_up'
+  // reason: 'completed' | 'cancelled' | 'expired'
   teardownMap();
 });
 ```

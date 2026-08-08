@@ -34,10 +34,10 @@ export class OutstationRideService {
     return OutstationRide.findById(id).select('+startOtp').populate(RIDE_POPULATE);
   };
 
-  // 'arriving' only — NOT the full active list. An outstation share link covers the approach and
-  // nothing else; the token is nulled at pickup, so an in_progress row could not match anyway, but
-  // naming the status here makes the invariant explicit instead of leaning on a field being
-  // cleared elsewhere.
+  // 'arriving' + 'in_progress' — NOT the full active list. An outstation share link covers the
+  // approach and the journey, and stops resolving at every terminal transition, each of which nulls
+  // the token as well. The status predicate is the belt to that braces: a token left behind by a
+  // future code path still could not be used to watch a finished trip.
   getRideByTrackingToken = async (trackingToken) => {
     return OutstationRide.findOne({
       trackingToken,
@@ -124,9 +124,10 @@ export class OutstationRideService {
 
   // The ride an identity has a ROOM in, either side — used to rejoin on reconnect.
   //
-  // Named for rooms rather than "active" because here the two are not the same thing: an outstation
-  // ride is active from assignment to completion, but only has a room while 'arriving'. A method
-  // called getActiveRideForParticipant that quietly excluded in_progress would be a trap.
+  // Named for rooms rather than "active" because here the two are still not the same thing: an
+  // outstation ride is active from assignment to completion, but has a room only from the moment
+  // the driver sets off. A method called getActiveRideForParticipant that quietly excluded
+  // 'assigned' would be a trap.
   getRoomEligibleRideForParticipant = async (id) => {
     return OutstationRide.findOne({
       $or: [{ assignedTo: id }, { bookedBy: id }],
@@ -192,17 +193,20 @@ export class OutstationRideService {
     ).populate(RIDE_POPULATE);
   };
 
-  // The rider is aboard — and the tracking window shuts in the same breath.
+  // The rider is aboard. The tracking window does NOT shut here — it carries straight on into the
+  // journey, which is the leg worth watching.
   //
   // The OTP is matched inside the query predicate, so comparing it and transitioning the ride are
-  // one atomic operation; no code path loads the OTP into memory to compare it. Nulling
-  // trackingToken HERE rather than in a follow-up write is the other half: two separate writes
-  // would leave a window where the ride is in_progress and the token still resolves — small, but
-  // exactly the window a leaked link would be used in. The controller closes the room right after.
+  // one atomic operation; no code path loads the OTP into memory to compare it.
+  //
+  // trackingToken is deliberately left untouched rather than rotated. A rider who shared the link
+  // with family while waiting for the car would otherwise have it die at the exact moment the
+  // long drive begins, and re-sharing from inside a moving vehicle is the worst possible time to
+  // ask. Same token, one continuous window, nulled at the terminal transitions below.
   pickupRide = async (rideId, driverId, startOtp) => {
     return OutstationRide.findOneAndUpdate(
       { _id: rideId, assignedTo: driverId, rideStatus: 'arriving', startOtp: String(startOtp) },
-      { rideStatus: 'in_progress', startedAt: new Date(), trackingToken: null },
+      { rideStatus: 'in_progress', startedAt: new Date() },
       { new: true }
     ).populate(RIDE_POPULATE);
   };

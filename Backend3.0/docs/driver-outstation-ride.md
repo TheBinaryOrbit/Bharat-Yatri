@@ -70,10 +70,10 @@ Related: [QuickRide](./driver-quick-ride.md) ·
 1. **Identity always comes from the token.** Never send a `driverId` anywhere.
 2. **Two driver actions, not one.** `/start` (no OTP) says you are setting off;
    `/pickup` (OTP) says the rider is aboard. QuickRide collapses these into one.
-3. **Tracking exists only between them.** `assigned` → nothing. `arriving` →
-   live position and a share link. `in_progress` → nothing again. This is
-   deliberate: a trip accepted three days early must not broadcast your position
-   for three days.
+3. **Tracking starts at `/start`, not at assignment.** `assigned` → nothing.
+   `arriving` and `in_progress` → live position and a share link, one unbroken
+   window. Waiting for `/start` is deliberate: a trip accepted three days early
+   must not broadcast your position for three days.
 4. **Bids never expire.** Yours stays on the rider's screen until something
    explicitly removes it — the ride is taken/cancelled/expires, you withdraw, or
    the rider dismisses it.
@@ -138,9 +138,12 @@ degradation — it must never render one as a QuickRide card and bid it to
 
 ### `ride:ended` reasons
 
-`completed` · `cancelled` · `expired` · **`picked_up`** (new — outstation only).
-A tracking page seeing `picked_up` should say *"the rider is on board"*, not
-*"this ride has ended"*.
+`completed` · `cancelled` · `expired` — the same three for both products.
+
+There is no `picked_up` teardown. The outstation room stays up through pickup
+and the whole journey, so `outstation:picked_up` (which is also broadcast into
+the room) is a **label change** for a tracking page — *"the rider is on board"* —
+not an end-of-stream.
 
 ### `ride:join` now takes a ride type
 
@@ -149,7 +152,7 @@ socket.emit('ride:join', { rideId, rideType: 'outstation' });
 ```
 
 `rideType` is optional and defaults to `'quickride'`, so shipped apps keep
-working. An outstation room is joinable **only while `arriving`** — joining an
+working. An outstation room is joinable **while `arriving` or `in_progress`** — joining an
 `assigned` or `in_progress` one returns `ride:join_error`.
 
 ### Reconnect
@@ -170,7 +173,7 @@ QuickRide accepted before the block window closed). On reconnect you get **one
 | `GET` | `/outstation-rides/available` | `?latitude&longitude&bookingType=now\|later` — 20 km, soonest departure first |
 | `GET` | `/outstation-rides/live` | either role; **the rider branch returns an array** |
 | `GET` | `/outstation-rides/my` | `?status=&date=\|from=&to=&by=createdAt\|pickupAt` |
-| `GET` | `/outstation-rides/track/:token` | public; resolves only while `arriving` |
+| `GET` | `/outstation-rides/track/:token` | public; resolves while `arriving` or `in_progress` |
 | `GET` | `/outstation-rides/:id` | participants only |
 | `GET` | `/outstation-rides/:id/bids` | *(rider)* |
 | `PATCH` | `/outstation-rides/:id/fare` | *(rider)* increase-only |
@@ -267,8 +270,8 @@ LAN IP does not, and the page says so rather than failing silently.
 | Bids arrive reliably | `outstation:bid_new` is applied to local state immediately, and a 5 s poll of `/live` runs while any trip is open. Sockets are still the delivery path — the poll exists because a dropped event looks exactly like *"no driver has bid yet"*, and the two must not be confusable while testing. The `polling:` pill shows when it is on |
 | Rider may hold many trips | Section 5 is a **list** with a count pill; each card shows its own bid count, and the bids panel follows the selected trip |
 | Scheduling | Each card shows `pickupAt`, `bookingType` and `expiresAt` — so you can see the 24 h TTL on a far booking and the `pickupAt` cap on a near one |
-| **The tracking window** | Three boxes light in sequence. The `ride:location` counter is the assertion: it must stay at **0** while the trip is `assigned`, start climbing on `outstation:started`, and stop on `outstation:picked_up` |
-| The share link's lifetime | The link field is empty until `arriving`. **Connect as share-link viewer** opens a socket with *only* the `trackingToken`, proving the handshake resolves outstation tokens; **`GET /track/:token`** returns `200` while `arriving` and `404` after pickup |
+| **The tracking window** | Three boxes light in sequence. The `ride:location` counter is the assertion: it must stay at **0** while the trip is `assigned`, start climbing on `outstation:started`, and **keep climbing through `outstation:picked_up`** until the trip completes |
+| The share link's lifetime | The link field is empty until `arriving`. **Connect as share-link viewer** opens a socket with *only* the `trackingToken`, proving the handshake resolves outstation tokens; **`GET /track/:token`** returns `200` from `arriving` through `in_progress`, and `404` once the trip is completed, cancelled or expired |
 
 ### The one check worth doing every time
 
@@ -311,9 +314,9 @@ single `ride:location` — indistinguishable from "the driver isn't moving".
 
 | Event / response | Meaning |
 |---|---|
-| `404` on the snapshot | Unknown token, finished trip, or (outstation) the rider is already aboard. Deliberately indistinguishable — a shared link must not reveal which |
+| `404` on the snapshot | Unknown token, or a trip that has finished, been cancelled or expired. Deliberately indistinguishable — a shared link must not reveal which |
 | `ride:location` | Move the marker |
-| `ride:ended` `reason: 'picked_up'` | **Outstation only, and not a failure.** The rider is in the vehicle and the window has done its job. Render "the rider is on board", never an error |
+| `outstation:picked_up` | **Outstation only, and not a teardown.** The rider is in the vehicle and the journey has begun. Relabel to "the rider is on board" and keep the map running |
 | `ride:ended` `completed` / `cancelled` / `expired` | Terminal; the socket is evicted from the room |
 
 ### Map choice

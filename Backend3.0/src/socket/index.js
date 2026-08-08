@@ -68,9 +68,10 @@ const authenticate = async (socket) => {
     let trackingRideType = 'quickride';
 
     if (!ride) {
-      // 'arriving' only. An outstation ride nulls its token at pickup so an in_progress row could
-      // never match anyway; naming the status makes the invariant explicit rather than relying on
-      // a field being cleared somewhere else.
+      // 'arriving' + 'in_progress': an outstation link is live from the driver setting off until
+      // the trip ends. The token is nulled at every terminal transition too, so this predicate is
+      // the belt to that braces rather than the only thing standing between a stale link and a
+      // finished trip.
       ride = await OutstationRide.findOne({
         trackingToken,
         rideStatus: { $in: OUTSTATION_TRACKABLE_RIDE_STATUSES },
@@ -311,8 +312,8 @@ export const initSocket = (httpServer) => {
       try {
         const [quickRide, outstationRide] = await Promise.all([
           quickRideService.getActiveRideForParticipant(id),
-          // 'arriving' only — an assigned-but-not-departed or in_progress outstation ride has no
-          // room to rejoin.
+          // 'arriving' or 'in_progress' — an assigned-but-not-departed outstation ride has no room
+          // to rejoin, because nothing is moving yet.
           outstationRideService.getRoomEligibleRideForParticipant(id),
         ]);
 

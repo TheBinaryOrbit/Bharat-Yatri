@@ -243,7 +243,7 @@
         </div>
       </div>
 
-      <label>Share link — appears only at <code>arriving</code></label>
+      <label>Share link — appears at <code>arriving</code>, stays live through <code>in_progress</code></label>
       <input id="shareUrl" readonly placeholder="nothing to track yet" />
       <div class="row" style="margin-top:8px">
         <button id="btnViewer" class="primary">Connect as share-link viewer</button>
@@ -422,7 +422,7 @@
       if (p.trackingUrl) $('shareUrl').value = p.trackingUrl;
       loadLive();
     });
-    socket.on('outstation:picked_up',      (p) => { log('in', 'outstation:picked_up — TRACKING CLOSES', p); loadLive(); });
+    socket.on('outstation:picked_up',      (p) => { log('in', 'outstation:picked_up — tracking CONTINUES through the journey', p); loadLive(); });
     socket.on('outstation:completed',      (p) => { log('in', 'outstation:completed', p); loadLive(); });
     socket.on('outstation:ride_cancelled', (p) => { log('in', 'outstation:ride_cancelled', p); loadLive(); });
     socket.on('outstation:ride_expired',   (p) => { log('in', 'outstation:ride_expired', p); loadLive(); });
@@ -899,7 +899,7 @@
     const json = await res.json().catch(() => ({}));
     log(res.ok ? 'view' : 'err', `[V] GET /track/${token.slice(0, 8)}… → ${res.status}`, json.rideStatus || json.message);
     if (!res.ok) {
-      alert(`${res.status} — ${json.message}\n\nExpected once the rider is aboard: the token is nulled at pickup.`);
+      alert(`${res.status} — ${json.message}\n\nExpected once the trip is completed or cancelled: the token is nulled there. While 'arriving' or 'in_progress' this should be a 200.`);
     }
   };
 

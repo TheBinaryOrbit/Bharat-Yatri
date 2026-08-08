@@ -309,13 +309,16 @@
       setNote(p.message || 'This trip is no longer being tracked.', 'err');
     });
 
-    // The teardown. 'picked_up' is outstation-only and is NOT a failure — the rider is aboard and
-    // the tracking window has done its job, so it must not read like something went wrong.
+    // Outstation only, and NOT a teardown: the room stays up for the journey. The map keeps
+    // running; only the caption changes, from "on the way to the pickup" to "under way".
+    socket.on('outstation:picked_up', () => {
+      setNote('The rider is on board — the trip is under way.', 'ok');
+    });
+
+    // The teardown. Three reasons, all terminal, both products.
     socket.on('ride:ended', (p) => {
       socket.disconnect();
       switch (p.reason) {
-        case 'picked_up':
-          return end('🧳', 'The rider is on board', 'Live tracking covers the drive to the pickup point. The trip is now under way.');
         case 'completed':
           return end('🏁', 'Trip completed', 'The rider has arrived. You can close this page.');
         case 'cancelled':
@@ -339,10 +342,10 @@
 
     const found = await fetchSnapshot();
 
-    // An unknown token, a finished trip and — for outstation — a trip whose rider is already
-    // aboard are all a 404 from the API, on purpose: a shared link must not reveal which.
+    // An unknown token and a trip that has finished, been cancelled or expired are all a 404 from
+    // the API, on purpose: a shared link must not reveal which.
     if (!found) {
-      return end('🔒', 'This link is no longer valid', 'The trip may have finished, been cancelled, or already started. Ask for a new link if it is still running.');
+      return end('🔒', 'This link is no longer valid', 'The trip may have finished or been cancelled. Ask for a new link if it is still running.');
     }
 
     state.rideType = found.rideType;

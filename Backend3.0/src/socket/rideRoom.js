@@ -82,8 +82,8 @@ export const joinRideRoom = async (socket, rideId, rideType) => {
   return { ok: true, ride };
 };
 
-// Called on EVERY transition that closes the tracking window — completed, cancelled and expired
-// for both products, plus 'picked_up' for outstation, where the window shuts mid-ride.
+// Called on EVERY transition that closes the tracking window — completed, cancelled and expired,
+// identically for both products.
 //
 // This is security-relevant, not housekeeping: a socket left in an ended ride's room would keep
 // receiving that driver's next trip's location.

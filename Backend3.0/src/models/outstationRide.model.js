@@ -154,8 +154,9 @@ const outstationRideSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    // Credential for the shareable live-tracking link. Minted when the driver sets off and nulled
-    // the instant the rider is aboard, so a shared link covers the approach and nothing else.
+    // Credential for the shareable live-tracking link. Minted when the driver sets off, carried
+    // unchanged through pickup so a link already shared keeps working for the journey, and nulled
+    // at every terminal transition — completed, cancelled, expired.
     trackingToken: {
       type: String,
       default: null,

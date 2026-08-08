@@ -18,7 +18,7 @@ import { parsePickupAt } from '../utils/pickupTime.js';
 import { validateCoordinates, parseRideStatuses } from '../utils/validate.js';
 import { buildTrackingUrl } from '../utils/trackingUrl.js';
 import { OUTSTATION_RIDE_STATUSES } from '../constants/ride.constants.js';
-import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { emitToDriver, emitToUser, emitToRide } from '../socket/emitters.js';
 import { notifyDriver, notifyUser } from '../notifications/index.js';
 import { openRideRoom, closeRideRoom } from '../socket/rideRoom.js';
 
@@ -416,8 +416,8 @@ export class OutstationRideController {
           bidBounds: this.fareService.getBidBounds(ride.offeredFare),
           // The driver needs the OTP once they are committed; the rider reads it out at pickup.
           startOtp: ride.rideStatus === 'assigned' || ride.rideStatus === 'arriving' ? ride.startOtp : null,
-          // Only ever non-null while 'arriving' — the token is minted when the driver sets off and
-          // nulled the instant the rider is aboard.
+          // Non-null from 'arriving' through 'in_progress' — minted when the driver sets off,
+          // carried through pickup, nulled at every terminal transition.
           trackingUrl: buildTrackingUrl(ride.trackingToken),
           bidCount: bids.length,
           bids,
@@ -604,7 +604,10 @@ export class OutstationRideController {
         return res.status(403).json({ error: 'Forbidden: you are not part of this ride' });
       }
 
-      // Only the rider ever sees the start OTP — the driver has to be told it out loud.
+      // Only the rider ever sees the start OTP — the driver has to be told it out loud — and only
+      // while it is still unspent. Once they are aboard the OTP is history, but the share link is
+      // not: it stays live for the whole journey, so the two are answered separately rather than
+      // from one branch.
       if (isRider && (ride.rideStatus === 'assigned' || ride.rideStatus === 'arriving')) {
         const withOtp = await this.outstationRideService.getRideWithOtp(ride._id);
         return res.status(200).json({
@@ -612,6 +615,12 @@ export class OutstationRideController {
           // null until the driver sets off; there is nothing to watch before that
           trackingUrl: buildTrackingUrl(withOtp.trackingToken),
         });
+      }
+
+      // The rider re-opening the app mid-journey gets their link back. `trackingToken` is nulled at
+      // every terminal transition, so this is null for a finished trip without testing the status.
+      if (isRider) {
+        return res.status(200).json({ ride, trackingUrl: buildTrackingUrl(ride.trackingToken) });
       }
 
       return res.status(200).json({ ride });
@@ -644,9 +653,10 @@ export class OutstationRideController {
   // PATCH /api/v3/outstation-rides/:id/start  (protected — driver only)
   //
   // "I'm setting off." No OTP — the rider is not here yet. This is the step QuickRide does not
-  // have, and it exists to make the tracking window narrow: a trip accepted three days ago streams
-  // nothing until the driver actually departs, and the driver's own tap is the trigger, so no
-  // scheduler is involved.
+  // have, and it is what keeps the tracking window from starting early: a trip accepted three days
+  // ago streams nothing until the driver actually departs, and the driver's own tap is the trigger,
+  // so no scheduler is involved. From here the room stays up until the trip reaches a terminal
+  // status — through pickup and the whole journey.
   startRide = async (req, res) => {
     try {
       const ride = await this.outstationRideService.getRideRaw(req.params.id);
@@ -699,7 +709,8 @@ export class OutstationRideController {
   // PATCH /api/v3/outstation-rides/:id/pickup  (protected — driver only)
   //
   // The rider reads the OTP out; the driver types it in. Proof the rider is actually in the
-  // vehicle — and the moment the tracking window shuts.
+  // vehicle — and the point the tracking window stops being about the approach and becomes the
+  // trip itself. The room does not change hands; it simply keeps running.
   pickupRide = async (req, res) => {
     const { startOtp } = req.body;
 
@@ -745,17 +756,18 @@ export class OutstationRideController {
       emitToUser(pickedUp.bookedBy?._id ?? pickedUp.bookedBy, 'outstation:picked_up', payload);
       emitToDriver(pickedUp.assignedTo?._id ?? pickedUp.assignedTo, 'outstation:picked_up', payload);
 
+      // Everyone already watching — rider, admin, share-link viewer — hears it in the room too, so
+      // a tracking page can relabel itself from "your driver is arriving" to "on the way" without
+      // polling. There is no closeRideRoom here, and that absence is the whole feature: the room
+      // opened at set-off stays up, the driver keeps this ride in activeRideIds, and their 5s pings
+      // keep feeding it for the length of the journey. It is torn down at complete/cancel/expire.
+      emitToRide(pickedUp._id, 'outstation:picked_up', payload);
+
       // Rider only. The driver just typed the OTP in.
       notifyUser(pickedUp.bookedBy?._id ?? pickedUp.bookedBy, 'outstation:picked_up', payload);
 
-      // The approach leg is over, so the tracking window closes with it. The service already
-      // nulled the token inside the atomic update; this tears down the room, which does three
-      // things at once — it tells any share-link viewer the trip has started, evicts them, and
-      // clears this ride from the driver's activeRideIds so their 5s pings stop feeding a room
-      // nobody should be in. Emitted to the identity rooms first: those are unaffected by the
-      // teardown, but reading them in this order is the only way the sequence is obvious.
-      await closeRideRoom(pickedUp._id, 'picked_up');
-
+      // No trackingUrl: this is the DRIVER's response, and the share link is the rider's
+      // credential — startRide keeps it out of the driver's payload for the same reason.
       return res.status(200).json({ message: 'Pickup confirmed. Ride started.', ride: pickedUp });
     } catch (error) {
       console.log(error);
@@ -789,7 +801,11 @@ export class OutstationRideController {
       // Rider only, for the same reason — the driver tapped this button.
       notifyUser(completed.bookedBy?._id ?? completed.bookedBy, 'outstation:completed', payload);
 
-      // Already torn down at pickup — kept so a future status change cannot leave a room open.
+      // The real teardown for a trip that ran its course: the room has been up since the driver set
+      // off. It evicts every share-link viewer, tells them why, and clears this ride from the
+      // driver's activeRideIds so their 5s pings stop feeding a room nobody should be in. Emitted
+      // to the identity rooms first — those are unaffected by the teardown, but reading them in
+      // this order is the only way the sequence is obvious.
       await closeRideRoom(completed._id, 'completed');
 
       const paymentDetails = await this.paymentDetailsService.getByDriver(

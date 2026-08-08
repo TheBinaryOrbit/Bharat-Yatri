@@ -7,12 +7,11 @@ const outstationRideService = new OutstationRideService();
 
 // The statuses in which a ride room may be joined, PER RIDE TYPE.
 //
-// They differ, and that difference is the whole point of the outstation tracking design. A
-// QuickRide room stays open through the trip because the rider in the back seat is the one watching
-// the map. An outstation room exists ONLY for the approach leg: it opens when the driver taps
-// start, and it is torn down — with the tracking token nulled in the same atomic update — the
-// instant the rider is aboard. So 'in_progress' is deliberately absent below, and a share link
-// handed out earlier stops resolving at that moment.
+// Both products track the trip itself; they differ only at the front. A QuickRide room opens the
+// moment a bid is accepted, because the driver is minutes away and the rider is watching them
+// approach. An outstation room cannot: a trip may be accepted days ahead, so it opens when the
+// driver taps start and 'assigned' is deliberately absent below. From set-off both lists run the
+// same way — through pickup and the journey, to a terminal status.
 const JOINABLE_STATUSES = {
   quickride: ACTIVE_RIDE_STATUSES,
   outstation: OUTSTATION_TRACKABLE_RIDE_STATUSES,
