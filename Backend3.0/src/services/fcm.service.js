@@ -75,6 +75,24 @@ export class FcmService {
     },
   });
 
+  // Responses come back positionally aligned with the tokens we sent, so a failure can always be
+  // traced back to the device that caused it. Shared by both send paths below.
+  collectBatchResult = (response, batchTokens, result, type) => {
+    result.successCount += response.successCount;
+    result.failureCount += response.failureCount;
+
+    response.responses.forEach((sent, index) => {
+      if (sent.success) return;
+
+      if (isDeadToken(sent.error)) {
+        result.deadTokens.push(batchTokens[index]);
+        return;
+      }
+
+      console.error(`FCM send failed [${type}] ${sent.error?.code}: ${sent.error?.message}`);
+    });
+  };
+
   // Sends one message to many devices and reports which tokens are dead.
   //
   // Never throws. Push is an enhancement on top of the socket layer, and a Firebase outage must
@@ -93,25 +111,53 @@ export class FcmService {
     for (const batch of chunk(targets, MULTICAST_LIMIT)) {
       try {
         const response = await messaging.sendEachForMulticast({ ...message, tokens: batch });
-
-        result.successCount += response.successCount;
-        result.failureCount += response.failureCount;
-
-        // Responses come back positionally aligned with the tokens we sent.
-        response.responses.forEach((sent, index) => {
-          if (sent.success) return;
-
-          if (isDeadToken(sent.error)) {
-            result.deadTokens.push(batch[index]);
-            return;
-          }
-
-          console.error(`FCM send failed [${data?.type}] ${sent.error?.code}: ${sent.error?.message}`);
-        });
+        this.collectBatchResult(response, batch, result, data?.type);
       } catch (error) {
         // A whole-batch failure: bad credentials, no network, Firebase down.
         result.failureCount += batch.length;
         console.error(`FCM multicast failed [${data?.type}]: ${error.message}`);
+      }
+    }
+
+    return result;
+  };
+
+  // Many devices, a DIFFERENT message each — the fan-out where the payload is personalised.
+  //
+  // `sendToTokens` above cannot express this: a multicast is one message body replicated, so
+  // anything that varies per driver (`distanceFromDriverKm`) has to be dropped from it. Firebase's
+  // sendEach takes up to 500 distinct messages in a single HTTP call, so paying for personalisation
+  // costs the same one round trip per 500 drivers that the multicast did — not one call per driver.
+  //
+  // `items` is [{ token, title, body, data }]. Same contract as sendToTokens: never throws, reports
+  // dead tokens.
+  sendEachToTokens = async (items) => {
+    const messaging = maybeGetMessaging();
+
+    // Last write wins on a duplicate token, mirroring the de-duplication sendToTokens does — two
+    // drivers sharing a handset is a data problem, not a reason to buzz it twice.
+    const byToken = new Map();
+    (items || []).forEach((item) => {
+      if (item?.token) byToken.set(item.token, item);
+    });
+
+    const targets = [...byToken.values()];
+    if (!messaging || !targets.length) {
+      return { successCount: 0, failureCount: 0, deadTokens: [] };
+    }
+
+    const type = targets[0]?.data?.type;
+    const result = { successCount: 0, failureCount: 0, deadTokens: [] };
+
+    for (const batch of chunk(targets, MULTICAST_LIMIT)) {
+      try {
+        const response = await messaging.sendEach(
+          batch.map((item) => ({ ...this.buildMessage(item), token: item.token }))
+        );
+        this.collectBatchResult(response, batch.map((item) => item.token), result, type);
+      } catch (error) {
+        result.failureCount += batch.length;
+        console.error(`FCM sendEach failed [${type}]: ${error.message}`);
       }
     }
 

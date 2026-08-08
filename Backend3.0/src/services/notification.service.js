@@ -28,6 +28,21 @@ export class NotificationService {
     return accounts.map((account) => account.fcmToken);
   };
 
+  // ids → Map(id → token), for sends where each recipient gets a different message and the token
+  // therefore has to stay attached to the account it came from. One query for the whole fan-out,
+  // exactly like resolveTokens; the difference is only that the id survives the lookup.
+  resolveTokenMap = async (audience, ids) => {
+    const unique = [...new Set((ids || []).map((id) => String(id?._id ?? id ?? '')).filter(Boolean))];
+    if (!unique.length) return new Map();
+
+    const accounts = await this.modelFor(audience)
+      .find({ _id: { $in: unique }, fcmToken: { $nin: [null, ''] } })
+      .select('fcmToken')
+      .lean();
+
+    return new Map(accounts.map((account) => [String(account._id), account.fcmToken]));
+  };
+
   // A device that reports "not registered" has been wiped, reinstalled or had the app removed.
   // Its token will never work again, so it is cleared rather than retried on every future event —
   // otherwise a popular route's fan-out slowly turns into a list of ghosts.
@@ -50,6 +65,29 @@ export class NotificationService {
     if (!tokens.length) return { successCount: 0, failureCount: 0, skipped: true };
 
     const result = await this.fcmService.sendToTokens(tokens, { title, body, data });
+    await this.pruneDeadTokens(audience, result.deadTokens);
+
+    return result;
+  };
+
+  // The per-recipient send path: one message PER id rather than one message TO all of them.
+  //
+  // `entries` is [{ id, message }]. Ids with no live token drop out silently, same as send().
+  // Still a single database query and a single Firebase round trip per 500 recipients.
+  sendEach = async (audience, entries) => {
+    const list = (entries || []).filter((entry) => entry?.id && entry?.message);
+    const tokens = await this.resolveTokenMap(audience, list.map((entry) => entry.id));
+
+    const items = list.reduce((acc, { id, message }) => {
+      const token = tokens.get(String(id?._id ?? id));
+      if (token) acc.push({ token, ...message });
+      return acc;
+    }, []);
+
+    console.log(`NotificationService.sendEach: audience=${audience}, ids=${list.length}, tokens=${items.length}`);
+    if (!items.length) return { successCount: 0, failureCount: 0, skipped: true };
+
+    const result = await this.fcmService.sendEachToTokens(items);
     await this.pruneDeadTokens(audience, result.deadTokens);
 
     return result;

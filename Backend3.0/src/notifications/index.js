@@ -32,7 +32,26 @@ const notify = (audience, ids, event, payload) => {
 
 export const notifyDriver = (driverId, event, payload) => notify('driver', [driverId], event, payload);
 
-// One template, one multicast, many devices — the dispatch fan-out's path.
-export const notifyDrivers = (driverIds, event, payload) => notify('driver', driverIds, event, payload);
-
 export const notifyUser = (userId, event, payload) => notify('user', [userId], event, payload);
+
+// The fan-out: one template, many drivers, each push rendered from that driver's OWN payload.
+//
+// `recipients` is [{ driverId, payload }]. Dispatch needs the per-driver shape because the ride
+// card carries `distanceFromDriverKm`, which differs for every driver in the ring and would have to
+// be dropped from a shared multicast body. Fire-and-forget like the singular helpers above, and
+// still one database query and one Firebase round trip per 500 drivers.
+export const notifyDriversEach = (recipients, event) => {
+  const entries = (recipients || []).reduce((acc, { driverId, payload }) => {
+    const message = renderNotification(event, 'driver', payload);
+    if (message) acc.push({ id: driverId, message });
+    return acc;
+  }, []);
+
+  if (!entries.length) return false;
+
+  notificationService
+    .sendEach('driver', entries)
+    .catch((error) => console.error(`Push failed [driver ${event}]: ${error.message}`));
+
+  return true;
+};

@@ -46,6 +46,15 @@ const humanizeMinutes = (minutes) => {
 // "Andheri East → Bandra West", trimmed of the long tail Google returns.
 const shortPlace = (name) => String(name || '').split(',')[0].trim();
 
+// Distances go out as data, and a raw Redis GEO result is 2.4000000000000004. One decimal is the
+// most an app would ever render, and it keeps the string the app parses short and stable.
+const km = (value) => {
+  if (value === null || value === undefined || value === '') return undefined;
+
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.round(number * 10) / 10 : undefined;
+};
+
 const route = (payload) =>
   `${shortPlace(payload.pickupLocationName)} → ${shortPlace(payload.dropLocationName)}`;
 
@@ -55,6 +64,10 @@ export const NOTIFICATION_TEMPLATES = {
   // ===========================================================================================
   // QuickRide — work offered to drivers
   // ===========================================================================================
+  // The one push that has to survive being tapped from a cold start: the driver app renders the
+  // whole ride card — route, fare, trip length, how far the pickup is — and an honest countdown
+  // from `expiresAt`, without waiting on a fetch. So this data block carries the card, not just a
+  // navigation hint. `distanceFromDriverKm` is why dispatch sends these one-per-driver.
   'ride:request': {
     driver: (payload) => ({
       type: NOTIFICATION_TYPES.QUICKRIDE_NEW,
@@ -65,6 +78,14 @@ export const NOTIFICATION_TEMPLATES = {
         rideId: rideId(payload),
         offeredFare: payload.offeredFare,
         expiresAt: payload.expiresAt,
+        pickup: shortPlace(payload.pickupLocationName),
+        drop: shortPlace(payload.dropLocationName),
+        estimatedDistanceKm: km(payload.estimatedDistanceKm),
+        distanceFromDriverKm: km(payload.distanceFromDriverKm),
+        // The band a bid must fall inside, flattened out of `bidBounds`. FCM data values are
+        // strings, so the nested object the socket card carries would arrive as "[object Object]".
+        minFare: payload.bidBounds?.min,
+        maxFare: payload.bidBounds?.max,
         screen: NOTIFICATION_SCREENS.DRIVER_RIDE_REQUESTS,
       },
     }),

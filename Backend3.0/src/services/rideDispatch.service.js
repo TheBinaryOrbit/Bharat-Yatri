@@ -3,7 +3,7 @@ import { DriverAvailabilityService } from './driverAvailability.service.js';
 import { FareService } from './fare.service.js';
 import { RideAudienceService } from './rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
-import { notifyDrivers, notifyUser } from '../notifications/index.js';
+import { notifyDriversEach, notifyUser } from '../notifications/index.js';
 import { fromGeoPoint } from '../utils/geo.js';
 
 export class RideDispatchService {
@@ -104,24 +104,23 @@ export class RideDispatchService {
       { ttlSeconds: audienceTtlSeconds }
     );
 
-    drivers.forEach((driver) => {
-      emitToDriver(driver.driverId, event, buildPayload(ride, driver.distanceKm));
-    });
+    // Built once per driver and used for both transports, so the card a driver gets over the socket
+    // and the one their push carries are the same object — they cannot describe the ride differently.
+    const cards = drivers.map((driver) => ({
+      driverId: driver.driverId,
+      payload: buildPayload(ride, driver.distanceKm),
+    }));
 
-    // One multicast for the whole ring, rather than a push per driver.
-    //
-    // The socket card above is per-driver because it carries distanceFromDriverKm; the push is not,
-    // because the banner says nothing about that distance — a driver who is 3 km out and one who is
-    // 7 km out read the same "New ride · Andheri → Bandra · ₹280". Passing null keeps that honest
-    // rather than baking one arbitrary driver's distance into everyone's notification.
+    cards.forEach(({ driverId, payload }) => emitToDriver(driverId, event, payload));
+
+    // Personalised, not multicast: the push carries the whole ride card, including this driver's own
+    // distanceFromDriverKm, so the app can render it and run an honest countdown to expiresAt
+    // straight from a cold start. That per-driver value is exactly what a shared multicast body
+    // cannot express. It still costs one Firebase round trip per 500 drivers — see FcmService.
     //
     // This is also the ONLY push a driver gets for a ride they have not bid on. The audience-drain
     // events (ride taken, expired, cancelled) stay socket-only — see notifications/templates.js.
-    notifyDrivers(
-      drivers.map((driver) => driver.driverId),
-      event,
-      buildPayload(ride, null)
-    );
+    notifyDriversEach(cards, event);
 
     return { drivers, radiusKm };
   };

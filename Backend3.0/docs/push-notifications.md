@@ -103,13 +103,57 @@ that would have been `null` are omitted rather than sent as `"null"`.
 `driver_ride_history`, `driver_kyc`, `user_ride_bids`, `user_active_ride`,
 `user_ride_history`.
 
+### `quickride.new` carries the whole card
+
+Most `data` blocks are a navigation hint. This one is not: a driver's ride offer
+has to be renderable — and countable-down — from a cold start, before any fetch
+returns.
+
+```jsonc
+{
+  "notification": {
+    "title": "New ride • ₹280",
+    "body": "Andheri East → Bandra West · 12 km trip"
+  },
+  "data": {
+    "type": "quickride.new",
+    "rideType": "quickride",
+    "rideId": "68f0…aa",
+    "offeredFare": "280",
+    "expiresAt": "2026-08-08T10:31:00.000Z",  // ISO-8601 — drive the countdown off this
+    "pickup": "Andheri East",                 // short form, comma tail trimmed
+    "drop": "Bandra West",
+    "estimatedDistanceKm": "12",              // trip length
+    "distanceFromDriverKm": "2.4",            // pickup's distance from THIS driver, 1 dp
+    "minFare": "224",                         // your bid must land in [minFare, maxFare]
+    "maxFare": "336",
+    "screen": "driver_ride_requests"
+  }
+}
+```
+
+`minFare` / `maxFare` are the bid band — the flattened `bidBounds` the socket
+card carries as a nested object, which `data` cannot hold because every value
+must be a string. They track the rider's **offered** fare, so a
+`quickride.fare_updated` push means the band you cached from this one is stale;
+re-read the bounds from the ride rather than reusing them.
+
+`distanceFromDriverKm` is per-recipient, so this event is sent as one message
+per driver (Firebase `sendEach`) rather than a multicast. It is omitted when
+dispatch had no distance for that driver. Every other value is ride-level and
+identical across the ring.
+
+Do **not** count down from a locally-captured receipt time: the push may have sat
+in Firebase, or the phone may have been dozing. `expiresAt` is the only honest
+clock.
+
 ---
 
 ## Driver notifications
 
 | `type` | When | Extra `data` |
 | --- | --- | --- |
-| `quickride.new` | A ride is dispatched to you | `offeredFare`, `expiresAt` |
+| `quickride.new` | A ride is dispatched to you | `offeredFare`, `expiresAt`, `pickup`, `drop`, `estimatedDistanceKm`, `distanceFromDriverKm`, `minFare`, `maxFare` |
 | `quickride.fare_updated` | The rider raised their offer (re-dispatch) | `offeredFare` |
 | `quickride.bid_accepted` | **You won the ride** | `finalFare` |
 | `quickride.bid_rejected` | The rider dismissed your bid | `bidId` |
