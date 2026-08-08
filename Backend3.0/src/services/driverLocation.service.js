@@ -14,6 +14,8 @@ export class DriverLocationService {
   upsertLocation = async ({ driverId, latitude, longitude, meta = {} }) => {
     const id = String(driverId);
 
+    console.log(`[loc] upsert ${id} → ${latitude}, ${longitude}`);
+
     await redis
       .pipeline()
       .geoadd(GEO_KEY, longitude, latitude, id)
@@ -106,7 +108,14 @@ export class DriverLocationService {
     if (hours <= 0) return true;
 
     const km = haversineKm(last, { latitude, longitude });
-    return km / hours <= env.MAX_LOCATION_JUMP_KMPH;
+    const kmph = km / hours;
+
+    console.log(
+      `[loc] jump check ${driverId}: ${last.latitude}, ${last.longitude} → ${latitude}, ${longitude}` +
+        ` = ${km.toFixed(3)}km in ${(hours * 3600).toFixed(1)}s (${kmph.toFixed(1)} km/h, limit ${env.MAX_LOCATION_JUMP_KMPH})`
+    );
+
+    return kmph <= env.MAX_LOCATION_JUMP_KMPH;
   };
 
   // Drivers within radiusKm of a point, nearest first, restricted to a vehicle type.

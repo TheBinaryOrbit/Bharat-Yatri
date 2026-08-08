@@ -95,6 +95,8 @@ export class AuthController {
 
       const token = generateToken({ id: updated._id, role });
 
+      console.log(token);
+
       return res.status(200).json({
         message: 'OTP verified successfully.',
         userStatus: 200,

@@ -18,6 +18,7 @@ import { validateCoordinates, parseRideStatuses } from '../utils/validate.js';
 import { buildTrackingUrl } from '../utils/trackingUrl.js';
 import { RIDE_STATUSES } from '../constants/ride.constants.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { notifyDriver, notifyUser } from '../notifications/index.js';
 import { openRideRoom, closeRideRoom } from '../socket/rideRoom.js';
 
 export class QuickRideController {
@@ -604,6 +605,9 @@ export class QuickRideController {
       emitToUser(started.bookedBy?._id ?? started.bookedBy, 'ride:started', payload);
       emitToDriver(started.assignedTo?._id ?? started.assignedTo, 'ride:started', payload);
 
+      // Rider only. The driver just typed the OTP in — they know the ride started.
+      notifyUser(started.bookedBy?._id ?? started.bookedBy, 'ride:started', payload);
+
       return res.status(200).json({ message: 'Ride started successfully.', ride: started });
     } catch (error) {
       console.log(error);
@@ -633,6 +637,9 @@ export class QuickRideController {
       };
       emitToUser(completed.bookedBy?._id ?? completed.bookedBy, 'ride:completed', payload);
       emitToDriver(completed.assignedTo?._id ?? completed.assignedTo, 'ride:completed', payload);
+
+      // Rider only, for the same reason as ride:started — the driver tapped this button.
+      notifyUser(completed.bookedBy?._id ?? completed.bookedBy, 'ride:completed', payload);
 
       await closeRideRoom(completed._id, 'completed');
       
@@ -683,6 +690,23 @@ export class QuickRideController {
       doomed.forEach((bid) => emitToDriver(bid.requestedBy, 'ride:cancelled', payload));
       if (isRider && cancelled.assignedTo) emitToDriver(cancelled.assignedTo?._id ?? cancelled.assignedTo, 'ride:cancelled', payload);
       if (isDriver) emitToUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'ride:cancelled', payload);
+
+      // The push list is built as a SET, and without the person who did the cancelling.
+      //
+      // The socket emits above can safely overlap — the assigned driver is in `doomed` (their
+      // accepted bid is deleted too) and named again on the isRider line, and clearing a card
+      // twice is a no-op. Two identical banners on a lock screen are not. Nor is telling the
+      // driver who just cancelled that "the rider cancelled", which is what a driver-side cancel
+      // would otherwise do, since their own accepted bid is in `doomed`.
+      const actorId = String(req.user._id);
+      const cancelledDriverIds = new Set(
+        [...doomed.map((bid) => bid.requestedBy), isRider ? cancelled.assignedTo : null]
+          .map((id) => String(id?._id ?? id ?? ''))
+          .filter((id) => id && id !== actorId)
+      );
+
+      cancelledDriverIds.forEach((driverId) => notifyDriver(driverId, 'ride:cancelled', payload));
+      if (isDriver) notifyUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'ride:cancelled', payload);
 
       // Everyone else the ride was ever pushed to. Bidders were just told above, and the assigned
       // driver either was too or is the one doing the cancelling — excluding both leaves exactly

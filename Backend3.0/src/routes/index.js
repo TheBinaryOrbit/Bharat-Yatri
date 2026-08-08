@@ -12,6 +12,7 @@ import outstationRideRoutes from './outstationRide.routes.js';
 import outstationRideBidRoutes from './outstationRideBid.routes.js';
 import reviewRoutes from './review.routes.js';
 import quickDestinationRoutes from './quickDestination.routes.js';
+import notificationRoutes from './notification.routes.js';
 
 const router = Router();
 
@@ -28,5 +29,6 @@ router.use('/outstation-rides', outstationRideRoutes);
 router.use('/outstation-ride-bids', outstationRideBidRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/quick-destinations', quickDestinationRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

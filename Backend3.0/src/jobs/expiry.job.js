@@ -5,6 +5,7 @@ import { OutstationRideService } from '../services/outstationRide.service.js';
 import { OutstationRideBidService } from '../services/outstationRideBid.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { notifyDriver, notifyUser } from '../notifications/index.js';
 import { closeRideRoom } from '../socket/rideRoom.js';
 
 const quickRideService = new QuickRideService();
@@ -34,6 +35,10 @@ const expireBids = async () => {
     // The rider's list drops the card; the driver's UI re-enables bidding.
     if (bid.quickRideId?.bookedBy) emitToUser(bid.quickRideId.bookedBy, 'bid:expired', payload);
     emitToDriver(bid.requestedBy, 'bid:expired', payload);
+
+    // Driver only. The rider loses one row from a list they are actively watching; the driver
+    // may have put the phone down after bidding and needs to know the window closed.
+    notifyDriver(bid.requestedBy, 'bid:expired', payload);
   });
 };
 
@@ -47,7 +52,12 @@ const expireRides = async () => {
   for (const ride of expired) {
     // Bids on a dead ride are unfulfillable; their drivers are told before the rows go.
     const doomed = await quickRideBidService.deleteOtherBidsForRide(ride._id, null);
-    doomed.forEach((bid) => emitToDriver(bid.requestedBy, 'ride:expired', { rideId: String(ride._id) }));
+    doomed.forEach((bid) => {
+      emitToDriver(bid.requestedBy, 'ride:expired', { rideId: String(ride._id) });
+      // Bidders only — the drivers who had a price on this ride. The notifyAndDrain audience
+      // below never committed to anything and is told over sockets alone.
+      notifyDriver(bid.requestedBy, 'ride:expired', { rideId: String(ride._id) });
+    });
 
     // Non-bidders were previously left to watch their own countdown run out. The card is now pulled
     // on the same tick that kills the ride, so every screen agrees on when it died.
@@ -59,6 +69,8 @@ const expireRides = async () => {
     );
 
     emitToUser(ride.bookedBy, 'ride:expired', { rideId: String(ride._id) });
+    notifyUser(ride.bookedBy, 'ride:expired', { rideId: String(ride._id) });
+
     await closeRideRoom(ride._id, 'expired');
   }
 };
@@ -81,9 +93,10 @@ const expireOutstationRides = async () => {
 
   for (const ride of expired) {
     const doomed = await outstationRideBidService.deleteOtherBidsForRide(ride._id, null);
-    doomed.forEach((bid) =>
-      emitToDriver(bid.requestedBy, 'outstation:ride_expired', { rideId: String(ride._id) })
-    );
+    doomed.forEach((bid) => {
+      emitToDriver(bid.requestedBy, 'outstation:ride_expired', { rideId: String(ride._id) });
+      notifyDriver(bid.requestedBy, 'outstation:ride_expired', { rideId: String(ride._id) });
+    });
 
     await rideAudienceService.notifyAndDrain(
       ride._id,
@@ -93,6 +106,7 @@ const expireOutstationRides = async () => {
     );
 
     emitToUser(ride.bookedBy, 'outstation:ride_expired', { rideId: String(ride._id) });
+    notifyUser(ride.bookedBy, 'outstation:ride_expired', { rideId: String(ride._id) });
 
     // A 'searching' outstation ride never had a room — the window only opens when the driver sets
     // off — so this is a no-op. Kept for symmetry with the QuickRide sweep, and so a future status

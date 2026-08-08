@@ -6,6 +6,7 @@ import { VehicleService } from '../services/vehicle.service.js';
 import { RideAudienceService } from '../services/rideAudience.service.js';
 import { DriverProfileService } from '../services/driverProfile.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { notifyDriver, notifyUser } from '../notifications/index.js';
 
 export class OutstationRideBidController {
   constructor() {
@@ -107,6 +108,14 @@ export class OutstationRideBidController {
       );
       emitToUser(ride.bookedBy, 'outstation:bid_new', { outstationRideId: String(ride._id), bid: populated });
 
+      // The one bid arrival that pushes. Its QuickRide twin does not: a QuickRide rider is watching
+      // a 60-second auction with the app open, while an outstation rider booked a trip for next
+      // Friday and closed the app — a bid they never see is a bid that never gets accepted.
+      notifyUser(ride.bookedBy, 'outstation:bid_new', {
+        outstationRideId: String(ride._id),
+        bid: populated,
+      });
+
       return res.status(201).json({ message: 'Bid placed successfully.', bid: populated });
     } catch (error) {
       console.log(error);
@@ -179,12 +188,13 @@ export class OutstationRideBidController {
 
       // Losing bids are deleted, not marked rejected
       const losers = await this.outstationRideBidService.deleteOtherBidsForRide(ride._id, bid._id);
-      losers.forEach((loser) =>
-        emitToDriver(loser.requestedBy, 'outstation:ride_taken', {
-          rideId: String(ride._id),
-          bidId: String(loser._id),
-        })
-      );
+      losers.forEach((loser) => {
+        const payload = { rideId: String(ride._id), bidId: String(loser._id) };
+
+        emitToDriver(loser.requestedBy, 'outstation:ride_taken', payload);
+        // Bidders only. The silent audience below is told over sockets alone.
+        notifyDriver(loser.requestedBy, 'outstation:ride_taken', payload);
+      });
 
       // The drivers who saw the card and never bid. They get the same event without a `bidId` —
       // there is no bid of theirs to reference. The winner is excluded for the obvious reason.
@@ -234,6 +244,21 @@ export class OutstationRideBidController {
         pickupAt: assigned.pickupAt,
       });
 
+      // No OTP in either push — it is a credential, and a notification is cached by the OS and
+      // rendered on a locked screen. It stays in the socket payload and the HTTP response.
+      notifyUser(assigned.bookedBy, 'outstation:assigned', {
+        rideId: String(assigned._id),
+        ride: full,
+        finalFare: assigned.finalFare,
+        pickupAt: assigned.pickupAt,
+      });
+
+      notifyDriver(assigned.assignedTo, 'outstation:bid_accepted', {
+        rideId: String(assigned._id),
+        finalFare: assigned.finalFare,
+        pickupAt: assigned.pickupAt,
+      });
+
       return res.status(200).json({
         message: 'Bid accepted successfully.',
         ride: full,
@@ -268,6 +293,13 @@ export class OutstationRideBidController {
       emitToDriver(bid.requestedBy, 'outstation:bid_removed', {
         bidId: String(bid._id),
         outstationRideId: String(ride._id),
+      });
+
+      // A distinct notification event, not 'outstation:bid_removed' — that socket event also fires
+      // when the driver withdraws and when a bid is orphaned. Only this path is a rider saying no.
+      notifyDriver(bid.requestedBy, 'outstation:bid_rejected', {
+        bidId: String(bid._id),
+        rideId: String(ride._id),
       });
 
       return res.status(200).json({ message: 'Bid dismissed successfully.' });

@@ -243,6 +243,21 @@ export class OutstationRideService {
     ).populate(RIDE_POPULATE);
   };
 
+  // Trips leaving inside the reminder horizon, for the departure-ladder sweeper.
+  //
+  // 'assigned' only, and that is the whole gate. A driver who has already tapped "on my way" is at
+  // 'arriving' and does not need telling; a trip still 'searching' has nobody to tell. Served by
+  // the {rideStatus, vehicleTypeId, pickupAt} index on its first field, and by {pickupAt} for the
+  // range — a sweep over a handful of upcoming trips either way.
+  findRidesDueForReminder = async (horizonMinutes) => {
+    const now = new Date();
+
+    return OutstationRide.find({
+      rideStatus: 'assigned',
+      pickupAt: { $gt: now, $lte: new Date(now.getTime() + horizonMinutes * 60 * 1000) },
+    }).select('_id assignedTo pickupAt pickupLocationName dropLocationName');
+  };
+
   findExpiredSearchingRides = async () => {
     return OutstationRide.find({ rideStatus: 'searching', expiresAt: { $lte: new Date() } }).select(
       '_id bookedBy'

@@ -3,6 +3,7 @@ import { DriverAvailabilityService } from './driverAvailability.service.js';
 import { FareService } from './fare.service.js';
 import { RideAudienceService } from './rideAudience.service.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { notifyDrivers, notifyUser } from '../notifications/index.js';
 import { fromGeoPoint } from '../utils/geo.js';
 
 export class RideDispatchService {
@@ -85,10 +86,10 @@ export class RideDispatchService {
     });
 
     if (!drivers.length) {
-      emitToUser(ride.bookedBy?._id ?? ride.bookedBy, noDriversEvent, {
-        rideId: String(ride._id),
-        searchedRadiusKm: radiusKm,
-      });
+      const emptyPayload = { rideId: String(ride._id), searchedRadiusKm: radiusKm };
+
+      emitToUser(ride.bookedBy?._id ?? ride.bookedBy, noDriversEvent, emptyPayload);
+      notifyUser(ride.bookedBy?._id ?? ride.bookedBy, noDriversEvent, emptyPayload);
       return { drivers: [], radiusKm };
     }
 
@@ -106,6 +107,21 @@ export class RideDispatchService {
     drivers.forEach((driver) => {
       emitToDriver(driver.driverId, event, buildPayload(ride, driver.distanceKm));
     });
+
+    // One multicast for the whole ring, rather than a push per driver.
+    //
+    // The socket card above is per-driver because it carries distanceFromDriverKm; the push is not,
+    // because the banner says nothing about that distance — a driver who is 3 km out and one who is
+    // 7 km out read the same "New ride · Andheri → Bandra · ₹280". Passing null keeps that honest
+    // rather than baking one arbitrary driver's distance into everyone's notification.
+    //
+    // This is also the ONLY push a driver gets for a ride they have not bid on. The audience-drain
+    // events (ride taken, expired, cancelled) stay socket-only — see notifications/templates.js.
+    notifyDrivers(
+      drivers.map((driver) => driver.driverId),
+      event,
+      buildPayload(ride, null)
+    );
 
     return { drivers, radiusKm };
   };

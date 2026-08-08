@@ -6,6 +6,7 @@ import { buildFileUrl } from '../utils/fileUrl.js';
 import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 import { isDuplicateKeyError, duplicateKeyInfo } from '../utils/duplicateKey.js';
 import { generateToken } from '../utils/token.js';
+import { notifyDriver } from '../notifications/index.js';
 import { env } from '../config/env.js';
 
 export class DriverController {
@@ -279,10 +280,19 @@ export class DriverController {
       const { requestId, status, adharFileId, aadhaarJpeg } = this.kycService.parseCallback(req.body);
 
       if (!requestId || !status || !adharFileId || !aadhaarJpeg) {
+        const reason = 'Invalid KYC Data: missing required fields';
+
         await this.driverService.updateDriver(driver._id, {
           isKycCompleted: false,
-          kycFailedReason: 'Invalid KYC Data: missing required fields',
+          kycFailedReason: reason,
         });
+
+        // Best effort, and only ever reaches a driver who already has an account on a device —
+        // a re-verification or a retry. On a first-time KYC there is no fcmToken yet (the account
+        // is created by this very callback), so the send resolves to zero tokens and is skipped.
+        // The app's own poll of GET /drivers/kyc/status/:phonenumber is what covers that case.
+        notifyDriver(driver._id, 'kyc:rejected', { reason });
+
         console.error('Invalid KYC callback data:', req.body);
         return res.status(400).json({ error: 'Invalid KYC callback data' });
       }
@@ -292,15 +302,20 @@ export class DriverController {
       if (adharFileId) {
         const owner = await this.driverService.getDriverByKycFileId(adharFileId);
         if (owner && String(owner._id) !== String(driver._id)) {
+          const reason = 'This KYC document is already linked to another account';
+
           await this.driverService.updateDriver(driver._id, {
             isKycCompleted: false,
             name: 'unknown',
             kycDetails: {
               status: 'failed',
             },
-            kycFailedReason: 'This KYC document is already linked to another account',
+            kycFailedReason: reason,
           });
-          return res.status(409).json({ error: 'This KYC document is already linked to another account' });
+
+          notifyDriver(driver._id, 'kyc:rejected', { reason });
+
+          return res.status(409).json({ error: reason });
         }
       }
 
@@ -311,6 +326,16 @@ export class DriverController {
 
       if (!driver) {
         return res.status(404).json({ error: 'Driver not found' });
+      }
+
+      // The provider's verdict, in the driver's hand. `status` is Signzy's own string, so anything
+      // other than 'success' is a failure with a reason we can quote back rather than invent.
+      if (driver.isKycCompleted) {
+        notifyDriver(driver._id, 'kyc:verified', {});
+      } else {
+        notifyDriver(driver._id, 'kyc:rejected', {
+          reason: `DigiLocker verification did not succeed (${status}). Please try again.`,
+        });
       }
 
       return res.status(200).json({ message: 'Driver KYC status updated successfully.' });

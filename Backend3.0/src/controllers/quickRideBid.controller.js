@@ -7,6 +7,7 @@ import { RideAudienceService } from '../services/rideAudience.service.js';
 import { DriverProfileService } from '../services/driverProfile.service.js';
 import { buildTrackingUrl } from '../utils/trackingUrl.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { notifyDriver, notifyUser } from '../notifications/index.js';
 import { openRideRoom } from '../socket/rideRoom.js';
 
 export class QuickRideBidController {
@@ -158,9 +159,15 @@ export class QuickRideBidController {
 
       // Losing bids are deleted, not marked rejected
       const losers = await this.quickRideBidService.deleteOtherBidsForRide(ride._id, bid._id);
-      losers.forEach((loser) =>
-        emitToDriver(loser.requestedBy, 'ride:taken', { rideId: String(ride._id), bidId: String(loser._id) })
-      );
+      losers.forEach((loser) => {
+        const payload = { rideId: String(ride._id), bidId: String(loser._id) };
+
+        emitToDriver(loser.requestedBy, 'ride:taken', payload);
+        // Only the drivers who actually bid are pushed. notifyAndDrain below reaches the rest
+        // over sockets alone: they never committed to a price and a buzz about a ride they
+        // ignored is pure noise.
+        notifyDriver(loser.requestedBy, 'ride:taken', payload);
+      });
 
       // The drivers who saw the card and never bid. They get the same event without a `bidId` —
       // there is no bid of theirs to reference. The winner is excluded for the obvious reason.
@@ -201,6 +208,20 @@ export class QuickRideBidController {
         finalFare: assigned.finalFare,
       });
 
+      // The push payloads carry no OTP and no tracking token. A notification is rendered on a lock
+      // screen and cached by the OS, so the two credentials in this transition stay in the socket
+      // payload and the HTTP response, where the app has to be open to read them.
+      notifyUser(assigned.bookedBy, 'ride:assigned', {
+        rideId: String(assigned._id),
+        ride: full,
+        finalFare: assigned.finalFare,
+      });
+
+      notifyDriver(assigned.assignedTo, 'bid:accepted', {
+        rideId: String(assigned._id),
+        finalFare: assigned.finalFare,
+      });
+
       return res.status(200).json({
         message: 'Bid accepted successfully.',
         ride: full,
@@ -235,6 +256,14 @@ export class QuickRideBidController {
       emitToDriver(bid.requestedBy, 'bid:removed', {
         bidId: String(bid._id),
         quickRideId: String(ride._id),
+      });
+
+      // A distinct notification event, not 'bid:removed'. The socket event is overloaded — it also
+      // fires when the driver withdraws their own bid and when a bid is orphaned — and only THIS
+      // path is a rider actively saying no, which is the only one worth a phone buzz.
+      notifyDriver(bid.requestedBy, 'bid:rejected', {
+        bidId: String(bid._id),
+        rideId: String(ride._id),
       });
 
       return res.status(200).json({ message: 'Bid dismissed successfully.' });

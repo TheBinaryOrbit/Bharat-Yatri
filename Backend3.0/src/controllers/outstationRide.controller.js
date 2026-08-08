@@ -19,6 +19,7 @@ import { validateCoordinates, parseRideStatuses } from '../utils/validate.js';
 import { buildTrackingUrl } from '../utils/trackingUrl.js';
 import { OUTSTATION_RIDE_STATUSES } from '../constants/ride.constants.js';
 import { emitToDriver, emitToUser } from '../socket/emitters.js';
+import { notifyDriver, notifyUser } from '../notifications/index.js';
 import { openRideRoom, closeRideRoom } from '../socket/rideRoom.js';
 
 // A single fixed sweep rather than the expanding rings QuickRide uses. Expressed in the ring
@@ -675,6 +676,16 @@ export class OutstationRideController {
         arrivingAt: started.arrivingAt,
       });
 
+      // Rider only — and this is the most valuable push in the outstation flow. A trip booked days
+      // ago goes quiet until this moment; "your driver is on the way" is the first thing the rider
+      // has heard since they picked a bid, and their app is certainly closed.
+      // The share link is left out on purpose: it is a credential, and a lock screen is not a
+      // place to put one. The socket payload and GET /outstation-rides/:id still carry it.
+      notifyUser(started.bookedBy?._id ?? started.bookedBy, 'outstation:started', {
+        rideId: String(started._id),
+        arrivingAt: started.arrivingAt,
+      });
+
       return res.status(200).json({
         message: 'On your way. The rider can now track you.',
         ride: started,
@@ -734,6 +745,9 @@ export class OutstationRideController {
       emitToUser(pickedUp.bookedBy?._id ?? pickedUp.bookedBy, 'outstation:picked_up', payload);
       emitToDriver(pickedUp.assignedTo?._id ?? pickedUp.assignedTo, 'outstation:picked_up', payload);
 
+      // Rider only. The driver just typed the OTP in.
+      notifyUser(pickedUp.bookedBy?._id ?? pickedUp.bookedBy, 'outstation:picked_up', payload);
+
       // The approach leg is over, so the tracking window closes with it. The service already
       // nulled the token inside the atomic update; this tears down the room, which does three
       // things at once — it tells any share-link viewer the trip has started, evicts them, and
@@ -771,6 +785,9 @@ export class OutstationRideController {
       };
       emitToUser(completed.bookedBy?._id ?? completed.bookedBy, 'outstation:completed', payload);
       emitToDriver(completed.assignedTo?._id ?? completed.assignedTo, 'outstation:completed', payload);
+
+      // Rider only, for the same reason — the driver tapped this button.
+      notifyUser(completed.bookedBy?._id ?? completed.bookedBy, 'outstation:completed', payload);
 
       // Already torn down at pickup — kept so a future status change cannot leave a room open.
       await closeRideRoom(completed._id, 'completed');
@@ -824,6 +841,18 @@ export class OutstationRideController {
         emitToDriver(cancelled.assignedTo?._id ?? cancelled.assignedTo, 'outstation:ride_cancelled', payload);
       }
       if (isDriver) emitToUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'outstation:ride_cancelled', payload);
+
+      // A SET, minus whoever did the cancelling — see the identical block in
+      // quickRide.controller.js for why the socket emits above may overlap and these must not.
+      const actorId = String(req.user._id);
+      const cancelledDriverIds = new Set(
+        [...doomed.map((bid) => bid.requestedBy), isRider ? cancelled.assignedTo : null]
+          .map((id) => String(id?._id ?? id ?? ''))
+          .filter((id) => id && id !== actorId)
+      );
+
+      cancelledDriverIds.forEach((driverId) => notifyDriver(driverId, 'outstation:ride_cancelled', payload));
+      if (isDriver) notifyUser(cancelled.bookedBy?._id ?? cancelled.bookedBy, 'outstation:ride_cancelled', payload);
 
       // Everyone else the ride was ever pushed to. Bidders were just told above, and the assigned
       // driver either was too or is the one doing the cancelling — excluding both leaves exactly

@@ -99,6 +99,36 @@ export const env = {
   // How long before an outstation pickup a driver stops being offered QuickRides. They keep
   // earning right up to this line, then they are reserved until the outstation ride is terminal.
   OUTSTATION_QUICKRIDE_BLOCK_MINUTES: Number(process.env.OUTSTATION_QUICKRIDE_BLOCK_MINUTES || 120),
+
+  // Firebase Cloud Messaging — push notifications.
+  //
+  // Only these three of the FIREBASE_* keys in .env are read: they are the whole of what
+  // admin.credential.cert() consumes. The rest (client id, auth/token URIs, cert URLs) belong to
+  // the downloaded service-account JSON and the Admin SDK derives or ignores every one of them.
+  //
+  // The private key is stored as a single line with literal \n escapes, which is the only way a
+  // PEM survives a .env file. dotenv unescapes those for a double-quoted value, but an unquoted
+  // or re-exported copy would not, so the replace below is the belt to that braces.
+  FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+  FIREBASE_CLIENT_EMAIL: process.env.FIREBASE_CLIENT_EMAIL,
+  FIREBASE_PRIVATE_KEY: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+
+  // Kill switch. Push is disabled outright when false — every notify() call becomes a no-op,
+  // which is what you want in a test run that must not fan out to real devices.
+  PUSH_ENABLED: String(process.env.PUSH_ENABLED ?? 'true') !== 'false',
+
+  // How long before an outstation pickup the assigned driver is reminded, in minutes.
+  // Read as a descending ladder; the sweeper fires the tightest one that is due and quietly
+  // swallows any wider one it has slept past, so a restart cannot deliver three at once.
+  OUTSTATION_REMINDER_OFFSETS_MINUTES: String(process.env.OUTSTATION_REMINDER_OFFSETS_MINUTES || '180,120,60,30')
+    .split(',')
+    .map((minutes) => Number(String(minutes).trim()))
+    .filter((minutes) => Number.isFinite(minutes) && minutes > 0)
+    .sort((a, b) => a - b),
+
+  // The reminder sweep is minute-grained by nature — a 3-hour reminder does not care about
+  // seconds — so it runs on its own far slower interval than the expiry sweeper.
+  REMINDER_SWEEP_INTERVAL_MS: Number(process.env.REMINDER_SWEEP_INTERVAL_MS || 60000),
 };
 
 // Fail fast if critical env vars are missing
