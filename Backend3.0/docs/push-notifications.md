@@ -103,9 +103,9 @@ that would have been `null` are omitted rather than sent as `"null"`.
 `driver_ride_history`, `driver_kyc`, `user_ride_bids`, `user_active_ride`,
 `user_ride_history`.
 
-### `quickride.new` carries the whole card
+### `quickride.new` and `outstation.new` carry the whole card
 
-Most `data` blocks are a navigation hint. This one is not: a driver's ride offer
+Most `data` blocks are a navigation hint. These two are not: a driver's ride offer
 has to be renderable — and countable-down — from a cold start, before any fetch
 returns.
 
@@ -147,6 +147,11 @@ Do **not** count down from a locally-captured receipt time: the push may have sa
 in Firebase, or the phone may have been dozing. `expiresAt` is the only honest
 clock.
 
+`outstation.new` carries every field above with `"rideType": "outstation"`, plus
+the two only a scheduled trip has — `bookingType` (`"now"` / `"later"`) and
+`pickupAt`. Its `expiresAt` is the end of the auction, which for a `later` trip
+is the earlier of the 24-hour TTL and departure, not a 5-minute countdown.
+
 ---
 
 ## Driver notifications
@@ -161,7 +166,7 @@ clock.
 | `quickride.ride_taken` | Another driver won — *bidders only* | `bidId` |
 | `quickride.expired` | The ride expired — *bidders only* | — |
 | `quickride.cancelled` | The **rider** cancelled | `cancelledBy` |
-| `outstation.new` | An outstation trip is dispatched to you | `offeredFare`, `bookingType`, `pickupAt` |
+| `outstation.new` | An outstation trip is dispatched to you | `offeredFare`, `expiresAt`, `pickup`, `drop`, `estimatedDistanceKm`, `distanceFromDriverKm`, `minFare`, `maxFare`, `bookingType`, `pickupAt` |
 | `outstation.fare_updated` | The rider raised their offer | `offeredFare`, `pickupAt` |
 | `outstation.bid_accepted` | **You won the trip** | `finalFare`, `pickupAt` |
 | `outstation.bid_rejected` | The rider dismissed your bid | `bidId` |

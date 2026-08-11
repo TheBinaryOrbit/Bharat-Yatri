@@ -286,6 +286,11 @@ export const NOTIFICATION_TEMPLATES = {
   // ===========================================================================================
   // Outstation — work offered to drivers
   // ===========================================================================================
+  // Carries the whole trip card, for the same reason `ride:request` does: this is the only push a
+  // driver gets for a trip they have not bid on, and it must render from a cold start without a
+  // fetch. Same fields as the QuickRide card plus what only a scheduled trip has — `bookingType`
+  // and `pickupAt`. `buildOutstationRequestPayload` spreads the QuickRide payload, so every field
+  // read here is already on the wire.
   'outstation:request': {
     driver: (payload) => ({
       type: NOTIFICATION_TYPES.OUTSTATION_NEW,
@@ -295,6 +300,13 @@ export const NOTIFICATION_TEMPLATES = {
         rideType: RIDE_TYPE_OUTSTATION,
         rideId: rideId(payload),
         offeredFare: payload.offeredFare,
+        expiresAt: payload.expiresAt,
+        pickup: shortPlace(payload.pickupLocationName),
+        drop: shortPlace(payload.dropLocationName),
+        estimatedDistanceKm: km(payload.estimatedDistanceKm),
+        distanceFromDriverKm: km(payload.distanceFromDriverKm),
+        minFare: payload.bidBounds?.min,
+        maxFare: payload.bidBounds?.max,
         bookingType: payload.bookingType,
         pickupAt: payload.pickupAt,
         screen: NOTIFICATION_SCREENS.DRIVER_RIDE_REQUESTS,
