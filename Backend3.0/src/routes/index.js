@@ -14,6 +14,7 @@ import reviewRoutes from './review.routes.js';
 import quickDestinationRoutes from './quickDestination.routes.js';
 import notificationRoutes from './notification.routes.js';
 import settingRoutes from './setting.routes.js';
+import installReferrerRoutes from './installReferrer.routes.js';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/reviews', reviewRoutes);
 router.use('/quick-destinations', quickDestinationRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/settings', settingRoutes);
+router.use('/install-referrers', installReferrerRoutes);
 
 export default router;
