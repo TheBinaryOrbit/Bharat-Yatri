@@ -1,6 +1,7 @@
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import sharp from 'sharp';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,60 @@ const imageFilter = (pattern, label) => (req, file, cb) => {
   cb(err);
 };
 
+const IMAGE_COMPRESSION_RATIO = 0.3; // Keep 30% quality => ~70% compression target
+
+const compressSingleImage = async (file) => {
+  const ext = path.extname(file.filename).toLowerCase();
+  const tempOutputPath = `${file.path}.tmp`;
+  const baseImage = sharp(file.path).rotate();
+
+  if (ext === '.jpg' || ext === '.jpeg') {
+    await baseImage.jpeg({ quality: Math.round(IMAGE_COMPRESSION_RATIO * 100) }).toFile(tempOutputPath);
+  } else if (ext === '.png') {
+    await baseImage.png({ compressionLevel: 9, adaptiveFiltering: true }).toFile(tempOutputPath);
+  } else if (ext === '.webp') {
+    await baseImage.webp({ quality: Math.round(IMAGE_COMPRESSION_RATIO * 100) }).toFile(tempOutputPath);
+  } else {
+    return;
+  }
+
+  await fs.promises.rename(tempOutputPath, file.path);
+};
+
+const collectUploadedFiles = (req) => {
+  if (req.file) {
+    return [req.file];
+  }
+  if (!req.files) {
+    return [];
+  }
+  if (Array.isArray(req.files)) {
+    return req.files;
+  }
+  return Object.values(req.files).flat();
+};
+
+const compressUploadedImages = async (req, res, next) => {
+  const uploadedFiles = collectUploadedFiles(req);
+  try {
+    await Promise.all(uploadedFiles.map((file) => compressSingleImage(file)));
+    next();
+  } catch (error) {
+    const err = new Error(`Failed to compress uploaded image: ${error.message}`);
+    err.statusCode = 500;
+    next(err);
+  }
+};
+
+const withImageCompression = (middleware) => (req, res, next) => {
+  middleware(req, res, (err) => {
+    if (err) {
+      return next(err);
+    }
+    compressUploadedImages(req, res, next);
+  });
+};
+
 export const upload = multer({
   storage,
   fileFilter: imageFilter(/jpeg|jpg|png|webp/, 'image (jpeg, jpg, png, webp)'),
@@ -49,31 +104,31 @@ export const uploadPng = multer({
 // --- Convenience middlewares per flow ---
 
 // User registration: a single profile image
-export const uploadUserProfile = upload.single('profileImage');
+export const uploadUserProfile = withImageCompression(upload.single('profileImage'));
 
 // Vehicle type: a single PNG icon
-export const uploadVehicleTypeIcon = uploadPng.single('icon');
+export const uploadVehicleTypeIcon = withImageCompression(uploadPng.single('icon'));
 
 // Vehicle registration: up to 3 vehicle images + RC front/back
-export const uploadVehicleDocs = upload.fields([
+export const uploadVehicleDocs = withImageCompression(upload.fields([
   { name: 'vehicleImages', maxCount: 3 },
   { name: 'rcFrontImage', maxCount: 1 },
   { name: 'rcBackImage', maxCount: 1 },
-]);
+]));
 
 // Driver profile edit: photo + DL images (no vehicle files)
-export const uploadDriverDocs = upload.fields([
+export const uploadDriverDocs = withImageCompression(upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'dlFrontImage', maxCount: 1 },
   { name: 'dlBackImage', maxCount: 1 },
-]);
+]));
 
 // Full driver onboarding: driver documents + vehicle documents in one request
-export const uploadDriverOnboarding = upload.fields([
+export const uploadDriverOnboarding = withImageCompression(upload.fields([
   { name: 'profileImage', maxCount: 1 },
   { name: 'dlFrontImage', maxCount: 1 },
   { name: 'dlBackImage', maxCount: 1 },
   { name: 'vehicleImages', maxCount: 3 },
   { name: 'rcFrontImage', maxCount: 1 },
   { name: 'rcBackImage', maxCount: 1 },
-]);
+]));
