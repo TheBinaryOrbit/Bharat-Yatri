@@ -6,7 +6,7 @@ export class KycService {
   // `callbackUrl` is where Signzy posts the result (must include the account id).
   createDigilockerUrl = async (callbackUrl) => {
 
-    console.log('Creating Signzy DigiLocker URL with callback:', env.SIGNZY_SUCCESS_URL);
+    console.log('Creating Signzy DigiLocker URL with callback:', env.SIGNZY_CALLBACK_URL);
     // console.log('Creating Signzy DigiLocker URL with callback:', callbackUrl);
     const { data } = await axios.post(
       `${env.SIGNZY_BASE_URL}/api/v3/digilocker/createUrl`,
