@@ -13,6 +13,12 @@ router
 
 // '/me' must precede '/:id' so it isn't captured as an id
 router.get('/me', protect, authorize('user'), userController.getMe);
+
+// SOS contact — separate get / update / delete on the caller's own record
+router.get('/me/sos-contact', protect, authorize('user'), userController.getSosContact);
+router.put('/me/sos-contact', protect, authorize('user'), userController.updateSosContact);
+router.delete('/me/sos-contact', protect, authorize('user'), userController.deleteSosContact);
+
 router.route('/:id').get(userController.getUserById);
 
 export default router;

@@ -44,7 +44,7 @@ const humanizeMinutes = (minutes) => {
 };
 
 // "Andheri East → Bandra West", trimmed of the long tail Google returns.
-const shortPlace = (name) => String(name || '').split(',')[0].trim();
+const shortPlace = (name) => String(name || '');
 
 // Distances go out as data, and a raw Redis GEO result is 2.4000000000000004. One decimal is the
 // most an app would ever render, and it keeps the string the app parses short and stable.

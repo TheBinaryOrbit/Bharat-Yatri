@@ -25,6 +25,13 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // Number to alert if something goes wrong during a ride. No default, so an
+    // unset contact reads as `undefined` rather than an empty string.
+    sosContact: {
+      type: String,
+      trim: true,
+      match: [/^[6-9]\d{9}$/, 'SOS contact must be a 10-digit number starting with 6-9'],
+    },
   },
   { timestamps: true }
 );
