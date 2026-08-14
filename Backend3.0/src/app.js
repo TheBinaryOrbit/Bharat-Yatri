@@ -64,7 +64,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Serve uploaded files
 app.use('/uploads', express.static(UPLOAD_DIR));
-app.use('/public', express.static(path.join(__dirname, '../public')));
+app.use('/public', express.static(path.join(PUBLIC_DIR , 'public')));
 
 // Request logging (skip in test)
 if (env.NODE_ENV !== 'test') {
