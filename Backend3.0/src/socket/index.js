@@ -138,15 +138,12 @@ const registerDriverHandlers = (io, socket) => {
   // index AND, when the driver is on a ride, feeds the ride room. No second event or cadence.
   socket.on('driver:location', async ({ latitude, longitude, heading, speed } = {}) => {
     try {
-      console.log(`[loc] ping ${driverId} → ${latitude}, ${longitude} (heading=${heading ?? '—'} speed=${speed ?? '—'})`);
 
       // Invalid or implausible fixes are dropped silently — never broadcast, never stored.
       if (!isValidCoordinate(latitude, longitude)) {
-        console.log(`[loc] DROPPED ${driverId}: invalid coordinate ${latitude}, ${longitude}`);
         return;
       }
       if (!(await driverLocationService.isPlausibleJump(driverId, latitude, longitude))) {
-        console.log(`[loc] DROPPED ${driverId}: implausible jump to ${latitude}, ${longitude}`);
         return;
       }
 
