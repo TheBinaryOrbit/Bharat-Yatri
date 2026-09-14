@@ -178,7 +178,7 @@ export class DriverController {
         dob,
         gender: gender?.toLowerCase(),
         address,
-        isProfileComplete : true,
+        isProfileComplete: true,
         profileImageUrl: fileUrl('profileImage'),
         dlDetails: {
           dlNumber: dlNumber || undefined,
@@ -267,15 +267,20 @@ export class DriverController {
         })()
         : undefined;
 
-      let driver = await this.driverService.createDriver({
-        phoneNumber: phonenumber,
-        name: data.aadharDetail?.name || "unknown",
-        dob,
-        aadharCardNumber: data.aadharDetail?.uid || undefined,
-        gender: data.aadharDetail?.gender
-          ? String(data.aadharDetail.gender).toLowerCase()
-          : undefined,
-      });
+      //
+
+      let driver = await this.driverService.getDriverByPhone(phonenumber);
+      if (!driver) {
+        driver = await this.driverService.createDriver({
+          phoneNumber: phonenumber,
+          name: data.aadharDetail?.name || "unknown",
+          dob,
+          aadharCardNumber: data.aadharDetail?.uid || undefined,
+          gender: data.aadharDetail?.gender
+            ? String(data.aadharDetail.gender).toLowerCase()
+            : undefined,
+        });
+      }
 
       const { requestId, status, adharFileId, aadhaarJpeg } = this.kycService.parseCallback(req.body);
 
@@ -293,7 +298,7 @@ export class DriverController {
         // The app's own poll of GET /drivers/kyc/status/:phonenumber is what covers that case.
         notifyDriver(driver._id, 'kyc:rejected', { reason });
 
-        console.error('Invalid KYC callback data:', req.body);
+        console.error('Invalid KYC callback data:', { ...req.body, phonenumber: phonenumber });
         return res.status(400).json({ error: 'Invalid KYC callback data' });
       }
 
@@ -343,7 +348,7 @@ export class DriverController {
       console.error('Error in completing driver kyc:', error);
       // Safety net for a race that slips past the pre-check (unique index)
       if (isDuplicateKeyError(error)) {
-        await this.driverService.updateDriver(req.params.phonenumber, {
+        await this.driverService.updateDriver({ phoneNumber: req.params.phonenumber }, {
           isKycCompleted: false,
           name: 'unknown',
           kycDetails: {
