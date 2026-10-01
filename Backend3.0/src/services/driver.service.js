@@ -21,8 +21,12 @@ export class DriverService {
     return Driver.create(driverData);
   };
 
-  updateDriver = async (id, updateData) => {
-    return Driver.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+  updateDriver = async (id, updateData, options = {}) => {
+    return Driver.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+      ...options,
+    });
   };
 
   updateFcmToken = async (phoneNumber, fcmToken) => {

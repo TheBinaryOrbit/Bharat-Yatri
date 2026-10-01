@@ -8,6 +8,7 @@ import { isDuplicateKeyError, duplicateKeyInfo } from '../utils/duplicateKey.js'
 import { generateToken } from '../utils/token.js';
 import { notifyDriver } from '../notifications/index.js';
 import { env } from '../config/env.js';
+import mongoose from 'mongoose';
 
 export class DriverController {
   constructor() {
@@ -158,7 +159,7 @@ export class DriverController {
       });
     }
 
-    // Pre-checks so we don't create a driver we'd have to roll back
+    // Pre-checks so the transaction only contains the driver and vehicle writes.
     try {
       const vehicleType = await resolveVehicleType(vehicleTypeId);
 
@@ -170,47 +171,52 @@ export class DriverController {
       const fileUrl = (field) => (files[field]?.[0] ? buildFileUrl(req, files[field][0].filename) : '');
       const vehicleImages = (files.vehicleImages || []).map((f) => buildFileUrl(req, f.filename));
 
-      // 1) update the driver
-      const driver = await this.driverService.updateDriver(userid, {
-        name,
-        email,
-        phoneNumber,
-        dob,
-        gender: gender?.toLowerCase(),
-        address,
-        isProfileComplete: true,
-        profileImageUrl: fileUrl('profileImage'),
-        dlDetails: {
-          dlNumber: dlNumber || undefined,
-          dlFrontImageUrl: fileUrl('dlFrontImage'),
-          dlBackImageUrl: fileUrl('dlBackImage'),
-        },
-      }, { new: true, upsert: true, setDefaultsOnInsert: true });
-
-      // 2) Create the vehicle — roll the driver back if this fails
+      const session = await mongoose.startSession();
+      let driver;
       let vehicle;
       try {
-        vehicle = await this.vehicleService.createVehicle({
-          driverId: driver._id,
-          vehicleTypeId: vehicleType._id,
-          vehicleNumber,
-          vehicleName,
-          seatingCapacity,
-          manufactureYear,
-          insuranceExpiry: {
-            month: insuranceExpiryMonth ? Number(insuranceExpiryMonth) : undefined,
-            year: insuranceExpiryYear ? Number(insuranceExpiryYear) : undefined,
-          },
-          vehicleImages,
-          rcDetails: {
-            frontImageUrl: fileUrl('rcFrontImage'),
-            backImageUrl: fileUrl('rcBackImage'),
-          },
+        await session.withTransaction(async () => {
+          // Both writes use this session, so either both commit or both roll back.
+          driver = await this.driverService.updateDriver(userid, {
+            name,
+            email,
+            phoneNumber,
+            dob,
+            gender: gender?.toLowerCase(),
+            address,
+            isProfileComplete: true,
+            profileImageUrl: fileUrl('profileImage'),
+            dlDetails: {
+              dlNumber: dlNumber || undefined,
+              dlFrontImageUrl: fileUrl('dlFrontImage'),
+              dlBackImageUrl: fileUrl('dlBackImage'),
+            },
+          }, {
+            upsert: true,
+            setDefaultsOnInsert: true,
+            session,
+          });
+
+          vehicle = await this.vehicleService.createVehicle({
+            driverId: driver._id,
+            vehicleTypeId: vehicleType._id,
+            vehicleNumber,
+            vehicleName,
+            seatingCapacity,
+            manufactureYear,
+            insuranceExpiry: {
+              month: insuranceExpiryMonth ? Number(insuranceExpiryMonth) : undefined,
+              year: insuranceExpiryYear ? Number(insuranceExpiryYear) : undefined,
+            },
+            vehicleImages,
+            rcDetails: {
+              frontImageUrl: fileUrl('rcFrontImage'),
+              backImageUrl: fileUrl('rcBackImage'),
+            },
+          }, { session });
         });
-      } catch (vehicleError) {
-        // Compensate: remove the just-created driver so we don't leave an orphan
-        await this.driverService.deleteDriver(driver._id);
-        throw vehicleError;
+      } finally {
+        await session.endSession();
       }
 
       return res.status(201).json({

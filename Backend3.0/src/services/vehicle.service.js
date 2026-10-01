@@ -22,7 +22,11 @@ export class VehicleService {
     return Vehicle.findOne({ vehicleNumber });
   };
 
-  createVehicle = async (data) => {
+  createVehicle = async (data, options = {}) => {
+    if (options.session) {
+      const [vehicle] = await Vehicle.create([data], options);
+      return vehicle;
+    }
     return Vehicle.create(data);
   };
 
