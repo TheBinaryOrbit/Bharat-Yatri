@@ -76,6 +76,7 @@ export class AuthController {
 
 
       if(role =='driver' && account?.isKycCompleted == true && account?.isProfileComplete == false){
+        console.log('OTP verified but driver profile incomplete:', account);
         return res.status(200).json({
           message: 'OTP verified successfully, but Setup Incomplete.',
           userStatus: 404,
