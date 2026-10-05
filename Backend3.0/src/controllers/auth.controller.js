@@ -75,6 +75,15 @@ export class AuthController {
       const account = await resolved.findByPhone(phoneNumber);
 
 
+      if(role == 'driver' && account?.isKycCompleted == false){
+        console.log('OTP verified but driver KYC incomplete:', account);
+        return res.status(200).json({
+          message: 'OTP verified successfully, but KYC Incomplete.',
+          userStatus: 404,
+        });
+      }
+
+
       if(role =='driver' && account?.isKycCompleted == true && account?.isProfileComplete == false){
         console.log('OTP verified but driver profile incomplete:', account);
         return res.status(200).json({
