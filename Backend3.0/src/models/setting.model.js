@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { SETTING_TYPES, APP_VERSION_PATTERN, MIN_BUILD_NUMBER } from '../constants/setting.constants.js';
+import { SETTING_TYPES, APP_VERSION_PATTERN, MIN_BUILD_NUMBER, SUPPORT_PHONE_PATTERN } from '../constants/setting.constants.js';
 
 // A promotional card on the rider's home screen. Kept as a subdocument rather than its own
 // collection because banners are only ever read as one platform's short ordered list — the same
@@ -78,11 +78,33 @@ const settingSchema = new mongoose.Schema(
     },
 
     // --- Content --------------------------------------------------------------------------
-    // Where the "get started" / onboarding walkthrough lives.
-    onboardingLink: {
+    // The onboarding walkthrough is two different pages: what a driver is shown before they have
+    // been through KYC, and what they are shown once it has cleared.
+    onboardingBeforeKycUrl: {
       type: String,
       trim: true,
       default: '',
+    },
+    onboardingAfterKycUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    // How to grant the location / notification / battery permissions the app depends on.
+    permissionGuideUrl: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    // Ten digits, or empty while no support line has been set.
+    supportPhoneNumber: {
+      type: String,
+      trim: true,
+      default: '',
+      validate: {
+        validator: (value) => value === '' || SUPPORT_PHONE_PATTERN.test(value),
+        message: 'Support phone number must be exactly 10 digits',
+      },
     },
     // HTML, rendered in a webview on the home screen. Same storage decision as appContent.content:
     // the apps render markup they are given rather than modelling every block type here.

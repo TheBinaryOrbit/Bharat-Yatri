@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ONBOARDING_STEPS } from '../constants/driver.constants.js';
 
 const dlDetailsSchema = new mongoose.Schema(
   {
@@ -86,6 +87,15 @@ const driverSchema = new mongoose.Schema(
     isProfileComplete: {
       type: Boolean,
       default: false,
+    },
+    // The last onboarding step the driver finished: 0 none, 1 personal, 2 licence, 3 vehicle.
+    // Each step is saved as it is submitted, so this is what lets a driver who closed the app
+    // half way pick up where they stopped. isProfileComplete flips to true together with step 3.
+    onboardingStep: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: ONBOARDING_STEPS.length,
     },
     kycFailedReason: {
       type: String,

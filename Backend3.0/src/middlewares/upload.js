@@ -123,6 +123,16 @@ export const uploadDriverDocs = withImageCompression(upload.fields([
   { name: 'dlBackImage', maxCount: 1 },
 ]));
 
+// Step-wise driver onboarding. Step 3 (the vehicle) reuses uploadVehicleDocs above.
+export const uploadDriverPersonal = withImageCompression(upload.fields([
+  { name: 'profileImage', maxCount: 1 },
+]));
+
+export const uploadDriverLicence = withImageCompression(upload.fields([
+  { name: 'dlFrontImage', maxCount: 1 },
+  { name: 'dlBackImage', maxCount: 1 },
+]));
+
 // Full driver onboarding: driver documents + vehicle documents in one request
 export const uploadDriverOnboarding = withImageCompression(upload.fields([
   { name: 'profileImage', maxCount: 1 },

@@ -2,6 +2,7 @@ import { OTPService } from '../services/otp.service.js';
 import { UserService } from '../services/user.service.js';
 import { DriverService } from '../services/driver.service.js';
 import { generateToken } from '../utils/token.js';
+import { onboardingProgress } from '../utils/onboardingProgress.js';
 
 export class AuthController {
   constructor() {
@@ -86,9 +87,17 @@ export class AuthController {
 
       if(role =='driver' && account?.isKycCompleted == true && account?.isProfileComplete == false){
         console.log('OTP verified but driver profile incomplete:', account);
+        // The OTP is verified and the account exists, so the driver gets a token here and can go
+        // straight back to the onboarding step they stopped at. userStatus stays 404 so the app
+        // still routes to the registration screens rather than Home.
+        const updated = await this.driverService.updateFcmToken(phoneNumber, fcmToken || account.fcmToken);
         return res.status(200).json({
-          message: 'OTP verified successfully, but Setup Incomplete.',
+           message: 'OTP verified successfully, but Setup Incomplete.',
           userStatus: 404,
+          token: generateToken({ id: updated._id, role }),
+          role,
+          onboarding: onboardingProgress(updated),
+          user: updated,
         });
       }
 

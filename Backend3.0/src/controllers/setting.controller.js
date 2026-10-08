@@ -1,6 +1,12 @@
 import { SettingService } from '../services/setting.service.js';
 import { isDuplicateKeyError } from '../utils/duplicateKey.js';
-import { SETTING_TYPES, APP_VERSION_PATTERN, MIN_BUILD_NUMBER } from '../constants/setting.constants.js';
+import {
+  SETTING_TYPES,
+  APP_VERSION_PATTERN,
+  MIN_BUILD_NUMBER,
+  SUPPORT_PHONE_PATTERN,
+  SETTING_URL_FIELDS,
+} from '../constants/setting.constants.js';
 
 // What the apps see. Parked banners are filtered out and the rest are ordered here rather than in
 // the app, so two platforms cannot drift on how they sort. The admin list read returns the raw
@@ -11,7 +17,10 @@ const shape = (setting) => ({
   appVersion: setting.appVersion,
   appBuildNumber: setting.appBuildNumber,
   isUpdateMandatory: setting.isUpdateMandatory,
-  onboardingLink: setting.onboardingLink,
+  onboardingBeforeKycUrl: setting.onboardingBeforeKycUrl,
+  onboardingAfterKycUrl: setting.onboardingAfterKycUrl,
+  permissionGuideUrl: setting.permissionGuideUrl,
+  supportPhoneNumber: setting.supportPhoneNumber,
   homePageContent: setting.homePageContent,
   userPromotionalBanners: (setting.userPromotionalBanners || [])
     .filter((banner) => banner.isActive)
@@ -54,6 +63,17 @@ const validate = (body, { requireAll }) => {
     errors.push({ field: 'isUpdateMandatory', message: 'isUpdateMandatory must be true or false' });
   }
 
+  SETTING_URL_FIELDS.forEach((field) => {
+    if (body[field] !== undefined && body[field] !== null && typeof body[field] !== 'string') {
+      errors.push({ field, message: `${field} must be a string` });
+    }
+  });
+
+  // An empty string is let through — it is how an admin clears the number.
+  if (has('supportPhoneNumber') && !SUPPORT_PHONE_PATTERN.test(String(body.supportPhoneNumber).trim())) {
+    errors.push({ field: 'supportPhoneNumber', message: 'Support phone number must be exactly 10 digits' });
+  }
+
   // The array is replaced wholesale, never merged — a PATCH carrying three banners leaves exactly
   // those three. Anything else makes deleting the middle banner impossible to express.
   if (body.userPromotionalBanners !== undefined) {
@@ -77,12 +97,23 @@ const validate = (body, { requireAll }) => {
 // Only these ever reach the document. `type` is excluded on update: it is the key the row is
 // found by, and letting a PATCH rewrite it turns "edit android" into "make a second ios".
 const pickWritable = (body) => {
-  const fields = ['appVersion', 'appBuildNumber', 'isUpdateMandatory', 'onboardingLink', 'homePageContent', 'userPromotionalBanners'];
+  const fields = [
+    'appVersion',
+    'appBuildNumber',
+    'isUpdateMandatory',
+    ...SETTING_URL_FIELDS,
+    'supportPhoneNumber',
+    'homePageContent',
+    'userPromotionalBanners',
+  ];
   const update = {};
 
   fields.forEach((field) => {
     if (body[field] !== undefined) update[field] = body[field];
   });
+
+  // Some clients send it as a number; it is stored as the string the pattern is checked against.
+  if (update.supportPhoneNumber != null) update.supportPhoneNumber = String(update.supportPhoneNumber).trim();
 
   return update;
 };

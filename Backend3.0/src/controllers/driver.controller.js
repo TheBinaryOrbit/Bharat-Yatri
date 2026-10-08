@@ -8,7 +8,38 @@ import { isDuplicateKeyError, duplicateKeyInfo } from '../utils/duplicateKey.js'
 import { generateToken } from '../utils/token.js';
 import { notifyDriver } from '../notifications/index.js';
 import { env } from '../config/env.js';
+import { onboardingProgress } from '../utils/onboardingProgress.js';
 import mongoose from 'mongoose';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Onboarding steps are for getting a driver to a finished profile. Once it is finished, edits go
+// through PATCH /drivers/me and PATCH /vehicles/:id, which do not touch the onboarding state.
+const alreadyOnboarded = (res, driver) =>
+  res.status(409).json({
+    message: 'Onboarding is already complete. Edit your profile instead.',
+    onboarding: onboardingProgress(driver),
+  });
+
+// A step submitted before the one ahead of it. `onboarding.nextStep` tells the app where to go.
+const stepOutOfOrder = (res, driver, message) =>
+  res.status(409).json({ message, onboarding: onboardingProgress(driver) });
+
+// Duplicate keys and schema validation failures are the driver's to fix, not a 500.
+const onboardingError = (res, error) => {
+  console.log(error);
+  if (isDuplicateKeyError(error)) {
+    const { field, label, message } = duplicateKeyInfo(error);
+    return res.status(409).json({ message: `${label} already registered`, errors: [{ field, message }] });
+  }
+  if (error?.name === 'ValidationError') {
+    return res.status(400).json({
+      message: 'Some details are invalid',
+      errors: Object.values(error.errors).map((e) => ({ field: e.path, message: e.message })),
+    });
+  }
+  return res.status(500).json({ error: 'Failed to save onboarding details', message: 'Internal server error' });
+};
 
 export class DriverController {
   constructor() {
@@ -112,7 +143,221 @@ export class DriverController {
     }
   };
 
+  // GET /api/v3/drivers/onboard/status  (protected — driver only)
+  // What the app calls on launch to resume: which step is next, plus everything saved so far so
+  // the earlier screens can be shown pre-filled.
+  getOnboardingStatus = async (req, res) => {
+    try {
+      const vehicle = await this.vehicleService.getVehicleByDriver(req.user._id);
+      return res.status(200).json({
+        onboarding: onboardingProgress(req.user),
+        driver: req.user,
+        vehicle,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ error: 'Failed to fetch onboarding status', message: 'Internal server error' });
+    }
+  };
+
+  // POST /api/v3/drivers/onboard/personal  (protected — driver only) — step 1 of 3
+  // multipart/form-data: name, email, phoneNumber, dob, gender + profileImage
+  // Saved on its own, so nothing here is lost if the driver quits before step 2. Re-submitting
+  // overwrites the saved values and never moves the driver backwards.
+  savePersonalDetails = async (req, res) => {
+    const driver = req.user;
+    const { name, email, phoneNumber, dob, gender } = req.body;
+    const files = req.files || {};
+
+    if (onboardingProgress(driver).isComplete) return alreadyOnboarded(res, driver);
+
+    const errors = [];
+    if (!name || !String(name).trim()) errors.push({ field: 'name', message: 'Name is required' });
+
+    if (!dob) {
+      errors.push({ field: 'dob', message: 'Date of birth is required' });
+    } else if (Number.isNaN(Date.parse(dob))) {
+      errors.push({ field: 'dob', message: 'Date of birth must be a valid date (YYYY-MM-DD)' });
+    } else if (Date.parse(dob) > Date.now()) {
+      errors.push({ field: 'dob', message: 'Date of birth cannot be in the future' });
+    }
+
+    // Only required the first time — a re-submit may keep the photo already on file.
+    if (!files.profileImage?.[0] && !driver.profileImageUrl) {
+      errors.push({ field: 'profileImage', message: 'Profile photo is required' });
+    }
+
+    if (gender && !String(gender).match(/^(male|female|other)$/i)) {
+      errors.push({ field: 'gender', message: 'Gender must be one of: male, female, other' });
+    }
+
+    if (email && !EMAIL_PATTERN.test(String(email).trim())) {
+      errors.push({ field: 'email', message: 'Email is invalid' });
+    }
+
+    // The number is the account's verified login identity and is never written from the body.
+    // It is accepted only so the form can post it; a different number is a mistake, not an edit.
+    if (phoneNumber && String(phoneNumber).trim() !== driver.phoneNumber) {
+      errors.push({ field: 'phoneNumber', message: 'Phone number must be the one this account was verified with' });
+    }
+
+    if (errors.length) {
+      return res.status(400).json({ message: 'Invalid personal details', errors });
+    }
+
+    const updates = { name: String(name).trim(), dob };
+    if (email) updates.email = String(email).trim();
+    if (gender) updates.gender = String(gender).toLowerCase();
+    if (files.profileImage?.[0]) updates.profileImageUrl = buildFileUrl(req, files.profileImage[0].filename);
+
+    try {
+      const updated = await this.driverService.updateDriver(driver._id, {
+        $set: updates,
+        $max: { onboardingStep: 1 },
+      });
+      return res.status(200).json({
+        message: 'Personal details saved.',
+        onboarding: onboardingProgress(updated),
+        driver: updated,
+      });
+    } catch (error) {
+      return onboardingError(res, error);
+    }
+  };
+
+  // POST /api/v3/drivers/onboard/licence  (protected — driver only) — step 2 of 3
+  // multipart/form-data: dlNumber + dlFrontImage, dlBackImage
+  saveLicenceDetails = async (req, res) => {
+    const driver = req.user;
+    const files = req.files || {};
+    const progress = onboardingProgress(driver);
+
+    if (progress.isComplete) return alreadyOnboarded(res, driver);
+    if (progress.completedStep < 1) {
+      return stepOutOfOrder(res, driver, 'Complete your personal details before adding your driving licence');
+    }
+
+    // As with the photo in step 1, anything already on file may be left out of a re-submit.
+    const dlNumber = String(req.body.dlNumber ?? '').trim() || driver.dlDetails?.dlNumber;
+
+    const errors = [];
+    if (!dlNumber) errors.push({ field: 'dlNumber', message: 'Driving licence number is required' });
+    if (!files.dlFrontImage?.[0] && !driver.dlDetails?.dlFrontImageUrl) {
+      errors.push({ field: 'dlFrontImage', message: 'Driving licence front image is required' });
+    }
+    if (!files.dlBackImage?.[0] && !driver.dlDetails?.dlBackImageUrl) {
+      errors.push({ field: 'dlBackImage', message: 'Driving licence back image is required' });
+    }
+    if (errors.length) {
+      return res.status(400).json({ message: 'Invalid driving licence details', errors });
+    }
+
+    // Dot notation so a re-submit carrying only one image leaves the other in place
+    const updates = { 'dlDetails.dlNumber': dlNumber };
+    if (files.dlFrontImage?.[0]) updates['dlDetails.dlFrontImageUrl'] = buildFileUrl(req, files.dlFrontImage[0].filename);
+    if (files.dlBackImage?.[0]) updates['dlDetails.dlBackImageUrl'] = buildFileUrl(req, files.dlBackImage[0].filename);
+
+    try {
+      const updated = await this.driverService.updateDriver(driver._id, {
+        $set: updates,
+        $max: { onboardingStep: 2 },
+      });
+      return res.status(200).json({
+        message: 'Driving licence details saved.',
+        onboarding: onboardingProgress(updated),
+        driver: updated,
+      });
+    } catch (error) {
+      return onboardingError(res, error);
+    }
+  };
+
+  // POST /api/v3/drivers/onboard/vehicle  (protected — driver only) — step 3 of 3
+  // multipart/form-data: vehicle fields + vehicleImages[] (≤3), rcFrontImage, rcBackImage
+  // Creates the driver's one vehicle and marks the profile complete, in one transaction.
+  saveVehicleDetails = async (req, res) => {
+    const driver = req.user;
+    const {
+      vehicleTypeId, vehicleNumber, vehicleName, ownerName, seatingCapacity,
+      manufactureYear, insuranceExpiryMonth, insuranceExpiryYear,
+    } = req.body;
+    const files = req.files || {};
+    const progress = onboardingProgress(driver);
+
+    if (progress.isComplete) return alreadyOnboarded(res, driver);
+    if (progress.completedStep < 2) {
+      return stepOutOfOrder(res, driver, 'Complete your personal and driving licence details before adding a vehicle');
+    }
+
+    const errors = [];
+    if (!vehicleTypeId) errors.push({ field: 'vehicleTypeId', message: 'Vehicle type is required' });
+    if (!vehicleNumber || !String(vehicleNumber).trim()) {
+      errors.push({ field: 'vehicleNumber', message: 'Vehicle number is required' });
+    }
+    if (errors.length) {
+      return res.status(400).json({ message: 'Invalid vehicle details', errors });
+    }
+
+    try {
+      const vehicleType = await resolveVehicleType(vehicleTypeId);
+      if (!vehicleType) {
+        return res.status(404).json({ message: 'Vehicle type not found' });
+      }
+
+      // A vehicle can already exist if it was added through POST /vehicles. The driver owns
+      // exactly one, so keep it and finish onboarding rather than fail on the unique index.
+      let vehicle = await this.vehicleService.getVehicleByDriver(driver._id);
+      const completed = { isProfileComplete: true, onboardingStep: 3 };
+      let updated;
+
+      if (vehicle) {
+        updated = await this.driverService.updateDriver(driver._id, { $set: completed });
+      } else {
+        const fileUrl = (field) => (files[field]?.[0] ? buildFileUrl(req, files[field][0].filename) : '');
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => {
+            // Both writes use this session, so either both commit or both roll back.
+            vehicle = await this.vehicleService.createVehicle({
+              driverId: driver._id,
+              vehicleTypeId: vehicleType._id,
+              vehicleNumber,
+              vehicleName,
+              ownerName,
+              seatingCapacity: seatingCapacity || undefined,
+              manufactureYear: manufactureYear || undefined,
+              insuranceExpiry: {
+                month: insuranceExpiryMonth ? Number(insuranceExpiryMonth) : undefined,
+                year: insuranceExpiryYear ? Number(insuranceExpiryYear) : undefined,
+              },
+              vehicleImages: (files.vehicleImages || []).map((f) => buildFileUrl(req, f.filename)),
+              rcDetails: {
+                frontImageUrl: fileUrl('rcFrontImage'),
+                backImageUrl: fileUrl('rcBackImage'),
+              },
+            }, { session });
+
+            updated = await this.driverService.updateDriver(driver._id, { $set: completed }, { session });
+          });
+        } finally {
+          await session.endSession();
+        }
+      }
+
+      return res.status(201).json({
+        message: 'Driver onboarded successfully.',
+        role: 'driver',
+        onboarding: onboardingProgress(updated),
+        driver: updated,
+        vehicle,
+      });
+    } catch (error) {
+      return onboardingError(res, error);
+    }
+  };
+
   // POST /api/v3/drivers/onboard
+  // Superseded by the three /onboard/* steps above; kept for app builds that still post it all at once.
   // One multipart call → creates the driver AND their vehicle, returns a JWT.
   // A driver may own exactly one vehicle, so this is the only place it's created.
   // Files: profileImage, dlFrontImage, dlBackImage, vehicleImages[] (≤3), rcFrontImage, rcBackImage
@@ -185,6 +430,7 @@ export class DriverController {
             gender: gender?.toLowerCase(),
             address,
             isProfileComplete: true,
+            onboardingStep: 3,
             profileImageUrl: fileUrl('profileImage'),
             dlDetails: {
               dlNumber: dlNumber || undefined,
@@ -331,6 +577,13 @@ export class DriverController {
       }
 
       driver = await this.driverService.updateDriver(driver._id, {
+        phoneNumber: phonenumber,
+        name: data.aadharDetail?.name || "unknown",
+        dob,
+        aadharCardNumber: data.aadharDetail?.uid || undefined,
+        gender: data.aadharDetail?.gender
+          ? String(data.aadharDetail.gender).toLowerCase()
+          : undefined,
         isKycCompleted: status === 'success',
         kycDetails: { requestId, status, adharFileId, aadhaarJpeg },
       });
@@ -379,7 +632,7 @@ export class DriverController {
 
       if (driver.isKycCompleted) {
         const token = generateToken({ id: driver._id, role: 'driver' });
-        return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, token: token });
+        return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, token: token, onboarding: onboardingProgress(driver) });
       } else {
         return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, kycFailedReason: driver.kycFailedReason });
       }

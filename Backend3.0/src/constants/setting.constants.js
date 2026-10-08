@@ -11,3 +11,10 @@ export const APP_VERSION_PATTERN = /^\d+(\.\d+){0,2}$/;
 // are compared wrong by every app that tries ("3.10.0" < "3.9.0" as a string); build numbers are
 // monotonic integers precisely so they can be compared with `<`.
 export const MIN_BUILD_NUMBER = 1;
+
+// Exactly ten digits — no +91, no spaces, no dashes. The apps hand this straight to the dialler
+// and prefix the country code themselves, the same shape every other phone number here is stored in.
+export const SUPPORT_PHONE_PATTERN = /^\d{10}$/;
+
+// The link fields, listed once so the validator and the writable list cannot drift.
+export const SETTING_URL_FIELDS = ['onboardingBeforeKycUrl', 'onboardingAfterKycUrl', 'permissionGuideUrl'];
