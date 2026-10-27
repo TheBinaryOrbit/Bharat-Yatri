@@ -3,6 +3,7 @@ import { UserService } from '../services/user.service.js';
 import { DriverService } from '../services/driver.service.js';
 import { generateToken } from '../utils/token.js';
 import { onboardingProgress } from '../utils/onboardingProgress.js';
+import { kycProgress } from '../utils/kycProgress.js';
 
 export class AuthController {
   constructor() {
@@ -49,6 +50,34 @@ export class AuthController {
     }
   };
 
+  // Driver half of POST /auth/verify, once the OTP has checked out.
+  //
+  // Order for a driver is: OTP → onboarding (personal, licence, vehicle) → home → KYC from home.
+  // So the account is created here on first login and a token is always returned; the onboarding
+  // steps need it. userStatus says where the app goes next:
+  //   404  onboarding not finished → the onboarding screens, resuming at onboarding.nextStep
+  //   200  onboarding finished     → home, which shows the KYC prompt until kyc.isVerified
+  verifyDriver = async (res, phoneNumber, fcmToken) => {
+    const account = await this.driverService.findOrCreateByPhone(phoneNumber);
+    const driver = fcmToken
+      ? await this.driverService.updateFcmToken(phoneNumber, fcmToken)
+      : account;
+
+    const onboarding = onboardingProgress(driver);
+
+    return res.status(200).json({
+      message: onboarding.isComplete
+        ? 'OTP verified successfully.'
+        : 'OTP verified successfully, but onboarding incomplete.',
+      userStatus: onboarding.isComplete ? 200 : 404,
+      token: generateToken({ id: driver._id, role: 'driver' }),
+      role: 'driver',
+      onboarding,
+      kyc: kycProgress(driver),
+      user: driver,
+    });
+  };
+
   // POST /api/v3/auth/verify  → verify OTP, return account + JWT (or userStatus 404)
   verifyOTP = async (req, res) => {
     try {
@@ -73,33 +102,11 @@ export class AuthController {
         return res.status(400).json({ error: 'Invalid or expired OTP.' });
       }
 
+      if (role === 'driver') {
+        return this.verifyDriver(res, phoneNumber, fcmToken);
+      }
+
       const account = await resolved.findByPhone(phoneNumber);
-
-
-      if(role == 'driver' && account?.isKycCompleted == false){
-        console.log('OTP verified but driver KYC incomplete:', account);
-        return res.status(200).json({
-          message: 'OTP verified successfully, but KYC Incomplete.',
-          userStatus: 404,
-        });
-      }
-
-
-      if(role =='driver' && account?.isKycCompleted == true && account?.isProfileComplete == false){
-        console.log('OTP verified but driver profile incomplete:', account);
-        // The OTP is verified and the account exists, so the driver gets a token here and can go
-        // straight back to the onboarding step they stopped at. userStatus stays 404 so the app
-        // still routes to the registration screens rather than Home.
-        const updated = await this.driverService.updateFcmToken(phoneNumber, fcmToken || account.fcmToken);
-        return res.status(200).json({
-           message: 'OTP verified successfully, but Setup Incomplete.',
-          userStatus: 404,
-          token: generateToken({ id: updated._id, role }),
-          role,
-          onboarding: onboardingProgress(updated),
-          user: updated,
-        });
-      }
 
       // OTP matched but no account yet → frontend routes to registration
       if (!account) {

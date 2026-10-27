@@ -544,7 +544,7 @@ export const NOTIFICATION_TEMPLATES = {
     driver: () => ({
       type: NOTIFICATION_TYPES.KYC_VERIFIED,
       title: 'KYC verified ✅',
-      body: 'You are verified. Complete your profile and start accepting rides.',
+      body: 'You are verified. Go online and start accepting rides.',
       data: { screen: NOTIFICATION_SCREENS.DRIVER_KYC },
     }),
   },

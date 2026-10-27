@@ -142,3 +142,9 @@ export const uploadDriverOnboarding = withImageCompression(upload.fields([
   { name: 'rcFrontImage', maxCount: 1 },
   { name: 'rcBackImage', maxCount: 1 },
 ]));
+
+// Manual KYC: photos of the Aadhaar card, front and back
+export const uploadManualKyc = withImageCompression(upload.fields([
+  { name: 'aadhaarFrontImage', maxCount: 1 },
+  { name: 'aadhaarBackImage', maxCount: 1 },
+]));

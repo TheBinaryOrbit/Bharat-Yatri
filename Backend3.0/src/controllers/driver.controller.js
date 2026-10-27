@@ -5,13 +5,31 @@ import { VehicleTypeService } from '../services/vehicleType.service.js';
 import { buildFileUrl } from '../utils/fileUrl.js';
 import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 import { isDuplicateKeyError, duplicateKeyInfo } from '../utils/duplicateKey.js';
-import { generateToken } from '../utils/token.js';
 import { notifyDriver } from '../notifications/index.js';
 import { env } from '../config/env.js';
 import { onboardingProgress } from '../utils/onboardingProgress.js';
+import { kycProgress } from '../utils/kycProgress.js';
+import { runAtomically } from '../utils/transaction.js';
+import { KYC_STATUSES } from '../constants/driver.constants.js';
 import mongoose from 'mongoose';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const KYC_ALREADY_LINKED = 'This KYC document is already linked to another account';
+
+// KYC is started from the home screen, so it needs a finished onboarding, and there is nothing
+// to do once verified. Returns the response it sent, or undefined when KYC may go ahead.
+const kycBlocked = (res, driver) => {
+  const onboarding = onboardingProgress(driver);
+  if (!onboarding.isComplete) {
+    return res.status(409).json({ message: 'Complete onboarding before starting KYC', onboarding });
+  }
+  const kyc = kycProgress(driver);
+  if (kyc.isVerified) {
+    return res.status(409).json({ message: 'KYC is already verified', kyc });
+  }
+  return undefined;
+};
 
 // Onboarding steps are for getting a driver to a finished profile. Once it is finished, edits go
 // through PATCH /drivers/me and PATCH /vehicles/:id, which do not touch the onboarding state.
@@ -151,6 +169,7 @@ export class DriverController {
       const vehicle = await this.vehicleService.getVehicleByDriver(req.user._id);
       return res.status(200).json({
         onboarding: onboardingProgress(req.user),
+        kyc: kycProgress(req.user),
         driver: req.user,
         vehicle,
       });
@@ -314,10 +333,9 @@ export class DriverController {
         updated = await this.driverService.updateDriver(driver._id, { $set: completed });
       } else {
         const fileUrl = (field) => (files[field]?.[0] ? buildFileUrl(req, files[field][0].filename) : '');
-        const session = await mongoose.startSession();
-        try {
-          await session.withTransaction(async () => {
-            // Both writes use this session, so either both commit or both roll back.
+        await runAtomically(
+          async (session) => {
+            vehicle = null;
             vehicle = await this.vehicleService.createVehicle({
               driverId: driver._id,
               vehicleTypeId: vehicleType._id,
@@ -338,16 +356,20 @@ export class DriverController {
             }, { session });
 
             updated = await this.driverService.updateDriver(driver._id, { $set: completed }, { session });
-          });
-        } finally {
-          await session.endSession();
-        }
+          },
+          // No transaction (standalone MongoDB): undo the vehicle if the driver update failed.
+          async () => {
+            if (vehicle) await this.vehicleService.deleteVehicle(vehicle._id);
+          }
+        );
       }
 
       return res.status(201).json({
         message: 'Driver onboarded successfully.',
         role: 'driver',
         onboarding: onboardingProgress(updated),
+        // Onboarding is done, so the app goes to home, which prompts for this next.
+        kyc: kycProgress(updated),
         driver: updated,
         vehicle,
       });
@@ -416,12 +438,15 @@ export class DriverController {
       const fileUrl = (field) => (files[field]?.[0] ? buildFileUrl(req, files[field][0].filename) : '');
       const vehicleImages = (files.vehicleImages || []).map((f) => buildFileUrl(req, f.filename));
 
-      const session = await mongoose.startSession();
+      // What the driver update below overwrites, so it can be put back if the vehicle fails.
+      const previous = req.user.toObject();
+      const touched = ['name', 'email', 'phoneNumber', 'dob', 'gender', 'address',
+        'isProfileComplete', 'onboardingStep', 'profileImageUrl', 'dlDetails'];
+
       let driver;
       let vehicle;
-      try {
-        await session.withTransaction(async () => {
-          // Both writes use this session, so either both commit or both roll back.
+      await runAtomically(
+        async (session) => {
           driver = await this.driverService.updateDriver(userid, {
             name,
             email,
@@ -460,10 +485,19 @@ export class DriverController {
               backImageUrl: fileUrl('rcBackImage'),
             },
           }, { session });
-        });
-      } finally {
-        await session.endSession();
-      }
+        },
+        // No transaction (standalone MongoDB): the vehicle is the second write, so if it failed
+        // only the driver needs restoring.
+        async () => {
+          const $set = {};
+          const $unset = {};
+          for (const key of touched) {
+            if (previous[key] === undefined) $unset[key] = '';
+            else $set[key] = previous[key];
+          }
+          await this.driverService.updateDriver(userid, { $set, $unset });
+        }
+      );
 
       return res.status(201).json({
         message: 'Driver onboarded successfully.',
@@ -481,17 +515,28 @@ export class DriverController {
     }
   };
 
-  // POST /api/v3/drivers/kyc/verify  (protected — driver only)
+  // --- KYC ---------------------------------------------------------------------------------
+  // KYC comes after onboarding and is started from the home screen, by one of two methods:
+  //   DigiLocker  POST /drivers/kyc/digilocker → Signzy webview → Signzy calls /kyc/callback
+  //   Manual      POST /drivers/kyc/manual with Aadhaar front + back photos → an admin reviews
+
+  // GET /api/v3/drivers/kyc/status  (protected — driver only)
+  getKycStatus = async (req, res) => {
+    return res.status(200).json({
+      kyc: kycProgress(req.user),
+      onboarding: onboardingProgress(req.user),
+    });
+  };
+
+  // POST /api/v3/drivers/kyc/digilocker  (protected — driver only), also /kyc/verify
   // Driver comes from the token; returns a Signzy DigiLocker redirect URL.
   verifyKyc = async (req, res) => {
-    try {
-      const { phoneNumber } = req.body;
+    const driver = req.user;
+    const blocked = kycBlocked(res, driver);
+    if (blocked) return blocked;
 
-      if (!phoneNumber || !String(phoneNumber).trim()) {
-        return res.status(400).json({ error: 'Phone number is required' });
-      }
-      console.log('verifyKyc called with phone:', phoneNumber);
-      const callbackUrl = `${env.SIGNZY_CALLBACK_URL}/api/v3/drivers/kyc/callback/${phoneNumber}`;
+    try {
+      const callbackUrl = `${env.SIGNZY_CALLBACK_URL}/api/v3/drivers/kyc/callback/${driver.phoneNumber}`;
 
       const redirectUrl = await this.kycService.createDigilockerUrl(callbackUrl);
       if (!redirectUrl) {
@@ -505,140 +550,208 @@ export class DriverController {
     }
   };
 
-  // POST /api/v3/drivers/kyc/callback/:phonenumber  (Signzy webhook — no token)
-  completeKyc = async (req, res) => {
+  // POST /api/v3/drivers/kyc/manual  (protected — driver only)
+  // multipart/form-data: aadhaarFrontImage, aadhaarBackImage
+  // Puts the driver in the admin review queue. Re-submitting while pending replaces the photos.
+  submitManualKyc = async (req, res) => {
+    const driver = req.user;
+    const files = req.files || {};
+    const blocked = kycBlocked(res, driver);
+    if (blocked) return blocked;
+
+    const errors = [];
+    if (!files.aadhaarFrontImage?.[0]) {
+      errors.push({ field: 'aadhaarFrontImage', message: 'Aadhaar front image is required' });
+    }
+    if (!files.aadhaarBackImage?.[0]) {
+      errors.push({ field: 'aadhaarBackImage', message: 'Aadhaar back image is required' });
+    }
+    if (errors.length) {
+      return res.status(400).json({ message: 'Both sides of the Aadhaar card are required', errors });
+    }
+
     try {
-      const { phonenumber } = req.params;
-      const data = req.body;
-
-      // create user by phone number
-      const dob = data.aadharDetail?.dob
-        ? (() => {
-          const [day, month, year] = data.aadharDetail.dob.split("/");
-          return new Date(`${year}-${month}-${day}T00:00:00.000Z`);
-        })()
-        : undefined;
-
-      //
-
-      let driver = await this.driverService.getDriverByPhone(phonenumber);
-      if (!driver) {
-        driver = await this.driverService.createDriver({
-          phoneNumber: phonenumber,
-          name: data.aadharDetail?.name || "unknown",
-          dob,
-          aadharCardNumber: data.aadharDetail?.uid || undefined,
-          gender: data.aadharDetail?.gender
-            ? String(data.aadharDetail.gender).toLowerCase()
-            : undefined,
-        });
-      }
-
-      const { requestId, status, adharFileId, aadhaarJpeg } = this.kycService.parseCallback(req.body);
-
-      if (!requestId || !status || !adharFileId || !aadhaarJpeg) {
-        const reason = 'Invalid KYC Data: missing required fields';
-
-        await this.driverService.updateDriver(driver._id, {
+      const updated = await this.driverService.updateDriver(driver._id, {
+        $set: {
+          kycMethod: 'manual',
+          kycStatus: 'pending',
           isKycCompleted: false,
-          kycFailedReason: reason,
-        });
-
-        // Best effort, and only ever reaches a driver who already has an account on a device —
-        // a re-verification or a retry. On a first-time KYC there is no fcmToken yet (the account
-        // is created by this very callback), so the send resolves to zero tokens and is skipped.
-        // The app's own poll of GET /drivers/kyc/status/:phonenumber is what covers that case.
-        notifyDriver(driver._id, 'kyc:rejected', { reason });
-
-        console.error('Invalid KYC callback data:', { ...req.body, phonenumber: phonenumber });
-        return res.status(400).json({ error: 'Invalid KYC callback data' });
-      }
-
-      // One KYC document per person: reject if this Aadhaar file is already
-      // linked to a different driver.
-      if (adharFileId) {
-        const owner = await this.driverService.getDriverByKycFileId(adharFileId);
-        if (owner && String(owner._id) !== String(driver._id)) {
-          const reason = 'This KYC document is already linked to another account';
-
-          await this.driverService.updateDriver(driver._id, {
-            isKycCompleted: false,
-            name: 'unknown',
-            kycDetails: {
-              status: 'failed',
-            },
-            kycFailedReason: reason,
-          });
-
-          notifyDriver(driver._id, 'kyc:rejected', { reason });
-
-          return res.status(409).json({ error: reason });
-        }
-      }
-
-      driver = await this.driverService.updateDriver(driver._id, {
-        phoneNumber: phonenumber,
-        name: data.aadharDetail?.name || "unknown",
-        dob,
-        aadharCardNumber: data.aadharDetail?.uid || undefined,
-        gender: data.aadharDetail?.gender
-          ? String(data.aadharDetail.gender).toLowerCase()
-          : undefined,
-        isKycCompleted: status === 'success',
-        kycDetails: { requestId, status, adharFileId, aadhaarJpeg },
+          kycFailedReason: '',
+          manualKyc: {
+            aadhaarFrontImageUrl: buildFileUrl(req, files.aadhaarFrontImage[0].filename),
+            aadhaarBackImageUrl: buildFileUrl(req, files.aadhaarBackImage[0].filename),
+            submittedAt: new Date(),
+          },
+        },
       });
 
+      return res.status(200).json({
+        message: 'Aadhaar submitted. We will verify it shortly.',
+        kyc: kycProgress(updated),
+      });
+    } catch (error) {
+      console.error('Failed to submit manual KYC:', error);
+      return res.status(500).json({ error: 'Failed to submit KYC', message: 'Internal server error' });
+    }
+  };
+
+  // POST /api/v3/drivers/kyc/callback/:phonenumber  (Signzy webhook — no token)
+  // The driver already exists: accounts are created at OTP verification, and DigiLocker can only
+  // be started by an onboarded driver.
+  completeKyc = async (req, res) => {
+    const { phonenumber } = req.params;
+    let driver;
+
+    try {
+      driver = await this.driverService.getDriverByPhone(phonenumber);
       if (!driver) {
+        console.error('KYC callback for unknown phone number:', phonenumber);
         return res.status(404).json({ error: 'Driver not found' });
       }
 
-      // The provider's verdict, in the driver's hand. `status` is Signzy's own string, so anything
-      // other than 'success' is a failure with a reason we can quote back rather than invent.
-      if (driver.isKycCompleted) {
-        notifyDriver(driver._id, 'kyc:verified', {});
-      } else {
-        notifyDriver(driver._id, 'kyc:rejected', {
-          reason: `DigiLocker verification did not succeed (${status}). Please try again.`,
-        });
+      const data = req.body;
+      const { requestId, status, adharFileId, aadhaarJpeg } = this.kycService.parseCallback(data);
+
+      if (!requestId || !status || !adharFileId || !aadhaarJpeg) {
+        console.error('Invalid KYC callback data:', { ...data, phonenumber });
+        await this.rejectDigilocker(driver, 'Invalid KYC Data: missing required fields');
+        return res.status(400).json({ error: 'Invalid KYC callback data' });
       }
+
+      // One KYC document per person: reject if this Aadhaar file is already linked to a different driver.
+      const owner = await this.driverService.getDriverByKycFileId(adharFileId);
+      if (owner && String(owner._id) !== String(driver._id)) {
+        await this.rejectDigilocker(driver, KYC_ALREADY_LINKED, { requestId, status: 'failed' });
+        return res.status(409).json({ error: KYC_ALREADY_LINKED });
+      }
+
+      // Signzy's own status string: anything other than 'success' is a failure.
+      if (status !== 'success') {
+        await this.rejectDigilocker(
+          driver,
+          `DigiLocker verification did not succeed (${status}). Please try again.`,
+          { requestId, status }
+        );
+        return res.status(200).json({ message: 'Driver KYC status updated successfully.' });
+      }
+
+      // The profile (name, dob, gender) was entered during onboarding and is left alone. The name
+      // on the Aadhaar is kept beside it so the two can be compared.
+      const updates = {
+        isKycCompleted: true,
+        kycStatus: 'verified',
+        kycMethod: 'digilocker',
+        kycFailedReason: '',
+        kycDetails: { requestId, status, adharFileId, aadhaarJpeg, aadhaarName: data.aadharDetail?.name },
+      };
+      if (data.aadharDetail?.uid) updates.aadharCardNumber = data.aadharDetail.uid;
+
+      driver = await this.driverService.updateDriver(driver._id, { $set: updates });
+      notifyDriver(driver._id, 'kyc:verified', {});
 
       return res.status(200).json({ message: 'Driver KYC status updated successfully.' });
     } catch (error) {
       console.error('Error in completing driver kyc:', error);
       // Safety net for a race that slips past the pre-check (unique index)
-      if (isDuplicateKeyError(error)) {
-        await this.driverService.updateDriver({ phoneNumber: req.params.phonenumber }, {
-          isKycCompleted: false,
-          name: 'unknown',
-          kycDetails: {
-            status: 'failed',
-          },
-          kycFailedReason: 'This KYC document is already linked to another account',
-        });
-        return res.status(409).json({ error: 'This KYC document is already linked to another account' });
+      if (isDuplicateKeyError(error) && driver) {
+        await this.rejectDigilocker(driver, KYC_ALREADY_LINKED, { status: 'failed' });
+        return res.status(409).json({ error: KYC_ALREADY_LINKED });
       }
       return res.status(500).json({ error: 'Error in completing driver kyc' });
     }
   };
 
-  checkKycStatus = async (req, res) => {
+  // Records a failed DigiLocker attempt and tells the driver why.
+  //
+  // A driver who is already verified, or whose manual photos are waiting on review, keeps that
+  // status: a failed DigiLocker try should not undo either.
+  rejectDigilocker = async (driver, reason, kycDetails) => {
+    const current = kycProgress(driver);
+    if (current.isVerified) return;
+
+    const updates = { kycFailedReason: reason };
+    if (kycDetails) updates.kycDetails = kycDetails;
+    if (!(current.status === 'pending' && current.method === 'manual')) {
+      Object.assign(updates, { kycStatus: 'rejected', kycMethod: 'digilocker', isKycCompleted: false });
+    }
+
+    await this.driverService.updateDriver(driver._id, { $set: updates });
+    notifyDriver(driver._id, 'kyc:rejected', { reason });
+  };
+
+  // GET /api/v3/drivers/kyc/manual?status=pending  (admin)
+  // The manual KYC review queue, oldest first. `status` defaults to pending.
+  listManualKycRequests = async (req, res) => {
+    const status = req.query.status || 'pending';
+    if (!KYC_STATUSES.includes(status)) {
+      return res.status(400).json({ message: `Status must be one of: ${KYC_STATUSES.join(', ')}` });
+    }
+
     try {
-      const { phonenumber } = req.params;
-      const driver = await this.driverService.getDriverByPhone(phonenumber);
+      const drivers = await this.driverService.getManualKycRequests(status);
+      return res.status(200).json({ count: drivers.length, data: drivers });
+    } catch (error) {
+      console.error('Failed to fetch manual KYC requests:', error);
+      return res.status(500).json({ error: 'Failed to fetch KYC requests', message: 'Internal server error' });
+    }
+  };
+
+  // PATCH /api/v3/drivers/:id/kyc/review  (admin)
+  // body: { decision: 'approve' | 'reject', reason }   — reason is required to reject
+  reviewManualKyc = async (req, res) => {
+    const { id } = req.params;
+    const { decision } = req.body || {};
+    const reason = String(req.body?.reason ?? '').trim();
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid driver id' });
+    }
+    const errors = [];
+    if (!['approve', 'reject'].includes(decision)) {
+      errors.push({ field: 'decision', message: "Decision must be 'approve' or 'reject'" });
+    }
+    if (decision === 'reject' && !reason) {
+      errors.push({ field: 'reason', message: 'A reason is required to reject' });
+    }
+    if (errors.length) {
+      return res.status(400).json({ message: 'Invalid review', errors });
+    }
+
+    const approved = decision === 'approve';
+
+    try {
+      // Matching on the pending manual state makes the review one-shot: a second click, or a
+      // driver who verified through DigiLocker meanwhile, is not overwritten.
+      const driver = await this.driverService.reviewPendingManualKyc(id, {
+        kycStatus: approved ? 'verified' : 'rejected',
+        isKycCompleted: approved,
+        kycFailedReason: approved ? '' : reason,
+        'manualKyc.reviewedAt': new Date(),
+      });
 
       if (!driver) {
-        return res.status(404).json({ kycStatus: 'not_found', message: 'Driver not found' });
+        const exists = await this.driverService.getDriverById(id);
+        if (!exists) return res.status(404).json({ message: 'Driver not found' });
+        return res.status(409).json({
+          message: 'This driver has no manual KYC request waiting for review',
+          kyc: kycProgress(exists),
+        });
       }
 
-      if (driver.isKycCompleted) {
-        const token = generateToken({ id: driver._id, role: 'driver' });
-        return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, token: token, onboarding: onboardingProgress(driver) });
+      if (approved) {
+        notifyDriver(driver._id, 'kyc:verified', {});
       } else {
-        return res.status(200).json({ driverId: driver._id, isKycCompleted: driver.isKycCompleted, kycDetails: driver.kycDetails, kycFailedReason: driver.kycFailedReason });
+        notifyDriver(driver._id, 'kyc:rejected', { reason });
       }
+
+      return res.status(200).json({
+        message: approved ? 'KYC approved.' : 'KYC rejected.',
+        driverId: driver._id,
+        kyc: kycProgress(driver),
+      });
     } catch (error) {
-      console.error('Error in checking driver kyc status:', error);
-      return res.status(500).json({ error: 'Error in checking driver kyc status' });
+      console.error('Failed to review manual KYC:', error);
+      return res.status(500).json({ error: 'Failed to review KYC', message: 'Internal server error' });
     }
-  }
+  };
 }
