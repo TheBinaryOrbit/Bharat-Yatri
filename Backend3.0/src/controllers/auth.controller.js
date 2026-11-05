@@ -4,6 +4,7 @@ import { DriverService } from '../services/driver.service.js';
 import { generateToken } from '../utils/token.js';
 import { onboardingProgress } from '../utils/onboardingProgress.js';
 import { kycProgress } from '../utils/kycProgress.js';
+import { blockedResponse } from '../middlewares/auth.js';
 
 export class AuthController {
   constructor() {
@@ -59,6 +60,10 @@ export class AuthController {
   //   200  onboarding finished     → home, which shows the KYC prompt until kyc.isVerified
   verifyDriver = async (res, phoneNumber, fcmToken) => {
     const account = await this.driverService.findOrCreateByPhone(phoneNumber);
+    if (account.isBlocked) {
+      return res.status(403).json(blockedResponse(account));
+    }
+
     const driver = fcmToken
       ? await this.driverService.updateFcmToken(phoneNumber, fcmToken)
       : account;
@@ -114,6 +119,10 @@ export class AuthController {
           message: 'OTP verified successfully, but account not found.',
           userStatus: 404,
         });
+      }
+
+      if (account.isBlocked) {
+        return res.status(403).json(blockedResponse(account));
       }
 
       // Persist the latest FCM token

@@ -27,6 +27,25 @@ const userSchema = new mongoose.Schema(
     },
     // Number to alert if something goes wrong during a ride. No default, so an
     // unset contact reads as `undefined` rather than an empty string.
+    // Set by an admin. A blocked account is refused at OTP login, on every authenticated API call
+    // and on socket connect. blockedBy is the Admin who did it; the reason is shown to the account.
+    isBlocked: {
+      type: Boolean,
+      default: false,
+    },
+    blockedReason: {
+      type: String,
+      default: '',
+    },
+    blockedAt: {
+      type: Date,
+      default: null,
+    },
+    blockedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Admin',
+      default: null,
+    },
     sosContact: {
       type: String,
       trim: true,

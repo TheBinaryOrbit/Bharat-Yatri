@@ -30,7 +30,7 @@ const shape = (setting) => ({
 
 // Shared by create and update. Only the fields present are checked, so a PATCH that touches one
 // field is not forced to resend the rest.
-const validate = (body, { requireAll }) => {
+export const validate = (body, { requireAll }) => {
   const errors = [];
   const has = (field) => body[field] !== undefined && body[field] !== null && body[field] !== '';
 
@@ -96,7 +96,7 @@ const validate = (body, { requireAll }) => {
 
 // Only these ever reach the document. `type` is excluded on update: it is the key the row is
 // found by, and letting a PATCH rewrite it turns "edit android" into "make a second ios".
-const pickWritable = (body) => {
+export const pickWritable = (body) => {
   const fields = [
     'appVersion',
     'appBuildNumber',

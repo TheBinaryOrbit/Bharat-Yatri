@@ -148,3 +148,6 @@ export const uploadManualKyc = withImageCompression(upload.fields([
   { name: 'aadhaarFrontImage', maxCount: 1 },
   { name: 'aadhaarBackImage', maxCount: 1 },
 ]));
+
+// Admin portal: a single image (banners, editor images). Field name `image`.
+export const uploadAdminImage = withImageCompression(upload.single('image'));

@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { verifyToken } from '../utils/token.js';
 import { User } from '../models/user.model.js';
 import { Driver } from '../models/driver.model.js';
+import { Admin } from '../models/admin.model.js';
 import { QuickRide } from '../models/quickRide.model.js';
 import { OutstationRide } from '../models/outstationRide.model.js';
 import { Vehicle } from '../models/vehicle.model.js';
@@ -34,9 +35,20 @@ const authenticate = async (socket) => {
 
   if (token) {
     const decoded = verifyToken(token); // { id, role }
+
+    // An admin portal session: a read-only observer, the same as the x-admin-key path below.
+    if (decoded.role === 'admin') {
+      const admin = await Admin.findById(decoded.id).select('isActive tokenVersion');
+      if (!admin?.isActive || (admin.tokenVersion ?? 0) !== (decoded.tv ?? 0)) {
+        throw new Error('Admin session is no longer valid');
+      }
+      return { id: `admin:${admin._id}`, role: 'admin', canPublish: false };
+    }
+
     const Model = decoded.role === 'driver' ? Driver : User;
     const account = await Model.findById(decoded.id);
     if (!account) throw new Error('Account not found');
+    if (account.isBlocked) throw new Error('ACCOUNT_BLOCKED');
 
     return {
       id: String(account._id),

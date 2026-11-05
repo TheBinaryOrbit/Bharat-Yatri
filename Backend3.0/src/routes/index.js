@@ -15,6 +15,7 @@ import quickDestinationRoutes from './quickDestination.routes.js';
 import notificationRoutes from './notification.routes.js';
 import settingRoutes from './setting.routes.js';
 import installReferrerRoutes from './installReferrer.routes.js';
+import adminRoutes from './admin/index.js';
 
 const router = Router();
 
@@ -34,5 +35,6 @@ router.use('/quick-destinations', quickDestinationRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/settings', settingRoutes);
 router.use('/install-referrers', installReferrerRoutes);
+router.use('/admin', adminRoutes);
 
 export default router;
