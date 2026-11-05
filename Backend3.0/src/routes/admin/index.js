@@ -62,6 +62,7 @@ router.patch('/customers/:id/block', can('people.block'), customers.block);
 
 router.get('/drivers', can('people.view'), drivers.list);
 router.get('/drivers/:id', can('people.view'), drivers.detail);
+router.patch('/drivers/:id', can('people.edit'), drivers.update);
 router.get('/drivers/:id/reviews', can('people.view'), drivers.reviews);
 router.delete('/drivers/:id/reviews/:reviewId', can('reviews.moderate'), drivers.deleteReview);
 router.get('/drivers/:id/bids', can('people.view'), drivers.bids);
@@ -70,6 +71,8 @@ router.patch('/drivers/:id/block', can('people.block'), drivers.block);
 router.get('/kyc', can('kyc.review'), drivers.kycQueue);
 router.get('/kyc/:id', can('kyc.review'), drivers.kycCaseDetail);
 router.patch('/kyc/:id/review', can('kyc.review'), drivers.kycReview);
+router.patch('/kyc/:id/complete', can('kyc.review'), drivers.kycComplete);
+router.patch('/kyc/:id/status', can('kyc.review'), drivers.kycSetStatus);
 
 router.get('/vehicles', can('people.view'), vehicles.list);
 router.get('/vehicles/:id', can('people.view'), vehicles.detail);

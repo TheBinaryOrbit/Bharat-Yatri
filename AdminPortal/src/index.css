@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-white text-ink font-sans antialiased; }
+  table td, table th, .num { font-variant-numeric: tabular-nums; }
+  :focus-visible { @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-white; }
+  ::selection { @apply bg-brand-soft/50; }
+}
+
+@layer components {
+  .eyebrow { @apply text-eyebrow uppercase font-medium text-ink/45; }
+  .hairline { @apply border-line; }
+  /* Headings and big numbers: default font, semibold, slightly tight. */
+  .font-display { font-weight: 600; letter-spacing: -0.01em; }
+  .field {
+    @apply w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink
+           placeholder:text-ink/35 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand
+           disabled:bg-mist disabled:text-ink/50;
+  }
+  select.field {
+    @apply appearance-none pr-8;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%230E2A47' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #C5CED9; border-radius: 9999px; border: 3px solid #fff; }
+
+/* Rich text: the editor and the read-only preview share these rules. */
+.prose-editor { font-size: 14px; line-height: 1.65; color: #0e2a47; }
+.prose-editor > * + * { margin-top: 0.75em; }
+.prose-editor h1 { font-size: 1.6rem; font-weight: 600; }
+.prose-editor h2 { font-size: 1.35rem; font-weight: 600; }
+.prose-editor h3 { font-size: 1.1rem; font-weight: 600; }
+.prose-editor h4 { font-size: 1rem; font-weight: 600; }
+.prose-editor ul { list-style: disc; padding-left: 1.4rem; }
+.prose-editor ol { list-style: decimal; padding-left: 1.4rem; }
+.prose-editor a { color: #f26b21; text-decoration: underline; }
+.prose-editor blockquote { border-left: 2px solid #c5ced9; padding-left: 0.9rem; color: rgba(14, 42, 71, 0.7); font-style: italic; }
+.prose-editor pre { background: #eef2f6; border-radius: 0.375rem; padding: 0.75rem; font-size: 0.8rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.prose-editor code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.prose-editor hr { border: 0; border-top: 1px solid #c5ced9; }
+.prose-editor img { max-width: 100%; border-radius: 0.375rem; }
+.prose-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder); float: left; height: 0; pointer-events: none; color: rgba(14, 42, 71, 0.35);
+}
+.ProseMirror:focus { outline: none; }
+
+/* Leaflet sits inside rounded cards. */
+.leaflet-container { font-family: inherit; background: #eef2f6; }
+.leaflet-popup-content-wrapper { border-radius: 0.5rem; box-shadow: 0 8px 24px -12px rgba(14,42,71,.35); }
+.leaflet-popup-content { margin: 12px 14px; font-size: 13px; color: #0e2a47; }

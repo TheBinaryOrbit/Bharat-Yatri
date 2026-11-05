@@ -10,7 +10,7 @@ import { KYC_STATUSES, KYC_METHODS } from '../../constants/driver.constants.js';
 import { ACTIVE_RIDE_STATUSES, OUTSTATION_ACTIVE_RIDE_STATUSES } from '../../constants/ride.constants.js';
 import { DriverService } from '../../services/driver.service.js';
 import { LiveService } from '../../services/admin/live.service.js';
-import { recordAudit } from '../../services/admin/audit.service.js';
+import { recordAudit, diffFields } from '../../services/admin/audit.service.js';
 import { enforceBlock } from '../../services/admin/accountBlock.service.js';
 import { notifyDriver } from '../../notifications/index.js';
 import { kycProgress } from '../../utils/kycProgress.js';
@@ -60,6 +60,21 @@ const kycCase = (req, d) => ({
   createdAt: d.createdAt,
   updatedAt: d.updatedAt,
 });
+
+// Which KYC documents a driver has NOT provided. Identity counts as present when either the
+// DigiLocker record came back or both manual Aadhaar photos were uploaded.
+export const missingKycDocuments = (d) => {
+  const missing = [];
+  const digilocker = Boolean(d.kycDetails?.adharFileId || d.kycDetails?.requestId);
+  if (!digilocker) {
+    if (!d.manualKyc?.aadhaarFrontImageUrl) missing.push({ key: 'aadhaarFront', label: 'Aadhaar front photo' });
+    if (!d.manualKyc?.aadhaarBackImageUrl) missing.push({ key: 'aadhaarBack', label: 'Aadhaar back photo' });
+  }
+  if (!d.dlDetails?.dlNumber) missing.push({ key: 'dlNumber', label: 'Driving licence number' });
+  if (!d.dlDetails?.dlFrontImageUrl) missing.push({ key: 'dlFront', label: 'Driving licence front photo' });
+  if (!d.dlDetails?.dlBackImageUrl) missing.push({ key: 'dlBack', label: 'Driving licence back photo' });
+  return missing;
+};
 
 export class DriversController {
   // GET /admin/drivers?q&kycStatus&kycMethod&blocked&vehicleTypeId&onboarding=complete|incomplete&from&to&sort
@@ -171,7 +186,7 @@ export class DriversController {
     return res.status(200).json({
       driver: maskPerson(req, { ...driver }),
       onboarding: onboardingProgress(driver),
-      kyc: { ...kycProgress(driver), aadhaarName: driver.kycDetails?.aadhaarName || '' },
+      kyc: { ...kycProgress(driver), aadhaarName: driver.kycDetails?.aadhaarName || '', missingDocuments: missingKycDocuments(driver) },
       vehicle,
       payment: payment ? { upiId: pii ? payment.upiId : maskUpi(payment.upiId), updatedAt: payment.updatedAt, createdAt: payment.createdAt } : null,
       rating: { average, count: reviewCount, distribution },
@@ -183,6 +198,75 @@ export class DriversController {
       activeRide: activeQuick ? { ...activeQuick, rideType: 'quickride' } : activeOut ? { ...activeOut, rideType: 'outstation' } : null,
       live,
     });
+  });
+
+  // PATCH /admin/drivers/:id  { name?, email?, dob?, gender?, address?, dlNumber? }
+  // The phone number is the login and is not editable here; KYC fields have their own flow.
+  update = handle('update driver', async (req, res) => {
+    const { id } = req.params;
+    if (!isId(id)) return res.status(400).json({ message: 'Invalid driver id' });
+    const driver = await Driver.findById(id);
+    if (!driver) return res.status(404).json({ message: 'Driver not found' });
+
+    const body = req.body || {};
+    const errors = [];
+    const set = {};
+    const unset = {};
+
+    if (body.name !== undefined) {
+      const name = String(body.name).trim();
+      if (!name) errors.push({ field: 'name', message: 'Name is required' });
+      else if (name.length > 80) errors.push({ field: 'name', message: 'Keep the name under 80 characters' });
+      else set.name = name;
+    }
+    if (body.email !== undefined) {
+      const email = String(body.email ?? '').trim().toLowerCase();
+      if (!email) unset.email = 1;
+      else if (email.includes('•') || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push({ field: 'email', message: 'Enter a valid email' });
+      else if (await Driver.exists({ email, _id: { $ne: driver._id } })) errors.push({ field: 'email', message: 'Another driver already uses this email' });
+      else set.email = email;
+    }
+    if (body.dob !== undefined) {
+      if (!body.dob) unset.dob = 1;
+      else {
+        const dob = new Date(`${String(body.dob).slice(0, 10)}T00:00:00Z`);
+        const age = (Date.now() - dob.getTime()) / (365.25 * 86400000);
+        if (Number.isNaN(dob.getTime())) errors.push({ field: 'dob', message: 'Enter a real date' });
+        else if (age < 18 || age > 90) errors.push({ field: 'dob', message: 'Driver must be between 18 and 90 years old' });
+        else set.dob = dob;
+      }
+    }
+    if (body.gender !== undefined) {
+      if (!body.gender) unset.gender = 1;
+      else if (!['male', 'female', 'other'].includes(body.gender)) errors.push({ field: 'gender', message: 'Choose male, female or other' });
+      else set.gender = body.gender;
+    }
+    if (body.address !== undefined) {
+      const address = String(body.address ?? '').trim();
+      if (address.length > 300) errors.push({ field: 'address', message: 'Keep the address under 300 characters' });
+      else set.address = address;
+    }
+    if (body.dlNumber !== undefined) {
+      const dl = String(body.dlNumber ?? '').trim().toUpperCase();
+      if (!dl) unset['dlDetails.dlNumber'] = 1;
+      else if (!/^[A-Z0-9 -]{6,20}$/.test(dl)) errors.push({ field: 'dlNumber', message: 'Use 6–20 letters, numbers, spaces or dashes' });
+      else if (await Driver.exists({ 'dlDetails.dlNumber': dl, _id: { $ne: driver._id } })) errors.push({ field: 'dlNumber', message: 'Another driver already has this licence number' });
+      else set['dlDetails.dlNumber'] = dl;
+    }
+    if (errors.length) return badRequest(res, errors);
+    if (!Object.keys(set).length && !Object.keys(unset).length) return res.status(400).json({ message: 'Nothing to change' });
+
+    const before = driver.toObject();
+    const updated = await Driver.findByIdAndUpdate(
+      driver._id,
+      { ...(Object.keys(set).length && { $set: set }), ...(Object.keys(unset).length && { $unset: unset }) },
+      { new: true, runValidators: true }
+    ).select(DRIVER_HIDDEN).lean();
+
+    const flat = (d) => ({ name: d.name, email: d.email, dob: d.dob, gender: d.gender, address: d.address, dlNumber: d.dlDetails?.dlNumber });
+    const diff = diffFields(flat(before), flat(updated), ['name', 'email', 'dob', 'gender', 'address', 'dlNumber']);
+    await recordAudit(req, { action: 'driver.update', entity: 'driver', entityId: driver._id, ...diff });
+    return res.status(200).json(maskPerson(req, updated));
   });
 
   // GET /admin/drivers/:id/reviews?rating
@@ -304,7 +388,140 @@ export class DriversController {
     const driver = await Driver.findById(id).select(DRIVER_HIDDEN).lean();
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
     const vehicle = await Vehicle.findOne({ driverId: driver._id }).populate('vehicleTypeId', 'name').lean();
-    return res.status(200).json({ case: maskPerson(req, kycCase(req, driver)), kyc: kycProgress(driver), onboarding: onboardingProgress(driver), vehicle });
+    return res.status(200).json({
+      case: maskPerson(req, kycCase(req, driver)),
+      kyc: kycProgress(driver),
+      onboarding: onboardingProgress(driver),
+      vehicle,
+      missingDocuments: missingKycDocuments(driver),
+    });
+  });
+
+  // PATCH /admin/kyc/:id/complete  { reason?, confirmMissingDocs? }
+  // Marks a driver's KYC verified regardless of method or current state (other than already
+  // verified). When documents are missing the first call answers 409 DOCUMENTS_MISSING with the
+  // list; the portal asks "are you sure?" and repeats with confirmMissingDocs: true + a reason.
+  kycComplete = handle('complete KYC', async (req, res) => {
+    const { id } = req.params;
+    if (!isId(id)) return res.status(400).json({ message: 'Invalid driver id' });
+    const driver = await Driver.findById(id).lean();
+    if (!driver) return res.status(404).json({ message: 'Driver not found' });
+    if (driver.kycStatus === 'verified') {
+      return res.status(409).json({ message: 'KYC is already completed for this driver', kyc: kycProgress(driver) });
+    }
+
+    const missing = missingKycDocuments(driver);
+    const confirmed = req.body?.confirmMissingDocs === true;
+    if (missing.length && !confirmed) {
+      return res.status(409).json({
+        code: 'DOCUMENTS_MISSING',
+        message: 'Some KYC documents are missing. Confirm to complete KYC without them.',
+        missingDocuments: missing,
+      });
+    }
+
+    const errors = [];
+    const reason = readReason(req.body, errors, { required: missing.length > 0 });
+    if (errors.length) return badRequest(res, errors);
+
+    // Matched on the status read above so two admins clicking at once cannot both write.
+    const updated = await Driver.findOneAndUpdate(
+      { _id: driver._id, kycStatus: driver.kycStatus ?? null },
+      {
+        $set: {
+          kycStatus: 'verified',
+          isKycCompleted: true,
+          kycFailedReason: '',
+          kycMethod: driver.kycMethod || 'manual',
+          'manualKyc.reviewedAt': new Date(),
+        },
+      },
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ message: 'KYC changed while you were reviewing it. Reload and try again.' });
+
+    notifyDriver(updated._id, 'kyc:verified', {});
+    await recordAudit(req, {
+      action: missing.length ? 'kyc.complete_without_documents' : 'kyc.complete',
+      entity: 'driver',
+      entityId: updated._id,
+      before: { kycStatus: driver.kycStatus, kycMethod: driver.kycMethod || null },
+      after: { kycStatus: 'verified', missingDocuments: missing.map((m) => m.label) },
+      reason,
+    });
+    return res.status(200).json({ message: 'KYC marked as completed', kyc: kycProgress(updated), missingDocuments: missing });
+  });
+
+  // PATCH /admin/kyc/:id/status  { status, reason?, confirmMissingDocs? }
+  // Sets a driver's KYC to any status from the driver profile.
+  //   verified     same rules as /complete: missing documents need confirmMissingDocs + a reason
+  //   rejected     reason required — it is what the driver is shown
+  //   pending      back into the manual review queue; needs both Aadhaar photos on file
+  //   not_started  a full reset, so the driver starts KYC again
+  // Every move except "to verified with all documents" needs a reason. Moving a verified driver
+  // to anything else also takes them offline, because they no longer pass the go-online check.
+  kycSetStatus = handle('change KYC status', async (req, res) => {
+    const { id } = req.params;
+    if (!isId(id)) return res.status(400).json({ message: 'Invalid driver id' });
+    const status = req.body?.status;
+    if (!KYC_STATUSES.includes(status)) {
+      return badRequest(res, [{ field: 'status', message: `Choose one of: ${KYC_STATUSES.join(', ')}` }]);
+    }
+    const driver = await Driver.findById(id).lean();
+    if (!driver) return res.status(404).json({ message: 'Driver not found' });
+    const current = driver.kycStatus || 'not_started';
+    if (current === status) return res.status(409).json({ message: `KYC is already ${status.replace('_', ' ')}` });
+
+    const missing = missingKycDocuments(driver);
+    if (status === 'verified' && missing.length && req.body?.confirmMissingDocs !== true) {
+      return res.status(409).json({
+        code: 'DOCUMENTS_MISSING',
+        message: 'Some KYC documents are missing. Confirm to complete KYC without them.',
+        missingDocuments: missing,
+      });
+    }
+
+    const errors = [];
+    const needsReason = !(status === 'verified' && !missing.length);
+    const reason = readReason(req.body, errors, { required: needsReason });
+    if (status === 'pending' && !(driver.manualKyc?.aadhaarFrontImageUrl && driver.manualKyc?.aadhaarBackImageUrl)) {
+      errors.push({ field: 'status', message: 'Pending review needs both Aadhaar photos. Reset to “not started” so the driver can upload them.' });
+    }
+    if (errors.length) return badRequest(res, errors);
+
+    const set = { kycStatus: status, isKycCompleted: status === 'verified' };
+    const unset = {};
+    if (status === 'verified') {
+      Object.assign(set, { kycFailedReason: '', kycMethod: driver.kycMethod || 'manual', 'manualKyc.reviewedAt': new Date() });
+    } else if (status === 'rejected') {
+      Object.assign(set, { kycFailedReason: reason, 'manualKyc.reviewedAt': new Date() });
+    } else if (status === 'pending') {
+      Object.assign(set, { kycFailedReason: '', kycMethod: 'manual', 'manualKyc.submittedAt': driver.manualKyc?.submittedAt || new Date() });
+      unset['manualKyc.reviewedAt'] = 1;
+    } else {
+      Object.assign(set, { kycFailedReason: '', kycMethod: null });
+    }
+
+    const updated = await Driver.findOneAndUpdate(
+      { _id: driver._id, kycStatus: driver.kycStatus ?? null },
+      { $set: set, ...(Object.keys(unset).length && { $unset: unset }) },
+      { new: true, runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ message: 'KYC changed while you were editing it. Reload and try again.' });
+
+    if (current === 'verified') await enforceBlock('driver', updated._id); // offline + socket closed; not blocked
+    if (status === 'verified') notifyDriver(updated._id, 'kyc:verified', {});
+    if (status === 'rejected') notifyDriver(updated._id, 'kyc:rejected', { reason });
+
+    await recordAudit(req, {
+      action: status === 'verified' && missing.length ? 'kyc.complete_without_documents' : `kyc.set_${status}`,
+      entity: 'driver',
+      entityId: updated._id,
+      before: { kycStatus: current, kycMethod: driver.kycMethod || null },
+      after: { kycStatus: status, kycMethod: updated.kycMethod || null, ...(status === 'verified' && missing.length && { missingDocuments: missing.map((m) => m.label) }) },
+      reason,
+    });
+    return res.status(200).json({ message: `KYC set to ${status.replace('_', ' ')}`, kyc: kycProgress(updated), missingDocuments: missing });
   });
 
   // PATCH /admin/kyc/:id/review  { decision: 'approve'|'reject', reason }
