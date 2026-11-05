@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, X } from 'lucide-react';
-import { useApi, useDebounced, useUrlFilters } from '../lib/hooks.js';
+import { useApi, useDebounced, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { RIDE_STATUS_LABEL, fmtDateTime, fmtMoney, shortId } from '../lib/format.js';
 import {
   Badge, Button, Card, DateRange, ErrorNote, Input, PageHead, Pagination, Person, Select, Table, Toolbar, EmptyState,
@@ -43,8 +43,11 @@ export default function Rides({ kind }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind]);
 
+  const sortProps = useUrlSort(f, setF);
   const { data: types } = useApi('/vehicle-types');
   const { data, error, loading } = useApi(copy.path, {
+    sortBy: f.sortBy,
+    order: f.order,
     page: f.page,
     limit: f.limit,
     q: f.q,
@@ -52,7 +55,7 @@ export default function Rides({ kind }) {
     vehicleTypeId: f.vehicleTypeId,
     from: f.from,
     to: f.to,
-    ...(kind === 'outstation' && { bookingType: f.bookingType, tripFrom: f.tripFrom, tripTo: f.tripTo, sort: f.sort }),
+    ...(kind === 'outstation' && { bookingType: f.bookingType, tripFrom: f.tripFrom, tripTo: f.tripTo }),
   });
 
   const filtered = ['q', 'status', 'vehicleTypeId', 'from', 'to', 'bookingType', 'tripFrom', 'tripTo'].some((k) => f[k]);
@@ -61,6 +64,7 @@ export default function Rides({ kind }) {
     {
       key: 'ride',
       header: 'Ride',
+      sortable: true,
       render: (r) => (
         <div>
           <p className="font-medium num">{shortId(r._id)}</p>
@@ -73,6 +77,7 @@ export default function Rides({ kind }) {
           {
             key: 'pickupAt',
             header: 'Trip',
+            sortable: true,
             render: (r) => (
               <div>
                 <p className="whitespace-nowrap">{fmtDateTime(r.pickupAt)}</p>
@@ -120,6 +125,7 @@ export default function Rides({ kind }) {
       key: 'fare',
       header: 'Fare',
       align: 'right',
+      sortable: true,
       render: (r) => (
         <div className="num">
           <p className="font-medium">{fmtMoney(r.finalFare ?? r.offeredFare)}</p>
@@ -128,7 +134,7 @@ export default function Rides({ kind }) {
       ),
     },
     { key: 'bids', header: 'Bids', align: 'right', render: (r) => <span className={`num ${r.bidCount ? '' : 'text-ink/35'}`}>{r.bidCount}</span> },
-    { key: 'status', header: 'Status', render: (r) => <Badge value={r.rideStatus} /> },
+    { key: 'status', header: 'Status', sortable: true, render: (r) => <Badge value={r.rideStatus} /> },
   ];
 
   return (
@@ -171,15 +177,6 @@ export default function Rides({ kind }) {
             <div className="flex w-full flex-wrap items-center gap-2">
               <span className="text-xs text-ink/50">Trip date</span>
               <DateRange presets={false} from={f.tripFrom} to={f.tripTo} onChange={({ from, to }) => setF({ tripFrom: from, tripTo: to })} />
-              <Select
-                className="w-40"
-                value={f.sort || ''}
-                onChange={(e) => setF({ sort: e.target.value })}
-                options={[
-                  { value: '', label: 'Newest booking first' },
-                  { value: 'trip', label: 'Latest trip first' },
-                ]}
-              />
             </div>
           )}
           {filtered && (
@@ -197,6 +194,7 @@ export default function Rides({ kind }) {
         </Toolbar>
         {error && <ErrorNote error={error} className="m-4" />}
         <Table
+          {...sortProps}
           columns={columns}
           rows={data?.data}
           loading={loading && !data}

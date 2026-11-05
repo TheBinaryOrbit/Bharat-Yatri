@@ -96,11 +96,11 @@ function RidesReport({ data }) {
               minWidth="min-w-[560px]"
               rowKey={(r) => r.name}
               columns={[
-                { key: 'name', header: 'Vehicle type', render: (r) => <span className="font-medium">{r.name}</span> },
-                { key: 'rides', header: 'Booked', align: 'right', render: (r) => fmtNumber(r.rides) },
-                { key: 'completed', header: 'Completed', align: 'right', render: (r) => fmtNumber(r.completed) },
-                { key: 'rate', header: 'Completion', align: 'right', render: (r) => fmtPercent(r.rides ? r.completed / r.rides : null) },
-                { key: 'value', header: 'Ride value', align: 'right', render: (r) => fmtMoney(r.value) },
+                { key: 'name', header: 'Vehicle type', sortable: true, render: (r) => <span className="font-medium">{r.name}</span> },
+                { key: 'rides', header: 'Booked', align: 'right', sortable: true, render: (r) => fmtNumber(r.rides) },
+                { key: 'completed', header: 'Completed', align: 'right', sortable: true, render: (r) => fmtNumber(r.completed) },
+                { key: 'rate', header: 'Completion', align: 'right', sortValue: (r) => (r.rides ? r.completed / r.rides : null), render: (r) => fmtPercent(r.rides ? r.completed / r.rides : null) },
+                { key: 'value', header: 'Ride value', align: 'right', sortable: true, render: (r) => fmtMoney(r.value) },
               ]}
               rows={t.byVehicleType}
             />
@@ -115,20 +115,20 @@ function PeopleTable({ kind, rows }) {
   const driver = kind === 'drivers';
   const columns = driver
     ? [
-        { key: 'name', header: 'Driver', render: (r) => <Link to={`/drivers/${r.driverId}`} className="font-medium hover:text-brand">{r.name}<span className="block text-xs font-normal text-ink/50">{r.phoneNumber}</span></Link> },
-        { key: 'assigned', header: 'Assigned', align: 'right', render: (r) => fmtNumber(r.assigned) },
-        { key: 'completed', header: 'Completed', align: 'right', render: (r) => fmtNumber(r.completed) },
-        { key: 'cancelledByDriver', header: 'Driver cancels', align: 'right', render: (r) => fmtNumber(r.cancelledByDriver) },
-        { key: 'completedValue', header: 'Ride value', align: 'right', render: (r) => fmtMoney(r.completedValue) },
-        { key: 'rating', header: 'Rating', align: 'right', render: (r) => (r.rating == null ? '—' : `★ ${r.rating.toFixed(1)} (${r.reviews})`) },
+        { key: 'name', header: 'Driver', sortable: true, render: (r) => <Link to={`/drivers/${r.driverId}`} className="font-medium hover:text-brand">{r.name}<span className="block text-xs font-normal text-ink/50">{r.phoneNumber}</span></Link> },
+        { key: 'assigned', header: 'Assigned', align: 'right', sortable: true, render: (r) => fmtNumber(r.assigned) },
+        { key: 'completed', header: 'Completed', align: 'right', sortable: true, render: (r) => fmtNumber(r.completed) },
+        { key: 'cancelledByDriver', header: 'Driver cancels', align: 'right', sortable: true, render: (r) => fmtNumber(r.cancelledByDriver) },
+        { key: 'completedValue', header: 'Ride value', align: 'right', sortable: true, render: (r) => fmtMoney(r.completedValue) },
+        { key: 'rating', header: 'Rating', align: 'right', sortable: true, render: (r) => (r.rating == null ? '—' : `★ ${r.rating.toFixed(1)} (${r.reviews})`) },
       ]
     : [
-        { key: 'name', header: 'Customer', render: (r) => <Link to={`/customers/${r.customerId}`} className="font-medium hover:text-brand">{r.name}<span className="block text-xs font-normal text-ink/50">{r.phoneNumber}</span></Link> },
-        { key: 'joinedAt', header: 'Joined', render: (r) => fmtDate(r.joinedAt) },
-        { key: 'booked', header: 'Booked', align: 'right', render: (r) => fmtNumber(r.booked) },
-        { key: 'completed', header: 'Completed', align: 'right', render: (r) => fmtNumber(r.completed) },
-        { key: 'cancelledByUser', header: 'Customer cancels', align: 'right', render: (r) => fmtNumber(r.cancelledByUser) },
-        { key: 'completedValue', header: 'Ride value', align: 'right', render: (r) => fmtMoney(r.completedValue) },
+        { key: 'name', header: 'Customer', sortable: true, render: (r) => <Link to={`/customers/${r.customerId}`} className="font-medium hover:text-brand">{r.name}<span className="block text-xs font-normal text-ink/50">{r.phoneNumber}</span></Link> },
+        { key: 'joinedAt', header: 'Joined', sortable: true, render: (r) => fmtDate(r.joinedAt) },
+        { key: 'booked', header: 'Booked', align: 'right', sortable: true, render: (r) => fmtNumber(r.booked) },
+        { key: 'completed', header: 'Completed', align: 'right', sortable: true, render: (r) => fmtNumber(r.completed) },
+        { key: 'cancelledByUser', header: 'Customer cancels', align: 'right', sortable: true, render: (r) => fmtNumber(r.cancelledByUser) },
+        { key: 'completedValue', header: 'Ride value', align: 'right', sortable: true, render: (r) => fmtMoney(r.completedValue) },
       ];
   return (
     <Card>
@@ -159,11 +159,11 @@ function AreasReport({ data }) {
           minWidth="min-w-[520px]"
           rowKey={(r) => r.area}
           columns={[
-            { key: 'area', header: 'Area', render: (r) => <span className="font-medium">{r.area}</span> },
-            { key: 'rides', header: 'Rides', align: 'right', render: (r) => fmtNumber(r.rides) },
-            { key: 'completed', header: 'Completed', align: 'right', render: (r) => fmtNumber(r.completed) },
-            { key: 'expired', header: 'No driver', align: 'right', render: (r) => fmtNumber(r.expired) },
-            { key: 'rate', header: 'No-driver rate', align: 'right', render: (r) => fmtPercent(r.rides ? r.expired / r.rides : null) },
+            { key: 'area', header: 'Area', sortable: true, render: (r) => <span className="font-medium">{r.area}</span> },
+            { key: 'rides', header: 'Rides', align: 'right', sortable: true, render: (r) => fmtNumber(r.rides) },
+            { key: 'completed', header: 'Completed', align: 'right', sortable: true, render: (r) => fmtNumber(r.completed) },
+            { key: 'expired', header: 'No driver', align: 'right', sortable: true, render: (r) => fmtNumber(r.expired) },
+            { key: 'rate', header: 'No-driver rate', align: 'right', sortValue: (r) => (r.rides ? r.expired / r.rides : null), render: (r) => fmtPercent(r.rides ? r.expired / r.rides : null) },
           ]}
           rows={data.pickups}
         />

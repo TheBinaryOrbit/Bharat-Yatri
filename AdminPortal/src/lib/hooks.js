@@ -82,3 +82,11 @@ export function useDebounced(value, ms = 350) {
   }, [value, ms]);
   return v;
 }
+
+// Column sort kept in the URL next to the filters (?sortBy&order). Spread into <Table {...sortProps} />.
+export function useUrlSort(f, set) {
+  return {
+    sort: f.sortBy ? { by: f.sortBy, order: f.order === 'asc' ? 'asc' : 'desc' } : null,
+    onSort: (next) => set({ sortBy: next?.by || '', order: next?.order || '' }),
+  };
+}

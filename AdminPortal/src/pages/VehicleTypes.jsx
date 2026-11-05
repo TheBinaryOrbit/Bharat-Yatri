@@ -4,8 +4,8 @@ import { api, fieldMap } from '../lib/api.js';
 import { useApi } from '../lib/hooks.js';
 import { fmtMoney, fmtNumber } from '../lib/format.js';
 import {
-  Badge, Button, Card, ChangeSummary, Confirm, EmptyState, ErrorNote, Field, InfoNote, Input, Modal, PageHead, Spinner,
-  Textarea, Toggle, useToast,
+  Badge, Button, Card, ChangeSummary, Confirm, EmptyState, ErrorNote, Field, InfoNote, Input, Modal, PageHead, Select, Spinner,
+  Textarea, Toggle, useListSort, useToast,
 } from '../components/ui/index.js';
 
 const SAMPLE_TRIPS = [
@@ -33,6 +33,8 @@ const LABELS = {
   name: 'Name', description: 'Description', capacity: 'Seats', baseFare: 'Base fare (₹)', ratePerKm: 'Per km (₹)',
   ratePerMinute: 'Per minute (₹)', features: 'Features', icon: 'Icon',
 };
+
+const EMPTY_LIST = [];
 
 const featuresList = (s) => s.split(',').map((f) => f.trim()).filter(Boolean);
 
@@ -217,7 +219,15 @@ export default function VehicleTypes() {
   const [creating, setCreating] = useState(false);
   const [toggling, setToggling] = useState(null);
 
-  const types = data?.data || [];
+  const [types, typeSort] = useListSort(data?.data || EMPTY_LIST, [
+    { value: 'added', label: 'Order added', by: (t) => t.createdAt, order: 'asc' },
+    { value: 'name', label: 'Name A–Z', by: (t) => t.name, order: 'asc' },
+    { value: 'baseFare', label: 'Base fare', by: (t) => t.baseFare, order: 'asc' },
+    { value: 'ratePerKm', label: 'Per km rate', by: (t) => t.ratePerKm, order: 'asc' },
+    { value: 'capacity', label: 'Seats', by: (t) => t.capacity, order: 'asc' },
+    { value: 'vehicles', label: 'Most vehicles', by: (t) => t.vehicleCount, order: 'desc' },
+    { value: 'status', label: 'Live first', by: (t) => (t.isActive ? 0 : 1), order: 'asc' },
+  ]);
   const replace = (saved) =>
     setData((d) => {
       const list = d?.data || [];
@@ -246,6 +256,12 @@ export default function VehicleTypes() {
         }
       />
       <ErrorNote error={error} className="mb-4" />
+      {types.length > 1 && (
+        <div className="mb-4 flex items-center justify-end gap-2">
+          <span className="text-xs text-ink/50">Sort by</span>
+          <Select className="w-40" {...typeSort} />
+        </div>
+      )}
       {loading ? (
         <Spinner />
       ) : !types.length ? (

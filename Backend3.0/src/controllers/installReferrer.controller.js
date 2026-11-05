@@ -1,6 +1,7 @@
 import { InstallReferrerService } from '../services/installReferrer.service.js';
 import { parseInstallReferrer, toInstallDate } from '../utils/referrer.js';
 import { parseDateRange } from '../utils/dateRange.js';
+import { sortParams } from './admin/helpers.js';
 import {
   DEFAULT_INSTALL_PAGE_SIZE,
   INSTALL_APPS,
@@ -171,7 +172,15 @@ export class InstallReferrerController {
 
     try {
       const [items, total] = await Promise.all([
-        this.installReferrerService.list(filter, { limit, skip }),
+        this.installReferrerService.list(filter, {
+          limit,
+          skip,
+          sort: sortParams(
+            req.query,
+            { installTime: 'installTime', app: 'app', source: ['source', 'medium'], campaign: 'campaign', platform: ['platform', 'appVersion'] },
+            { installTime: -1 }
+          ),
+        }),
         this.installReferrerService.count(filter),
       ]);
 

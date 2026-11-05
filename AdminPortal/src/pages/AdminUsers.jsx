@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Wand2 } from 'lucide-react';
 import { api, fieldMap } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-import { useApi, useUrlFilters } from '../lib/hooks.js';
+import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDate, fmtDateTime, titleCase } from '../lib/format.js';
 import {
   Badge, Button, Card, CardBody, CardHead, ErrorNote, Field, Input, Modal, PageHead, Pagination, Person, Select, Table, Toggle, Toolbar, useToast,
@@ -154,7 +154,8 @@ function AdminModal({ open, onClose, initial, roles, onSaved }) {
 export default function AdminUsers() {
   const [f, setF] = useUrlFilters({ q: '', role: '', page: '1', limit: '20' });
   const [q, setQ] = useState(f.q);
-  const list = useApi('/admins', { q: f.q, role: f.role, page: f.page, limit: f.limit });
+  const sortProps = useUrlSort(f, setF);
+  const list = useApi('/admins', { q: f.q, role: f.role, page: f.page, limit: f.limit, sortBy: f.sortBy, order: f.order });
   const rolesRes = useApi('/admins/roles');
   const roles = rolesRes.data?.data || [];
   const [modal, setModal] = useState(null); // 'new' | admin
@@ -184,14 +185,15 @@ export default function AdminUsers() {
         </Toolbar>
         <ErrorNote error={list.error} className="m-4" />
         <Table
+          {...sortProps}
           loading={list.loading}
           onRowClick={(a) => setModal(a)}
           columns={[
-            { key: 'name', header: 'Admin', render: (a) => <Person name={a.name} sub={a.email} avatar /> },
-            { key: 'role', header: 'Role', render: (a) => <Badge value={a.role}>{a.roleLabel}</Badge> },
-            { key: 'isActive', header: 'Status', render: (a) => <Badge value={a.isActive ? 'active' : 'inactive'}>{a.isActive ? 'Active' : 'Deactivated'}</Badge> },
-            { key: 'lastLoginAt', header: 'Last sign-in', render: (a) => (a.lastLoginAt ? fmtDateTime(a.lastLoginAt) : <span className="text-ink/35">Never</span>) },
-            { key: 'createdAt', header: 'Added', render: (a) => <span className="text-ink/60">{fmtDate(a.createdAt)}</span> },
+            { key: 'name', header: 'Admin', sortable: true, render: (a) => <Person name={a.name} sub={a.email} avatar /> },
+            { key: 'role', header: 'Role', sortable: true, render: (a) => <Badge value={a.role}>{a.roleLabel}</Badge> },
+            { key: 'isActive', header: 'Status', sortable: true, render: (a) => <Badge value={a.isActive ? 'active' : 'inactive'}>{a.isActive ? 'Active' : 'Deactivated'}</Badge> },
+            { key: 'lastLoginAt', header: 'Last sign-in', sortable: true, render: (a) => (a.lastLoginAt ? fmtDateTime(a.lastLoginAt) : <span className="text-ink/35">Never</span>) },
+            { key: 'createdAt', header: 'Added', sortable: true, render: (a) => <span className="text-ink/60">{fmtDate(a.createdAt)}</span> },
           ]}
           rows={d?.data || []}
         />

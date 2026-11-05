@@ -50,9 +50,9 @@ export class InstallReferrerService {
     );
   };
 
-  list = async (filter, { limit, skip = 0 } = {}) => {
+  list = async (filter, { limit, skip = 0, sort = { installTime: -1 } } = {}) => {
     return InstallReferrer.find(filter)
-      .sort({ installTime: -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit)
       .populate('userId', 'name phoneNumber')

@@ -106,13 +106,14 @@ export function RideHistory({ filterKey, id, showCustomer = false, showDriver = 
   const navigate = useNavigate();
   const [kind, setKind] = useState('quickride');
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState(null);
   const path = kind === 'quickride' ? '/quick-rides' : '/outstation-rides';
-  const { data, loading } = useApi(path, { [filterKey]: id, page, limit: 10 });
+  const { data, loading } = useApi(path, { [filterKey]: id, page, limit: 10, sortBy: sort?.by, order: sort?.order });
   const base = kind === 'quickride' ? '/quick-rides' : '/outstation-rides';
 
   const columns = [
     { key: 'id', header: 'Ride', render: (r) => <span className="font-medium">{shortId(r._id)}</span> },
-    { key: 'when', header: kind === 'outstation' ? 'Trip date' : 'Booked', render: (r) => fmtDateTime(kind === 'outstation' ? r.pickupAt : r.createdAt) },
+    { key: 'when', sortKey: kind === 'outstation' ? 'pickupAt' : 'ride', header: kind === 'outstation' ? 'Trip date' : 'Booked', sortable: true, render: (r) => fmtDateTime(kind === 'outstation' ? r.pickupAt : r.createdAt) },
     {
       key: 'route',
       header: 'Route',
@@ -126,8 +127,8 @@ export function RideHistory({ filterKey, id, showCustomer = false, showDriver = 
     showCustomer && { key: 'customer', header: 'Customer', render: (r) => <Person name={r.bookedBy?.name} sub={r.bookedBy?.phoneNumber} /> },
     showDriver && { key: 'driver', header: 'Driver', render: (r) => (r.assignedTo ? <Person name={r.assignedTo.name} sub={r.assignedTo.phoneNumber} /> : <span className="text-ink/35">—</span>) },
     { key: 'type', header: 'Vehicle', render: (r) => r.vehicleTypeId?.name || '—' },
-    { key: 'status', header: 'Status', render: (r) => <Badge value={r.rideStatus} /> },
-    { key: 'fare', header: 'Fare', align: 'right', render: (r) => fmtMoney(r.finalFare ?? r.offeredFare) },
+    { key: 'status', header: 'Status', sortable: true, render: (r) => <Badge value={r.rideStatus} /> },
+    { key: 'fare', header: 'Fare', align: 'right', sortable: true, render: (r) => fmtMoney(r.finalFare ?? r.offeredFare) },
   ].filter(Boolean);
 
   return (
@@ -138,6 +139,7 @@ export function RideHistory({ filterKey, id, showCustomer = false, showDriver = 
           onChange={(v) => {
             setKind(v);
             setPage(1);
+            setSort(null);
           }}
           options={[
             { value: 'quickride', label: 'Quick rides' },
@@ -146,7 +148,7 @@ export function RideHistory({ filterKey, id, showCustomer = false, showDriver = 
         />
       </div>
       <div className="mt-3">
-        <Table columns={columns} rows={data?.data} loading={loading} onRowClick={(r) => navigate(`${base}/${r._id}`)} minWidth="min-w-[640px]" />
+        <Table sort={sort} onSort={(s) => { setSort(s); setPage(1); }} columns={columns} rows={data?.data} loading={loading} onRowClick={(r) => navigate(`${base}/${r._id}`)} minWidth="min-w-[640px]" />
         {data && data.total > 10 && <Pagination page={data.page} pages={data.pages} total={data.total} limit={data.limit} onPage={setPage} />}
       </div>
     </div>

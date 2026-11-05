@@ -18,12 +18,12 @@ export default function AppContent() {
   const count = (t) => all.filter((p) => p.type === t).length;
 
   const columns = [
-    { key: 'name', header: 'Page', render: (p) => <span className="font-medium">{p.name}</span> },
-    { key: 'slug', header: 'Slug', render: (p) => <code className="text-xs text-ink/60">{p.slug}</code> },
-    { key: 'type', header: 'App', render: (p) => <Badge value={p.type} /> },
-    { key: 'iconName', header: 'Icon', render: (p) => (p.iconName ? <span className="text-xs text-ink/55">{p.iconName}</span> : <span className="text-ink/35">—</span>) },
-    { key: 'isActive', header: 'Status', render: (p) => <Badge value={p.isActive ? 'active' : 'inactive'}>{p.isActive ? 'Live' : 'Hidden'}</Badge> },
-    { key: 'updatedAt', header: 'Updated', render: (p) => <span className="text-ink/60">{fmtDateTime(p.updatedAt)}</span> },
+    { key: 'name', header: 'Page', sortable: true, render: (p) => <span className="font-medium">{p.name}</span> },
+    { key: 'slug', header: 'Slug', sortable: true, render: (p) => <code className="text-xs text-ink/60">{p.slug}</code> },
+    { key: 'type', header: 'App', sortable: true, render: (p) => <Badge value={p.type} /> },
+    { key: 'iconName', header: 'Icon', sortable: true, render: (p) => (p.iconName ? <span className="text-xs text-ink/55">{p.iconName}</span> : <span className="text-ink/35">—</span>) },
+    { key: 'isActive', header: 'Status', sortable: true, render: (p) => <Badge value={p.isActive ? 'active' : 'inactive'}>{p.isActive ? 'Live' : 'Hidden'}</Badge> },
+    { key: 'updatedAt', header: 'Updated', sortable: true, render: (p) => <span className="text-ink/60">{fmtDateTime(p.updatedAt)}</span> },
     {
       key: 'actions',
       header: '',

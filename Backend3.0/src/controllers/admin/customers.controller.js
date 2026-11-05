@@ -7,7 +7,7 @@ import { ACTIVE_RIDE_STATUSES, OUTSTATION_ACTIVE_RIDE_STATUSES } from '../../con
 import { recordAudit, diffFields } from '../../services/admin/audit.service.js';
 import { enforceBlock } from '../../services/admin/accountBlock.service.js';
 import {
-  USER_HIDDEN, badRequest, containsRegex, dateFilter, handle, isId, listResponse, maskPerson, pageParams, readReason, toId,
+  USER_HIDDEN, badRequest, containsRegex, dateFilter, handle, isId, listResponse, maskPerson, pageParams, readReason, sortParams, toId,
 } from './helpers.js';
 import { countBy } from './metrics.js';
 
@@ -42,7 +42,8 @@ export class CustomersController {
       filter._id = req.query.hasRides === 'true' ? { $in: riders } : { $nin: riders };
     }
 
-    const sort = req.query.sort === 'oldest' ? { createdAt: 1 } : req.query.sort === 'name' ? { name: 1 } : { createdAt: -1 };
+    const legacy = req.query.sort === 'oldest' ? { createdAt: 1 } : req.query.sort === 'name' ? { name: 1 } : { createdAt: -1 };
+    const sort = sortParams(req.query, { name: 'name', joined: 'createdAt', status: 'isBlocked' }, legacy);
     const [rows, total] = await Promise.all([
       User.find(filter).select(USER_HIDDEN).sort(sort).skip(skip).limit(limit).lean(),
       User.countDocuments(filter),

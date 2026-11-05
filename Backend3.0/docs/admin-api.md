@@ -68,7 +68,9 @@ log.
 
 Lists are paginated with `?page=&limit=` (`limit` is at most 100) and return
 `{ data, total, page, limit, pages }`. Date filters accept `from`/`to` (or `date`) as `YYYY-MM-DD`
-in IST, the same as the rest of the API. Validation errors come back as
+in IST, the same as the rest of the API. Lists also take `?sortBy=<column>&order=asc|desc`; each
+endpoint accepts only its own column keys (for example `name`, `joined`, `status` on customers) and
+falls back to its default order for anything else. Validation errors come back as
 `400 { message, errors: [{ field, message }] }`.
 
 | Route | Permission | Notes |

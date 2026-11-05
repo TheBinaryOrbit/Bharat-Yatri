@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useApi, useUrlFilters } from '../lib/hooks.js';
+import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtAgo, fmtDateTime } from '../lib/format.js';
 import { Badge, Card, EmptyState, ErrorNote, PageHead, Pagination, Person, Select, Table, Tabs, Toolbar } from '../components/ui/index.js';
 import { SearchInput } from '../components/people/shared.jsx';
@@ -17,10 +17,11 @@ export default function KycQueue() {
   const { data, error, loading } = useApi('/kyc', f);
   const counts = data?.counts || {};
   const pending = f.status === 'pending';
+  const sortProps = useUrlSort(f, set);
 
   const columns = [
-    { key: 'driver', header: 'Driver', render: (r) => <Person name={r.name} sub={r.phoneNumber} src={r.profileImageUrl} avatar /> },
-    { key: 'submitted', header: 'Submitted', render: (r) => fmtDateTime(r.manualKyc?.submittedAt || r.updatedAt) },
+    { key: 'driver', header: 'Driver', sortable: true, render: (r) => <Person name={r.name} sub={r.phoneNumber} src={r.profileImageUrl} avatar /> },
+    { key: 'submitted', header: 'Submitted', sortable: true, render: (r) => fmtDateTime(r.manualKyc?.submittedAt || r.updatedAt) },
     pending && {
       key: 'waiting',
       header: 'Waiting',
@@ -29,8 +30,8 @@ export default function KycQueue() {
         return <Badge tone={waitTone(at)}>{fmtAgo(at).replace(' ago', '')}</Badge>;
       },
     },
-    !pending && { key: 'reviewed', header: 'Reviewed', render: (r) => fmtDateTime(r.manualKyc?.reviewedAt || r.updatedAt) },
-    { key: 'method', header: 'Method', render: (r) => (r.kycMethod ? <Badge value={r.kycMethod} /> : '—') },
+    !pending && { key: 'reviewed', header: 'Reviewed', sortable: true, render: (r) => fmtDateTime(r.manualKyc?.reviewedAt || r.updatedAt) },
+    { key: 'method', header: 'Method', sortable: true, render: (r) => (r.kycMethod ? <Badge value={r.kycMethod} /> : '—') },
     { key: 'status', header: 'Status', render: (r) => <Badge value={r.kycStatus} /> },
     f.status === 'rejected' && { key: 'reason', header: 'Reason', render: (r) => <span className="block max-w-xs truncate text-ink/65" title={r.kycFailedReason}>{r.kycFailedReason || '—'}</span> },
   ].filter(Boolean);
@@ -58,6 +59,7 @@ export default function KycQueue() {
         </Toolbar>
         {error && <ErrorNote error={error} className="m-4" />}
         <Table
+          {...sortProps}
           columns={columns}
           rows={data?.data}
           loading={loading}

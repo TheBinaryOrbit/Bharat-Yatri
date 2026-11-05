@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useApi, useUrlFilters } from '../lib/hooks.js';
+import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDate, fmtNumber, KYC_LABEL } from '../lib/format.js';
 import { Badge, Button, Card, DateRange, ErrorNote, PageHead, Pagination, Person, Select, Stars, Table, Toolbar } from '../components/ui/index.js';
 import { AccountStatus, SearchInput } from '../components/people/shared.jsx';
@@ -9,10 +9,11 @@ export default function Drivers() {
   const [f, set, clear] = useUrlFilters({ page: '1', limit: '20' });
   const { data, error, loading } = useApi('/drivers', f);
   const { data: types } = useApi('/vehicle-types');
-  const active = Object.keys(f).some((k) => !['page', 'limit'].includes(k));
+  const sortProps = useUrlSort(f, set);
+  const active = Object.keys(f).some((k) => !['page', 'limit', 'sortBy', 'order'].includes(k));
 
   const columns = [
-    { key: 'name', header: 'Driver', render: (r) => <Person name={r.name} sub={r.phoneNumber} src={r.profileImageUrl} avatar /> },
+    { key: 'name', header: 'Driver', sortable: true, render: (r) => <Person name={r.name} sub={r.phoneNumber} src={r.profileImageUrl} avatar /> },
     {
       key: 'vehicle',
       header: 'Vehicle',
@@ -29,6 +30,7 @@ export default function Drivers() {
     {
       key: 'kyc',
       header: 'KYC',
+      sortable: true,
       render: (r) => (
         <span className="flex flex-col items-start gap-1">
           <Badge value={r.kycStatus || 'not_started'} />
@@ -39,6 +41,7 @@ export default function Drivers() {
     {
       key: 'onboarding',
       header: 'Onboarding',
+      sortable: true,
       render: (r) =>
         r.onboarding?.isComplete ? (
           <Badge tone="good">Complete</Badge>
@@ -61,8 +64,8 @@ export default function Drivers() {
         ),
     },
     { key: 'done', header: 'Completed rides', align: 'right', render: (r) => <span className="num">{fmtNumber(r.completedRides)}</span> },
-    { key: 'joined', header: 'Joined', render: (r) => fmtDate(r.createdAt) },
-    { key: 'status', header: 'Status', render: (r) => <AccountStatus blocked={r.isBlocked} /> },
+    { key: 'joined', header: 'Joined', sortable: true, render: (r) => fmtDate(r.createdAt) },
+    { key: 'status', header: 'Status', sortable: true, render: (r) => <AccountStatus blocked={r.isBlocked} /> },
   ];
 
   return (
@@ -81,7 +84,7 @@ export default function Drivers() {
           {active && <Button variant="ghost" size="sm" onClick={clear}>Clear</Button>}
         </Toolbar>
         {error && <ErrorNote error={error} className="m-4" />}
-        <Table columns={columns} rows={data?.data} loading={loading} onRowClick={(r) => navigate(`/drivers/${r._id}`)} minWidth="min-w-[960px]" />
+        <Table {...sortProps} columns={columns} rows={data?.data} loading={loading} onRowClick={(r) => navigate(`/drivers/${r._id}`)} minWidth="min-w-[960px]" />
         {data && (
           <Pagination page={data.page} pages={data.pages} total={data.total} limit={data.limit} onPage={(page) => set({ page }, { resetPage: false })} onLimit={(limit) => set({ limit })} />
         )}

@@ -8,7 +8,7 @@ import { Vehicle } from '../../models/vehicle.model.js';
 import { Review } from '../../models/review.model.js';
 import { RIDE_STATUSES, OUTSTATION_RIDE_STATUSES, BOOKING_TYPES } from '../../constants/ride.constants.js';
 import { LiveService } from '../../services/admin/live.service.js';
-import { badRequest, containsRegex, dateFilter, handle, isId, listResponse, maskPerson, pageParams, toId } from './helpers.js';
+import { badRequest, containsRegex, dateFilter, handle, isId, listResponse, maskPerson, pageParams, sortParams, toId } from './helpers.js';
 import { parseDateRange } from '../../utils/dateRange.js';
 
 const liveService = new LiveService();
@@ -88,13 +88,18 @@ export class RidesController {
       }
     }
 
-    const sortField = this.kind === 'outstation' && req.query.sort === 'trip' ? 'pickupAt' : 'createdAt';
+    const legacyField = this.kind === 'outstation' && req.query.sort === 'trip' ? 'pickupAt' : 'createdAt';
+    const sort = sortParams(
+      req.query,
+      { ride: 'createdAt', pickupAt: 'pickupAt', fare: 'offeredFare', status: 'rideStatus' },
+      { [legacyField]: -1 }
+    );
     const [rows, total] = await Promise.all([
       Ride.find(filter)
         .populate('bookedBy', 'name phoneNumber')
         .populate('assignedTo', 'name phoneNumber')
         .populate('vehicleTypeId', 'name')
-        .sort({ [sortField]: -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit)
         .lean(),

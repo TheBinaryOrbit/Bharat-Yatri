@@ -17,7 +17,7 @@ import { kycProgress } from '../../utils/kycProgress.js';
 import { onboardingProgress } from '../../utils/onboardingProgress.js';
 import {
   DRIVER_HIDDEN, badRequest, canSeePii, containsRegex, dateFilter, handle, isId, listResponse, maskPerson, maskUpi,
-  pageParams, readReason, toId,
+  pageParams, readReason, sortParams, toId,
 } from './helpers.js';
 import { countBy } from './metrics.js';
 
@@ -108,7 +108,12 @@ export class DriversController {
     }
     if (idSets.length) filter._id = { $in: idSets[0] };
 
-    const sort = req.query.sort === 'oldest' ? { createdAt: 1 } : req.query.sort === 'name' ? { name: 1 } : { createdAt: -1 };
+    const legacy = req.query.sort === 'oldest' ? { createdAt: 1 } : req.query.sort === 'name' ? { name: 1 } : { createdAt: -1 };
+    const sort = sortParams(
+      req.query,
+      { name: 'name', kyc: 'kycStatus', onboarding: ['isProfileComplete', 'onboardingStep'], joined: 'createdAt', status: 'isBlocked' },
+      legacy
+    );
     const [rows, total] = await Promise.all([
       Driver.find(filter)
         .select('name phoneNumber email profileImageUrl kycStatus kycMethod isKycCompleted isProfileComplete onboardingStep isBlocked createdAt')
@@ -280,7 +285,7 @@ export class DriversController {
     if (req.query.hasComment === 'true') filter.comment = { $nin: ['', null] };
 
     const [rows, total] = await Promise.all([
-      Review.find(filter).populate('userId', 'name phoneNumber').sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Review.find(filter).populate('userId', 'name phoneNumber').sort(sortParams(req.query, { createdAt: 'createdAt', rating: 'rating' }, { createdAt: -1 })).skip(skip).limit(limit).lean(),
       Review.countDocuments(filter),
     ]);
     rows.forEach((r) => maskPerson(req, r.userId));
@@ -313,7 +318,7 @@ export class DriversController {
     const [rows, total] = await Promise.all([
       Model.find(filter)
         .populate(rideField, 'pickupLocationName dropLocationName rideStatus offeredFare createdAt acceptedBidId')
-        .sort({ createdAt: -1 })
+        .sort(sortParams(req.query, { fare: 'fare', status: 'requestStatus', at: 'createdAt' }, { createdAt: -1 }))
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -372,7 +377,12 @@ export class DriversController {
     if (method !== 'any') filter.kycMethod = method;
     if (req.query.q) filter.$or = [{ name: containsRegex(req.query.q) }, { phoneNumber: containsRegex(req.query.q) }];
 
-    const sort = status === 'pending' ? { 'manualKyc.submittedAt': 1, updatedAt: 1 } : { updatedAt: -1 };
+    const oldestFirst = status === 'pending' ? { 'manualKyc.submittedAt': 1, updatedAt: 1 } : { updatedAt: -1 };
+    const sort = sortParams(
+      req.query,
+      { driver: 'name', submitted: ['manualKyc.submittedAt', 'updatedAt'], reviewed: ['manualKyc.reviewedAt', 'updatedAt'], method: 'kycMethod' },
+      oldestFirst
+    );
     const [rows, total, counts] = await Promise.all([
       Driver.find(filter).select(DRIVER_HIDDEN).sort(sort).skip(skip).limit(limit).lean(),
       Driver.countDocuments(filter),

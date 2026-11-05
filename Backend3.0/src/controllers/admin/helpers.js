@@ -11,7 +11,21 @@ export const pageParams = (query) => {
   return { page, limit, skip: (page - 1) * limit };
 };
 
-export const listResponse = (res, { data, total, page, limit, ...extra }) =>
+// Column sort from ?sortBy=<key>&order=asc|desc. `allowed` maps the public key to a field path
+// (or a list of paths for tie-breaks); unknown keys get `fallback`. _id keeps paging stable.
+export const sortParams = (query, allowed, fallback) => {
+  const fields = allowed[query?.sortBy];
+  if (!fields) return fallback;
+  const dir = query.order === 'asc' ? 1 : -1;
+  const sort = {};
+  [].concat(fields).forEach((f) => {
+    sort[f] = dir;
+  });
+  sort._id = dir;
+  return sort;
+};
+
+export const listResponse =(res, { data, total, page, limit, ...extra }) =>
   res.status(200).json({ data, total, page, limit, pages: Math.max(Math.ceil(total / limit), 1), ...extra });
 
 export const badRequest = (res, errors, message = 'Please fix the highlighted fields') =>

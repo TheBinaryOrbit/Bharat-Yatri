@@ -24,13 +24,27 @@ function LiveChip({ live }) {
   );
 }
 
+const REVIEW_SORTS = {
+  newest: { sortBy: 'createdAt', order: 'desc' },
+  oldest: { sortBy: 'createdAt', order: 'asc' },
+  highest: { sortBy: 'rating', order: 'desc' },
+  lowest: { sortBy: 'rating', order: 'asc' },
+};
+const REVIEW_SORT_OPTIONS = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'highest', label: 'Highest rating' },
+  { value: 'lowest', label: 'Lowest rating' },
+];
+
 function ReviewsSection({ driverId, rating }) {
   const { can } = useAuth();
   const toast = useToast();
   const [page, setPage] = useState(1);
   const [stars, setStars] = useState('');
+  const [order, setOrder] = useState('newest');
   const [removing, setRemoving] = useState(null);
-  const { data, loading, error, reload } = useApi(`/drivers/${driverId}/reviews`, { page, limit: 10, rating: stars });
+  const { data, loading, error, reload } = useApi(`/drivers/${driverId}/reviews`, { page, limit: 10, rating: stars, ...REVIEW_SORTS[order] });
   const max = Math.max(...Object.values(rating.distribution), 1);
 
   return (
@@ -60,7 +74,10 @@ function ReviewsSection({ driverId, rating }) {
           eyebrow="Reviews"
           title={stars ? `${stars}-star reviews` : 'All reviews'}
           action={
-            <Select className="w-32" value={stars} onChange={(e) => { setStars(e.target.value); setPage(1); }} placeholder="Any rating" options={[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `${n} stars` }))} />
+            <div className="flex items-center gap-2">
+              <Select className="w-32" value={stars} onChange={(e) => { setStars(e.target.value); setPage(1); }} placeholder="Any rating" options={[5, 4, 3, 2, 1].map((n) => ({ value: String(n), label: `${n} stars` }))} />
+              <Select className="w-36" value={order} onChange={(e) => { setOrder(e.target.value); setPage(1); }} aria-label="Sort reviews" options={REVIEW_SORT_OPTIONS} />
+            </div>
           }
         />
         {error && <ErrorNote error={error} className="m-4" />}
@@ -121,7 +138,8 @@ function BidsSection({ driverId }) {
   const navigate = useNavigate();
   const [rideType, setRideType] = useState('quickride');
   const [page, setPage] = useState(1);
-  const { data, loading, error } = useApi(`/drivers/${driverId}/bids`, { rideType, page, limit: 10 });
+  const [sort, setSort] = useState(null);
+  const { data, loading, error } = useApi(`/drivers/${driverId}/bids`, { rideType, page, limit: 10, sortBy: sort?.by, order: sort?.order });
   const base = rideType === 'outstation' ? '/outstation-rides' : '/quick-rides';
 
   const columns = [
@@ -138,10 +156,10 @@ function BidsSection({ driverId }) {
         ) : '—',
     },
     { key: 'offered', header: 'Rider offered', align: 'right', render: (b) => fmtMoney(b.ride?.offeredFare) },
-    { key: 'fare', header: 'Bid', align: 'right', render: (b) => <span className="font-medium">{fmtMoney(b.fare)}</span> },
-    { key: 'status', header: 'Bid status', render: (b) => <Badge value={b.requestStatus} /> },
+    { key: 'fare', header: 'Bid', align: 'right', sortable: true, render: (b) => <span className="font-medium">{fmtMoney(b.fare)}</span> },
+    { key: 'status', header: 'Bid status', sortable: true, render: (b) => <Badge value={b.requestStatus} /> },
     { key: 'ridestatus', header: 'Ride status', render: (b) => (b.ride ? <Badge value={b.ride.rideStatus} /> : '—') },
-    { key: 'at', header: 'Placed', render: (b) => fmtDateTime(b.createdAt) },
+    { key: 'at', header: 'Placed', sortable: true, render: (b) => fmtDateTime(b.createdAt) },
   ];
 
   return (
@@ -156,7 +174,7 @@ function BidsSection({ driverId }) {
       )}
       {error && <ErrorNote error={error} className="m-4" />}
       <div className="mt-3">
-        <Table columns={columns} rows={data?.data} loading={loading} onRowClick={(b) => b.ride && navigate(`${base}/${b.ride._id}`)} empty={<EmptyState title="No bids" />} />
+        <Table sort={sort} onSort={(s) => { setSort(s); setPage(1); }} columns={columns} rows={data?.data} loading={loading} onRowClick={(b) => b.ride && navigate(`${base}/${b.ride._id}`)} empty={<EmptyState title="No bids" />} />
       </div>
       {data && data.total > 10 && <Pagination page={data.page} pages={data.pages} total={data.total} limit={data.limit} onPage={setPage} />}
     </Card>

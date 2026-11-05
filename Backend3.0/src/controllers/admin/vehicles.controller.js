@@ -6,7 +6,7 @@ import { VehicleTypeService } from '../../services/vehicleType.service.js';
 import { recordAudit, diffFields } from '../../services/admin/audit.service.js';
 import { buildFileUrl } from '../../utils/fileUrl.js';
 import { FareService } from '../../services/fare.service.js';
-import { badRequest, containsRegex, handle, isId, listResponse, maskPerson, pageParams, toId } from './helpers.js';
+import { badRequest, containsRegex, handle, isId, listResponse, maskPerson, pageParams, sortParams, toId } from './helpers.js';
 
 const vehicleTypeService = new VehicleTypeService();
 const fareService = new FareService();
@@ -82,7 +82,21 @@ export class VehiclesController {
       Vehicle.find(filter)
         .populate('vehicleTypeId', 'name')
         .populate('driverId', 'name phoneNumber isBlocked kycStatus')
-        .sort({ createdAt: -1 })
+        .sort(
+          sortParams(
+            req.query,
+            {
+              number: 'vehicleNumber',
+              name: 'vehicleName',
+              owner: 'ownerName',
+              seats: 'seatingCapacity',
+              year: 'manufactureYear',
+              insurance: ['insuranceExpiry.year', 'insuranceExpiry.month'],
+              added: 'createdAt',
+            },
+            { createdAt: -1 }
+          )
+        )
         .skip(skip)
         .limit(limit)
         .lean(),

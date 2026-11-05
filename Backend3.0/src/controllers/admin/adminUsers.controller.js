@@ -4,7 +4,7 @@ import { AuditLog } from '../../models/auditLog.model.js';
 import { ADMIN_ROLES, ADMIN_ROLE_KEYS } from '../../constants/admin.constants.js';
 import { recordAudit } from '../../services/admin/audit.service.js';
 import { validatePassword } from './adminAuth.controller.js';
-import { badRequest, containsRegex, dateFilter, handle, isId, listResponse, pageParams } from './helpers.js';
+import { badRequest, containsRegex, dateFilter, handle, isId, listResponse, pageParams, sortParams } from './helpers.js';
 
 const shape = (a) => ({
   _id: a._id,
@@ -31,7 +31,8 @@ export class AdminUsersController {
     if (req.query.q) filter.$or = [{ name: containsRegex(req.query.q) }, { email: containsRegex(req.query.q) }];
     if (req.query.role && ADMIN_ROLE_KEYS.includes(req.query.role)) filter.role = req.query.role;
     const [rows, total] = await Promise.all([
-      Admin.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Admin.find(filter)
+        .sort(sortParams(req.query, { name: 'name', role: 'role', isActive: 'isActive', lastLoginAt: 'lastLoginAt', createdAt: 'createdAt' }, { createdAt: -1 })).skip(skip).limit(limit).lean(),
       Admin.countDocuments(filter),
     ]);
     return listResponse(res, { data: rows.map(shape), total, page, limit });
@@ -134,7 +135,8 @@ export class AdminUsersController {
     if (req.query.adminId && isId(req.query.adminId)) filter.adminId = req.query.adminId;
 
     const [rows, total] = await Promise.all([
-      AuditLog.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      AuditLog.find(filter)
+        .sort(sortParams(req.query, { createdAt: 'createdAt', admin: 'adminName', action: 'action', entity: 'entity' }, { createdAt: -1 })).skip(skip).limit(limit).lean(),
       AuditLog.countDocuments(filter),
     ]);
     return listResponse(res, { data: rows, total, page, limit });

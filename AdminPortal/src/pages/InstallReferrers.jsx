@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { useApi, useDebounced, useUrlFilters } from '../lib/hooks.js';
+import { useApi, useDebounced, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { daysAgo, fmtDate, fmtDateTime, fmtNumber, fmtPercent, isoDay } from '../lib/format.js';
 import {
   Badge, Card, CardBody, CardHead, DateRange, ErrorNote, Input, PageHead, Pagination, Select, StatCard, Table, Toolbar,
@@ -22,10 +22,11 @@ export default function InstallReferrers() {
   const page = Number(f.page) || 1;
   const limit = Number(f.limit) || 50;
 
+  const sortProps = useUrlSort(f, setF);
   const summary = useApi('/install-referrers/summary', range);
   const series = useApi('/install-referrers/timeseries', range);
   const list = useApi('/install-referrers', {
-    ...range, source: f.source, medium: f.medium, campaign: f.campaign, linked: f.linked, limit, skip: (page - 1) * limit,
+    ...range, source: f.source, medium: f.medium, campaign: f.campaign, linked: f.linked, sortBy: f.sortBy, order: f.order, limit, skip: (page - 1) * limit,
   });
 
   const s = summary.data;
@@ -89,10 +90,10 @@ export default function InstallReferrers() {
               setSearch((x) => ({ ...x, source: r.source === 'unknown' ? '' : r.source, medium: r.medium === 'unknown' ? '' : r.medium }));
             }}
             columns={[
-              { key: 'source', header: 'Source', render: (r) => <span className="font-medium">{r.source}</span> },
-              { key: 'medium', header: 'Medium', render: (r) => <span className="text-ink/60">{r.medium}</span> },
-              { key: 'installs', header: 'Installs', align: 'right', render: (r) => fmtNumber(r.installs) },
-              { key: 'signups', header: 'Sign-ups', align: 'right', render: (r) => `${fmtNumber(r.signups)} · ${fmtPercent(r.installs ? r.signups / r.installs : null)}` },
+              { key: 'source', header: 'Source', sortable: true, render: (r) => <span className="font-medium">{r.source}</span> },
+              { key: 'medium', header: 'Medium', sortable: true, render: (r) => <span className="text-ink/60">{r.medium}</span> },
+              { key: 'installs', header: 'Installs', align: 'right', sortable: true, render: (r) => fmtNumber(r.installs) },
+              { key: 'signups', header: 'Sign-ups', align: 'right', sortable: true, render: (r) => `${fmtNumber(r.signups)} · ${fmtPercent(r.installs ? r.signups / r.installs : null)}` },
             ]}
             rows={s?.data || []}
           />
@@ -114,13 +115,15 @@ export default function InstallReferrers() {
         </Toolbar>
         <ErrorNote error={list.error} className="m-4" />
         <Table
+          {...sortProps}
           loading={list.loading}
           columns={[
-            { key: 'installTime', header: 'Installed', render: (r) => <span className="whitespace-nowrap text-ink/70">{fmtDateTime(r.installTime)}</span> },
-            { key: 'app', header: 'App', render: (r) => <Badge value={r.app} /> },
+            { key: 'installTime', header: 'Installed', sortable: true, render: (r) => <span className="whitespace-nowrap text-ink/70">{fmtDateTime(r.installTime)}</span> },
+            { key: 'app', header: 'App', sortable: true, render: (r) => <Badge value={r.app} /> },
             {
               key: 'source',
               header: 'Source / medium',
+              sortable: true,
               render: (r) => (
                 <span>
                   <span className="font-medium">{r.source || 'unknown'}</span>
@@ -128,8 +131,8 @@ export default function InstallReferrers() {
                 </span>
               ),
             },
-            { key: 'campaign', header: 'Campaign', render: (r) => r.campaign || <span className="text-ink/35">—</span> },
-            { key: 'platform', header: 'Platform', render: (r) => <span className="text-ink/60">{r.platform}{r.appVersion ? ` · v${r.appVersion}` : ''}</span> },
+            { key: 'campaign', header: 'Campaign', sortable: true, render: (r) => r.campaign || <span className="text-ink/35">—</span> },
+            { key: 'platform', header: 'Platform', sortable: true, render: (r) => <span className="text-ink/60">{r.platform}{r.appVersion ? ` · v${r.appVersion}` : ''}</span> },
             {
               key: 'account',
               header: 'Signed up as',

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
-import { useApi, useUrlFilters } from '../lib/hooks.js';
+import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDateTime, shortId, titleCase } from '../lib/format.js';
 import { Badge, Card, DateRange, ErrorNote, Input, KeyValues, Modal, PageHead, Pagination, Select, Table, Toolbar } from '../components/ui/index.js';
 
@@ -73,6 +73,7 @@ export default function AuditLog() {
   const [f, setF] = useUrlFilters({ action: '', entity: '', entityId: '', adminId: '', from: '', to: '', page: '1', limit: '50' });
   const [action, setAction] = useState(f.action);
   const [open, setOpen] = useState(null);
+  const sortProps = useUrlSort(f, setF);
   const list = useApi('/audit-logs', f);
   const admins = useApi('/admins', { limit: 100 }, { enabled: can('admins.manage') });
 
@@ -129,13 +130,15 @@ export default function AuditLog() {
         </Toolbar>
         <ErrorNote error={list.error} className="m-4" />
         <Table
+          {...sortProps}
           loading={list.loading}
           onRowClick={setOpen}
           columns={[
-            { key: 'createdAt', header: 'When', render: (r) => <span className="whitespace-nowrap text-ink/70">{fmtDateTime(r.createdAt)}</span> },
+            { key: 'createdAt', header: 'When', sortable: true, render: (r) => <span className="whitespace-nowrap text-ink/70">{fmtDateTime(r.createdAt)}</span> },
             {
               key: 'admin',
               header: 'Admin',
+              sortable: true,
               render: (r) => (
                 <span>
                   <span className="block font-medium">{r.adminName || 'Admin'}</span>
@@ -143,8 +146,8 @@ export default function AuditLog() {
                 </span>
               ),
             },
-            { key: 'action', header: 'Action', render: (r) => <Badge tone={toneOf(r.action)}>{r.action}</Badge> },
-            { key: 'entity', header: 'Record', render: entityCell },
+            { key: 'action', header: 'Action', sortable: true, render: (r) => <Badge tone={toneOf(r.action)}>{r.action}</Badge> },
+            { key: 'entity', header: 'Record', sortable: true, render: entityCell },
             { key: 'reason', header: 'Reason', tdClassName: 'max-w-xs', render: (r) => (r.reason ? <span className="line-clamp-2 text-ink/70">{r.reason}</span> : <span className="text-ink/35">—</span>) },
           ]}
           rows={d?.data || []}

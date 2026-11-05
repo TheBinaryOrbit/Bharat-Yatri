@@ -132,6 +132,7 @@ export default function RideDetail({ kind }) {
     {
       key: 'driver',
       header: 'Driver',
+      sortValue: (b) => b.requestedBy?.name,
       render: (b) =>
         b.requestedBy ? (
           <Person name={b.requestedBy.name} sub={b.requestedBy.phoneNumber} to={`/drivers/${b.requestedBy._id}`} src={b.requestedBy.profileImageUrl} avatar />
@@ -142,6 +143,7 @@ export default function RideDetail({ kind }) {
     {
       key: 'vehicle',
       header: 'Vehicle',
+      sortValue: (b) => b.vehicleId?.vehicleNumber,
       render: (b) =>
         b.vehicleId ? (
           <div>
@@ -156,6 +158,7 @@ export default function RideDetail({ kind }) {
       key: 'fare',
       header: 'Bid',
       align: 'right',
+      sortable: true,
       render: (b) => {
         const diff = b.fare - ride.offeredFare;
         return (
@@ -166,10 +169,11 @@ export default function RideDetail({ kind }) {
         );
       },
     },
-    { key: 'placed', header: 'Placed', render: (b) => <span className="whitespace-nowrap text-xs">{fmtDateTime(b.createdAt)}</span> },
+    { key: 'placed', header: 'Placed', sortValue: (b) => b.createdAt, render: (b) => <span className="whitespace-nowrap text-xs">{fmtDateTime(b.createdAt)}</span> },
     {
       key: 'status',
       header: 'Status',
+      sortValue: (b) => (b.isAccepted ? 'accepted' : b.requestStatus),
       render: (b) => (b.isAccepted ? <Badge tone="good">Accepted</Badge> : <Badge value={b.requestStatus} />),
     },
   ];

@@ -6,7 +6,8 @@ import { useApi } from '../lib/hooks.js';
 import { useAuth } from '../lib/auth.jsx';
 import { fmtDate, fmtDateTime, fmtMoney, fmtNumber, shortId } from '../lib/format.js';
 import {
-  Avatar, Button, Card, CardBody, CardHead, ErrorNote, Field, Input, KeyValues, Modal, NotesPanel, PageHead, Spinner, StatCard, StatRow, Stars, useToast,
+  Avatar, Button, Card, CardBody, CardHead, ErrorNote, Field, Input, KeyValues, Modal, NotesPanel, PageHead, Select, Spinner, StatCard, StatRow, Stars,
+  useListSort, useToast,
 } from '../components/ui/index.js';
 import { AccountStatus, BackLink, BlockAction, BlockedBanner, RideHistory, osmLink } from '../components/people/shared.jsx';
 
@@ -75,11 +76,22 @@ export default function CustomerDetail() {
   const { can } = useAuth();
   const { data, error, loading, reload } = useApi(`/customers/${id}`);
   const [editing, setEditing] = useState(false);
+  const [destinations, destSort] = useListSort(data?.destinations, [
+    { value: 'newest', label: 'Newest first', by: (d) => d.createdAt, order: 'desc' },
+    { value: 'oldest', label: 'Oldest first', by: (d) => d.createdAt, order: 'asc' },
+    { value: 'name', label: 'Name A–Z', by: (d) => d.tag, order: 'asc' },
+  ]);
+  const [reviews, reviewSort] = useListSort(data?.reviews, [
+    { value: 'newest', label: 'Newest first', by: (r) => r.createdAt, order: 'desc' },
+    { value: 'oldest', label: 'Oldest first', by: (r) => r.createdAt, order: 'asc' },
+    { value: 'highest', label: 'Highest rating', by: (r) => r.rating, order: 'desc' },
+    { value: 'lowest', label: 'Lowest rating', by: (r) => r.rating, order: 'asc' },
+  ]);
 
   if (loading && !data) return <Spinner />;
   if (error) return <ErrorNote error={error} />;
   if (!data) return null;
-  const { customer: c, rides, destinations, reviews } = data;
+  const { customer: c, rides } = data;
 
   return (
     <>
@@ -145,7 +157,7 @@ export default function CustomerDetail() {
         </Card>
 
         <Card>
-          <CardHead eyebrow="Saved places" title="Quick destinations" />
+          <CardHead eyebrow="Saved places" title="Quick destinations" action={destinations.length > 1 && <Select className="w-36" {...destSort} />} />
           <CardBody>
             {destinations.length ? (
               <ul className="divide-y divide-line">
@@ -178,7 +190,7 @@ export default function CustomerDetail() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card>
-          <CardHead eyebrow="Feedback" title="Reviews they wrote" />
+          <CardHead eyebrow="Feedback" title="Reviews they wrote" action={reviews.length > 1 && <Select className="w-36" {...reviewSort} />} />
           <CardBody>
             {reviews.length ? (
               <ul className="divide-y divide-line">
