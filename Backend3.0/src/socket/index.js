@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 
 import { env } from '../config/env.js';
+import { socketCorsOptions } from '../config/cors.js';
 import { verifyToken } from '../utils/token.js';
 import { User } from '../models/user.model.js';
 import { Driver } from '../models/driver.model.js';
@@ -217,7 +218,7 @@ const registerDriverHandlers = (io, socket) => {
 
 export const initSocket = (httpServer) => {
   const io = new Server(httpServer, {
-    cors: { origin: '*' },
+    ...socketCorsOptions,
   });
 
   setIO(io);

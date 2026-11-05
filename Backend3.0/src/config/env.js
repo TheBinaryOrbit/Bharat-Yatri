@@ -17,6 +17,15 @@ export const env = {
   // Admin gate (temporary key-based auth for admin-only endpoints)
   ADMIN_API_KEY: process.env.ADMIN_API_KEY,
 
+  // Browser origins allowed to call the API and open sockets, comma-separated, e.g.
+  //   CORS_ALLOWED_ORIGINS=https://admin.bharatyaatri.com,http://localhost:5173
+  // `*.bharatyaatri.com` matches any subdomain; `*` allows every origin. Empty = allow every
+  // origin (the old behaviour), with a warning at startup. See src/config/cors.js.
+  CORS_ALLOWED_ORIGINS: String(process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean),
+
   // Signzy DigiLocker KYC
   SIGNZY_BASE_URL: process.env.SIGNZY_BASE_URL,
   SIGNZY_API_KEY: process.env.SIGNZY_API_KEY,

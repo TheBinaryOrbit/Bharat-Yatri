@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 import { env } from './config/env.js';
+import { corsOptions, describeCors } from './config/cors.js';
 import routes from './routes/index.js';
 import { UPLOAD_DIR } from './middlewares/upload.js';
 import { notFound } from './middlewares/notFound.js';
@@ -58,7 +59,8 @@ if (env.NODE_ENV !== 'production') {
 // Security & parsing middleware
 // crossOriginResourcePolicy relaxed so uploaded images load from other origins
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors());
+app.use(cors(corsOptions));
+console.log(describeCors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
