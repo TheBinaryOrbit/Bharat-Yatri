@@ -4,7 +4,7 @@ import { ArrowRight, X } from 'lucide-react';
 import { useApi, useDebounced, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { RIDE_STATUS_LABEL, fmtDateTime, fmtMoney, shortId } from '../lib/format.js';
 import {
-  Badge, Button, Card, DateRange, ErrorNote, Input, PageHead, Pagination, Person, Select, Table, Toolbar, EmptyState,
+  Badge, Button, Card, DateRange, ErrorNote, ExportButton, Input, PageHead, Pagination, Person, Select, Table, Toolbar, EmptyState,
 } from '../components/ui/index.js';
 
 const STATUSES = {
@@ -24,6 +24,28 @@ const COPY = {
     description: 'Long-distance trips, booked for now or scheduled ahead. Bids stay open until the rider accepts one.',
   },
 };
+
+const exportColumns = (kind) => [
+  { header: 'Ride ID', value: (r) => r._id, width: 26 },
+  { header: 'Booked', value: (r) => r.createdAt, type: 'datetime' },
+  ...(kind === 'outstation'
+    ? [
+        { header: 'Trip date', value: (r) => r.pickupAt, type: 'datetime' },
+        { header: 'Booking', value: (r) => (r.bookingType === 'later' ? 'Scheduled' : 'Now') },
+      ]
+    : []),
+  { header: 'Customer', value: (r) => r.bookedBy?.name, width: 22 },
+  { header: 'Customer phone', value: (r) => r.bookedBy?.phoneNumber },
+  { header: 'Driver', value: (r) => r.assignedTo?.name, width: 22 },
+  { header: 'Driver phone', value: (r) => r.assignedTo?.phoneNumber },
+  { header: 'Pickup', value: (r) => r.pickupLocationName, width: 40 },
+  { header: 'Drop', value: (r) => r.dropLocationName, width: 40 },
+  { header: 'Vehicle type', value: (r) => r.vehicleTypeId?.name },
+  { header: 'Offered fare (₹)', value: (r) => r.offeredFare, type: 'money' },
+  { header: 'Final fare (₹)', value: (r) => r.finalFare, type: 'money' },
+  { header: 'Bids', value: (r) => r.bidCount, type: 'number' },
+  { header: 'Status', value: (r) => RIDE_STATUS_LABEL[r.rideStatus] || r.rideStatus },
+];
 
 export default function Rides({ kind }) {
   const copy = COPY[kind];
@@ -45,7 +67,7 @@ export default function Rides({ kind }) {
 
   const sortProps = useUrlSort(f, setF);
   const { data: types } = useApi('/vehicle-types');
-  const { data, error, loading } = useApi(copy.path, {
+  const query = {
     sortBy: f.sortBy,
     order: f.order,
     page: f.page,
@@ -56,7 +78,8 @@ export default function Rides({ kind }) {
     from: f.from,
     to: f.to,
     ...(kind === 'outstation' && { bookingType: f.bookingType, tripFrom: f.tripFrom, tripTo: f.tripTo }),
-  });
+  };
+  const { data, error, loading } = useApi(copy.path, query);
 
   const filtered = ['q', 'status', 'vehicleTypeId', 'from', 'to', 'bookingType', 'tripFrom', 'tripTo'].some((k) => f[k]);
 
@@ -139,7 +162,12 @@ export default function Rides({ kind }) {
 
   return (
     <>
-      <PageHead eyebrow="Rides" title={copy.title} description={copy.description} />
+      <PageHead
+        eyebrow="Rides"
+        title={copy.title}
+        description={copy.description}
+        action={<ExportButton path={copy.path} params={query} columns={exportColumns(kind)} filename={kind === 'outstation' ? 'outstation-rides' : 'quick-rides'} sheet={copy.title} />}
+      />
       <Card>
         <Toolbar>
           <Input className="w-52" placeholder="Ride id, person or place" value={search} onChange={(e) => setSearch(e.target.value)} />

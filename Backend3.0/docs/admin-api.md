@@ -73,6 +73,12 @@ endpoint accepts only its own column keys (for example `name`, `joined`, `status
 falls back to its default order for anything else. Validation errors come back as
 `400 { message, errors: [{ field, message }] }`.
 
+**Excel export.** Any list `GET` accepts `?export=1`. It needs `reports.export` (403 otherwise),
+raises the `limit` cap to 500 so the portal can page through every matching row quickly, and writes
+one `data.export` audit entry (entity `export`, entityId = the list path, `after.filters` = the
+filters used) on the first page. The portal builds the `.xlsx` in the browser from those rows, with
+the same filters and sort the admin is looking at; exports stop at 50,000 rows.
+
 | Route | Permission | Notes |
 |---|---|---|
 | `POST auth/login` | public | `{ email, password }` returns `{ token, admin }` |
@@ -85,7 +91,8 @@ falls back to its default order for anything else. Validation errors come back a
 | `GET customers[/:id]` | `people.view` | The detail response includes saved quick destinations and the reviews the customer wrote |
 | `PATCH customers/:id` | `people.edit` | Editable fields: `name`, `title`, `sosContact` |
 | `PATCH customers/:id/block` · `drivers/:id/block` | `people.block` | `{ blocked, reason }` |
-| `GET drivers[/:id]`, `drivers/:id/reviews`, `drivers/:id/bids` | `people.view` | The list includes the average rating. The detail includes UPI payment details and the rating distribution |
+| `GET drivers[/:id]`, `drivers/:id/reviews`, `drivers/:id/bids` | `people.view` | The list includes the average rating. The detail includes UPI payment details, the rating distribution and `lastLoginAt` (from the activity log) |
+| `GET drivers/:id/activity` | `people.view` | The driver's activity log, newest first. `?category=auth\|account\|onboarding\|kyc\|profile\|vehicle\|admin`, `?type=`, `from`/`to`. Each entry: `type`, `title`, `uploads [{ field, label, url }]`, `fields` (names of the text fields sent), `meta`, `actor { kind: driver\|admin\|system, name }`, `ip` (masked without `pii.view`), `userAgent`, `createdAt`. See *Driver activity log* below |
 | `DELETE drivers/:id/reviews/:reviewId` | `reviews.moderate` | `{ reason }`. The deleted review is kept in the audit log |
 | `GET kyc[/:id]` · `PATCH kyc/:id/review` | `kyc.review` | `{ decision: 'approve' \| 'reject', reason }`. One-shot: returns 409 if the driver is no longer pending. Notifies the driver |
 | `PATCH kyc/:id/complete` | `kyc.review` | Admin override that marks any not-yet-verified driver as verified. If documents are missing (Aadhaar front/back unless DigiLocker, DL number, DL front/back), the first call returns `409 { code: 'DOCUMENTS_MISSING', missingDocuments }`. Repeating it with `confirmMissingDocs: true` and a `reason` completes it. Audited as `kyc.complete` or `kyc.complete_without_documents`. Notifies the driver |
@@ -97,7 +104,7 @@ falls back to its default order for anything else. Validation errors come back a
 | `GET/POST/PATCH/DELETE app-content[/:id]` | `content.edit` | HTML is sanitised with `sanitize-html` |
 | `GET settings` · `PATCH settings/:type` | `settings.edit` | Validates URLs, the phone number and banners. The first save creates the record |
 | `POST uploads/image` | `settings.edit` or `content.edit` | Multipart `image`. Returns `{ url }` |
-| `GET reports/rides\|drivers\|customers\|areas` | `reports.view` | Add `?format=csv` to download; this needs `reports.export` |
+| `GET reports/rides\|drivers\|customers\|areas` | `reports.view` | Add `?format=xlsx` (Excel) or `?format=csv` to download; this needs `reports.export` |
 | `GET install-referrers[/summary\|/timeseries]` | `referrers.view` | The list uses `limit`/`skip`, the same as the original endpoint |
 | `GET notes` · `POST notes` | `people.view` / `notes.write` | Internal notes on a user, driver, vehicle or ride |
 | `GET/POST/PATCH admins` · `GET admins/roles` | `admins.manage` | |
@@ -130,3 +137,22 @@ The `auditlogs` collection is append-only. Each entry records `adminId`, `adminN
 - Admin user changes
 - Password changes
 - Notes
+- Data exports (`data.export`)
+
+## Driver activity log
+
+The `driveractivities` collection (`models/driverActivity.model.js`) is an append-only timeline per
+driver, shown on the driver's **Activity** tab. Entries are written by
+`services/driverActivity.service.js` without being awaited, so a failed write never fails the
+driver's request. Types and their titles live in `constants/driverActivity.constants.js`:
+
+- **Sign-in** — `account.created` (first OTP verify), `auth.login`, `auth.login_blocked`
+- **Onboarding** — `onboarding.personal|licence|vehicle` with the uploaded files and their URLs,
+  plus `*_failed` with the validation errors when a step is rejected; `onboarding.full` for the
+  older one-call endpoint
+- **App edits** — `profile.update`, `vehicle.create`, `vehicle.update`, with uploads
+- **KYC** — `kyc.digilocker_started|verified|failed`, `kyc.manual_submitted|manual_failed`
+- **Admin** — `admin.kyc_approved|kyc_rejected|kyc_completed|kyc_status|profile_update|blocked|unblocked`
+
+Only names of text fields are stored, not their values. Logging started with this change: drivers
+who signed up earlier have no history before it.

@@ -81,9 +81,10 @@ export const api = {
   patch: (path, body) => request('PATCH', path, { body }),
   del: (path, body) => request('DELETE', path, { body }),
   upload: (path, form, method = 'POST') => request(method, path, { form }),
-  // Downloads a CSV report through the authenticated fetch (a plain link would carry no token).
-  download: async (path, params, filename) => {
-    const res = await request('GET', path, { params: { ...params, format: 'csv' }, raw: true });
+  // Downloads a report file (format: 'csv' | 'xlsx') through the authenticated fetch — a plain
+  // link would carry no token.
+  download: async (path, params, filename, format = 'csv') => {
+    const res = await request('GET', path, { params: { ...params, format }, raw: true });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -11,6 +11,9 @@ import { ACTIVE_RIDE_STATUSES, OUTSTATION_ACTIVE_RIDE_STATUSES } from '../../con
 import { DriverService } from '../../services/driver.service.js';
 import { LiveService } from '../../services/admin/live.service.js';
 import { recordAudit, diffFields } from '../../services/admin/audit.service.js';
+import { logDriverActivity } from '../../services/driverActivity.service.js';
+import { DriverActivity } from '../../models/driverActivity.model.js';
+import { DRIVER_ACTIVITY, DRIVER_ACTIVITY_CATEGORIES } from '../../constants/driverActivity.constants.js';
 import { enforceBlock } from '../../services/admin/accountBlock.service.js';
 import { notifyDriver } from '../../notifications/index.js';
 import { kycProgress } from '../../utils/kycProgress.js';
@@ -178,6 +181,7 @@ export class DriversController {
       OutstationRide.findOne({ ...match, rideStatus: { $in: OUTSTATION_ACTIVE_RIDE_STATUSES } }).select('_id rideStatus pickupAt').lean(),
       liveService.driverLiveState(driver._id).catch(() => ({ state: 'unknown' })),
     ]);
+    const lastLogin = await DriverActivity.findOne({ driverId: driver._id, type: 'auth.login' }).sort({ createdAt: -1 }).select('createdAt').lean();
 
     const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     ratingRows.forEach((r) => { distribution[r._id] = r.count; });
@@ -202,6 +206,7 @@ export class DriversController {
       bids: { quick: quickBids, outstation: outBids },
       activeRide: activeQuick ? { ...activeQuick, rideType: 'quickride' } : activeOut ? { ...activeOut, rideType: 'outstation' } : null,
       live,
+      lastLoginAt: lastLogin?.createdAt || null,
     });
   });
 
@@ -271,10 +276,40 @@ export class DriversController {
     const flat = (d) => ({ name: d.name, email: d.email, dob: d.dob, gender: d.gender, address: d.address, dlNumber: d.dlDetails?.dlNumber });
     const diff = diffFields(flat(before), flat(updated), ['name', 'email', 'dob', 'gender', 'address', 'dlNumber']);
     await recordAudit(req, { action: 'driver.update', entity: 'driver', entityId: driver._id, ...diff });
+    if (Object.keys(diff.after).length) logDriverActivity(req, driver._id, 'admin.profile_update', { fields: Object.keys(diff.after) });
     return res.status(200).json(maskPerson(req, updated));
   });
 
   // GET /admin/drivers/:id/reviews?rating
+  // GET /admin/drivers/:id/activity?category&type&from&to&page&limit
+  // The driver's timeline, newest first: sign-ins, onboarding steps with what was uploaded, KYC
+  // attempts and admin actions. IPs are masked for roles without pii.view.
+  activity = handle('load driver activity', async (req, res) => {
+    const { id } = req.params;
+    if (!isId(id)) return res.status(400).json({ message: 'Invalid driver id' });
+    const errors = [];
+    const range = dateFilter(req.query, errors);
+    if (req.query.category && !DRIVER_ACTIVITY_CATEGORIES.includes(req.query.category)) {
+      errors.push({ field: 'category', message: `Category must be one of: ${DRIVER_ACTIVITY_CATEGORIES.join(', ')}` });
+    }
+    if (req.query.type && !DRIVER_ACTIVITY[req.query.type]) errors.push({ field: 'type', message: 'Unknown activity type' });
+    if (errors.length) return badRequest(res, errors);
+
+    const filter = { driverId: toId(id) };
+    if (req.query.category) filter.category = req.query.category;
+    if (req.query.type) filter.type = req.query.type;
+    if (range) filter.createdAt = range;
+
+    const { page, limit, skip } = pageParams(req.query);
+    const sort = sortParams(req.query, { createdAt: 'createdAt', type: 'type' }, { createdAt: -1, _id: -1 });
+    const [data, total] = await Promise.all([
+      DriverActivity.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+      DriverActivity.countDocuments(filter),
+    ]);
+    if (!canSeePii(req)) data.forEach((a) => { a.ip = a.ip ? a.ip.replace(/[\da-f]+$/i, '•••') : ''; });
+    return listResponse(res, { data, total, page, limit, categories: DRIVER_ACTIVITY_CATEGORIES, types: DRIVER_ACTIVITY });
+  });
+
   reviews = handle('load driver reviews', async (req, res) => {
     const { id } = req.params;
     if (!isId(id)) return res.status(400).json({ message: 'Invalid driver id' });
@@ -360,6 +395,7 @@ export class DriversController {
       after: { isBlocked: driver.isBlocked, blockedReason: driver.blockedReason },
       reason,
     });
+    logDriverActivity(req, driver._id, blocked ? 'admin.blocked' : 'admin.unblocked', { meta: { reason } });
     return res.status(200).json({ message: blocked ? 'Driver blocked' : 'Driver unblocked', isBlocked: driver.isBlocked });
   });
 
@@ -459,6 +495,7 @@ export class DriversController {
       after: { kycStatus: 'verified', missingDocuments: missing.map((m) => m.label) },
       reason,
     });
+    logDriverActivity(req, updated._id, 'admin.kyc_completed', { meta: { reason, from: driver.kycStatus, missingDocuments: missing.map((m) => m.label) } });
     return res.status(200).json({ message: 'KYC marked as completed', kyc: kycProgress(updated), missingDocuments: missing });
   });
 
@@ -531,6 +568,7 @@ export class DriversController {
       after: { kycStatus: status, kycMethod: updated.kycMethod || null, ...(status === 'verified' && missing.length && { missingDocuments: missing.map((m) => m.label) }) },
       reason,
     });
+    logDriverActivity(req, updated._id, 'admin.kyc_status', { meta: { from: current, to: status, reason } });
     return res.status(200).json({ message: `KYC set to ${status.replace('_', ' ')}`, kyc: kycProgress(updated), missingDocuments: missing });
   });
 
@@ -570,6 +608,7 @@ export class DriversController {
       after: { kycStatus: driver.kycStatus },
       reason,
     });
+    logDriverActivity(req, driver._id, approved ? 'admin.kyc_approved' : 'admin.kyc_rejected', { meta: reason ? { reason } : null });
     return res.status(200).json({ message: approved ? 'KYC approved' : 'KYC rejected', kyc: kycProgress(driver) });
   });
 }

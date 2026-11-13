@@ -6,6 +6,7 @@ import { Review } from '../../models/review.model.js';
 import { InstallReferrer } from '../../models/installReferrer.model.js';
 import { INSTALL_APPS } from '../../constants/install.constants.js';
 import { badRequest, canSeePii, dateFilter, handle, maskPhone } from './helpers.js';
+import writeXlsxFile from 'write-excel-file/node';
 import { areaExpr, dayKey, daysBetween, defaultRange, TZ } from './metrics.js';
 
 const MODELS = { quickride: QuickRide, outstation: OutstationRide };
@@ -16,19 +17,41 @@ const csvCell = (v) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
-// ?format=csv on any report sends its main table as a download. Gated on reports.export here,
-// not just by hiding the button.
-const maybeCsv = (req, res, name, columns, rows) => {
-  if (req.query.format !== 'csv') return false;
+// ?format=xlsx (or csv) on any report sends its main table as a download. Gated on
+// reports.export here, not just by hiding the button. Returns a promise of true when it answered.
+const maybeExport = async (req, res, name, columns, rows) => {
+  const format = req.query.format;
+  if (format !== 'csv' && format !== 'xlsx') return false;
   if (!req.permissions.has('reports.export')) {
     res.status(403).json({ message: 'You do not have permission to export reports' });
     return true;
   }
+  const stamp = new Date().toISOString().slice(0, 10);
+  if (format === 'xlsx') {
+    const sheet = [
+      columns.map((c) => ({ value: c.label, fontWeight: 'bold' })),
+      ...rows.map((r) => columns.map((c) => xlsxCell(c.get(r)))),
+    ];
+    const buffer = await writeXlsxFile(sheet, { sheet: name, stickyRowsCount: 1, columns: columns.map(() => ({ width: 20 })) }).toBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}-${stamp}.xlsx"`);
+    res.status(200).send(buffer);
+    return true;
+  }
   const lines = [columns.map((c) => csvCell(c.label)).join(','), ...rows.map((r) => columns.map((c) => csvCell(c.get(r))).join(','))];
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${name}-${new Date().toISOString().slice(0, 10)}.csv"`);
-  res.status(200).send(`﻿${lines.join('\n')}`);
+  res.setHeader('Content-Disposition', `attachment; filename="${name}-${stamp}.csv"`);
+  res.status(200).send(`\ufeff${lines.join('\n')}`);
   return true;
+};
+
+// Numbers stay numbers so the sheet can sum them; everything else is text.
+const xlsxCell = (v) => {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  // Excel has no time zones: write the IST wall-clock time the portal shows.
+  if (v instanceof Date) return { value: new Date(v.getTime() + 330 * 60000), format: 'dd/mm/yyyy hh:mm' };
+  return String(v);
 };
 
 const readRange = (req, res) => {
@@ -147,7 +170,7 @@ export class ReportsController {
     perType.forEach((t) => {
       ['Created', 'Completed', 'Cancelled', 'Expired', 'Value'].forEach((k) => columns.push({ label: `${t.rideType} ${k.toLowerCase()}`, get: (r) => r[`${t.rideType}${k}`] }));
     });
-    if (maybeCsv(req, res, 'ride-report', columns, days)) return undefined;
+    if (await maybeExport(req, res, 'ride-report', columns, days)) return undefined;
 
     return res.status(200).json({
       range: { from: range.$gte, to: range.$lte, timezone: TZ },
@@ -208,7 +231,7 @@ export class ReportsController {
     });
 
     if (
-      maybeCsv(req, res, 'driver-report', [
+      await maybeExport(req, res, 'driver-report', [
         { label: 'Driver', get: (r) => r.name },
         { label: 'Phone', get: (r) => r.phoneNumber },
         { label: 'Assigned', get: (r) => r.assigned },
@@ -265,7 +288,7 @@ export class ReportsController {
       };
     });
     if (
-      maybeCsv(req, res, 'customer-report', [
+      await maybeExport(req, res, 'customer-report', [
         { label: 'Customer', get: (r) => r.name },
         { label: 'Phone', get: (r) => r.phoneNumber },
         { label: 'Booked', get: (r) => r.booked },
@@ -312,7 +335,7 @@ export class ReportsController {
     };
     const pickupRows = merge(pickups);
     if (
-      maybeCsv(req, res, 'area-report', [
+      await maybeExport(req, res, 'area-report', [
         { label: 'Pickup area', get: (r) => r.area },
         { label: 'Rides', get: (r) => r.rides },
         { label: 'Completed', get: (r) => r.completed },

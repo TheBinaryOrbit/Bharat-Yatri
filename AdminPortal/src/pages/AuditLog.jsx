@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth.jsx';
 import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDateTime, shortId, titleCase } from '../lib/format.js';
-import { Badge, Card, DateRange, ErrorNote, Input, KeyValues, Modal, PageHead, Pagination, Select, Table, Toolbar } from '../components/ui/index.js';
+import { Badge, Card, DateRange, ErrorNote, ExportButton, Input, KeyValues, Modal, PageHead, Pagination, Select, Table, Toolbar } from '../components/ui/index.js';
 
 const ENTITIES = [
   ['driver', 'Driver'],
@@ -16,6 +16,20 @@ const ENTITIES = [
   ['quickride', 'Quick ride'],
   ['outstation', 'Outstation ride'],
   ['admin', 'Admin user'],
+  ['export', 'Data export'],
+];
+
+const EXPORT_COLUMNS = [
+  { header: 'When', value: (r) => r.createdAt, type: 'datetime' },
+  { header: 'Admin', value: (r) => r.adminName, width: 22 },
+  { header: 'Role', value: (r) => titleCase(r.adminRole || '') },
+  { header: 'Action', value: (r) => r.action, width: 26 },
+  { header: 'Record type', value: (r) => ENTITY_LABEL[r.entity] || r.entity },
+  { header: 'Record ID', value: (r) => r.entityId, width: 26 },
+  { header: 'Reason', value: (r) => r.reason, width: 40 },
+  { header: 'Before', value: (r) => (r.before ? JSON.stringify(r.before) : ''), width: 40 },
+  { header: 'After', value: (r) => (r.after ? JSON.stringify(r.after) : ''), width: 40 },
+  { header: 'IP address', value: (r) => r.ip },
 ];
 const ENTITY_LABEL = Object.fromEntries(ENTITIES);
 
@@ -107,6 +121,7 @@ export default function AuditLog() {
         eyebrow="Administration"
         title="Audit log"
         description="Every change made through this portal — who, when, what it was before and after, and why. Entries cannot be edited or removed."
+        action={<ExportButton path="/audit-logs" params={f} columns={EXPORT_COLUMNS} filename="audit-log" sheet="Audit log" />}
       />
       <Card>
         <Toolbar>

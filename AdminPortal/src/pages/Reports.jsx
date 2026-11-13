@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
@@ -180,10 +180,10 @@ export default function Reports() {
   const { data, error, loading } = useApi(`/reports/${f.tab}`, params);
   const [exporting, setExporting] = useState(false);
 
-  const exportCsv = async () => {
-    setExporting(true);
+  const exportReport = async (format) => {
+    setExporting(format);
     try {
-      await api.download(`/reports/${f.tab}`, params, `${f.tab}-report.csv`);
+      await api.download(`/reports/${f.tab}`, params, `${f.tab}-report.${format}`, format);
     } catch (e) {
       toast.error(e);
     } finally {
@@ -199,9 +199,14 @@ export default function Reports() {
         description="Ride, driver, customer and area numbers for any window. Ride value is the total of fares agreed on completed rides — not what the platform earns."
         action={
           can('reports.export') && (
-            <Button variant="secondary" onClick={exportCsv} loading={exporting}>
-              <Download size={14} /> Export CSV
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => exportReport('xlsx')} loading={exporting === 'xlsx'} disabled={Boolean(exporting)}>
+                <FileSpreadsheet size={14} /> Export Excel
+              </Button>
+              <Button variant="ghost" onClick={() => exportReport('csv')} loading={exporting === 'csv'} disabled={Boolean(exporting)}>
+                <Download size={14} /> CSV
+              </Button>
+            </>
           )
         }
       />

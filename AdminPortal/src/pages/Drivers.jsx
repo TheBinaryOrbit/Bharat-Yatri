@@ -1,8 +1,26 @@
 import { useNavigate } from 'react-router-dom';
 import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDate, fmtNumber, KYC_LABEL } from '../lib/format.js';
-import { Badge, Button, Card, DateRange, ErrorNote, PageHead, Pagination, Person, Select, Stars, Table, Toolbar } from '../components/ui/index.js';
+import { Badge, Button, Card, DateRange, ErrorNote, ExportButton, PageHead, Pagination, Person, Select, Stars, Table, Toolbar } from '../components/ui/index.js';
 import { AccountStatus, SearchInput } from '../components/people/shared.jsx';
+
+const EXPORT_COLUMNS = [
+  { header: 'Driver ID', value: (r) => r._id },
+  { header: 'Name', value: (r) => r.name, width: 24 },
+  { header: 'Phone', value: (r) => r.phoneNumber },
+  { header: 'Email', value: (r) => r.email, width: 26 },
+  { header: 'Vehicle number', value: (r) => r.vehicle?.vehicleNumber },
+  { header: 'Vehicle type', value: (r) => r.vehicle?.vehicleType },
+  { header: 'Vehicle model', value: (r) => r.vehicle?.vehicleName },
+  { header: 'KYC status', value: (r) => KYC_LABEL[r.kycStatus || 'not_started'] || r.kycStatus },
+  { header: 'KYC method', value: (r) => (r.kycMethod === 'digilocker' ? 'DigiLocker' : r.kycMethod === 'manual' ? 'Manual' : '') },
+  { header: 'Onboarding', value: (r) => (r.onboarding?.isComplete ? 'Complete' : `Step ${r.onboarding?.completedStep ?? 0} of ${r.onboarding?.totalSteps ?? 3}`) },
+  { header: 'Rating', value: (r) => r.rating?.average, type: 'decimal' },
+  { header: 'Reviews', value: (r) => r.rating?.count, type: 'number' },
+  { header: 'Completed rides', value: (r) => r.completedRides, type: 'number' },
+  { header: 'Joined', value: (r) => r.createdAt, type: 'datetime' },
+  { header: 'Status', value: (r) => (r.isBlocked ? 'Blocked' : 'Active') },
+];
 
 export default function Drivers() {
   const navigate = useNavigate();
@@ -70,7 +88,12 @@ export default function Drivers() {
 
   return (
     <>
-      <PageHead eyebrow="People" title="Drivers" description="Every driver account, from first OTP to fully verified. Ratings come from rider reviews." />
+      <PageHead
+        eyebrow="People"
+        title="Drivers"
+        description="Every driver account, from first OTP to fully verified. Ratings come from rider reviews."
+        action={<ExportButton path="/drivers" params={f} columns={EXPORT_COLUMNS} filename="drivers" sheet="Drivers" />}
+      />
       <Card>
         <Toolbar>
           <SearchInput value={f.q} onChange={(q) => set({ q })} placeholder="Name, phone or vehicle no." />

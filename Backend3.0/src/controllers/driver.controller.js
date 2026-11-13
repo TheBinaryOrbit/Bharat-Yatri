@@ -12,8 +12,12 @@ import { kycProgress } from '../utils/kycProgress.js';
 import { runAtomically } from '../utils/transaction.js';
 import { KYC_STATUSES } from '../constants/driver.constants.js';
 import mongoose from 'mongoose';
+import { fieldsSent, logDriverActivity, uploadsFrom } from '../services/driverActivity.service.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Who the activity log names for entries written by the DigiLocker webhook.
+const SIGNZY = { kind: 'system', id: null, name: 'DigiLocker (Signzy)' };
 
 const KYC_ALREADY_LINKED = 'This KYC document is already linked to another account';
 
@@ -150,6 +154,10 @@ export class DriverController {
       if (!driver) {
         return res.status(404).json({ message: 'Driver not found' });
       }
+      logDriverActivity(req, driverId, 'profile.update', {
+        uploads: uploadsFrom(req),
+        fields: fieldsSent(req.body, ['name', 'email', 'dob', 'gender', 'address', 'aadharCardNumber', 'dlNumber']),
+      });
       return res.status(200).json({ message: 'Profile updated successfully.', driver });
     } catch (error) {
       console.log(error);
@@ -221,6 +229,7 @@ export class DriverController {
     }
 
     if (errors.length) {
+      logDriverActivity(req, driver._id, 'onboarding.personal_failed', { meta: { errors } });
       return res.status(400).json({ message: 'Invalid personal details', errors });
     }
 
@@ -233,6 +242,11 @@ export class DriverController {
       const updated = await this.driverService.updateDriver(driver._id, {
         $set: updates,
         $max: { onboardingStep: 1 },
+      });
+      logDriverActivity(req, driver._id, 'onboarding.personal', {
+        uploads: uploadsFrom(req),
+        fields: fieldsSent(req.body, ['name', 'email', 'dob', 'gender']),
+        meta: { step: 1, resubmitted: driver.onboardingStep >= 1 },
       });
       return res.status(200).json({
         message: 'Personal details saved.',
@@ -268,6 +282,7 @@ export class DriverController {
       errors.push({ field: 'dlBackImage', message: 'Driving licence back image is required' });
     }
     if (errors.length) {
+      logDriverActivity(req, driver._id, 'onboarding.licence_failed', { meta: { errors } });
       return res.status(400).json({ message: 'Invalid driving licence details', errors });
     }
 
@@ -280,6 +295,11 @@ export class DriverController {
       const updated = await this.driverService.updateDriver(driver._id, {
         $set: updates,
         $max: { onboardingStep: 2 },
+      });
+      logDriverActivity(req, driver._id, 'onboarding.licence', {
+        uploads: uploadsFrom(req),
+        fields: fieldsSent(req.body, ['dlNumber']),
+        meta: { step: 2, resubmitted: driver.onboardingStep >= 2 },
       });
       return res.status(200).json({
         message: 'Driving licence details saved.',
@@ -314,6 +334,7 @@ export class DriverController {
       errors.push({ field: 'vehicleNumber', message: 'Vehicle number is required' });
     }
     if (errors.length) {
+      logDriverActivity(req, driver._id, 'onboarding.vehicle_failed', { meta: { errors } });
       return res.status(400).json({ message: 'Invalid vehicle details', errors });
     }
 
@@ -326,6 +347,7 @@ export class DriverController {
       // A vehicle can already exist if it was added through POST /vehicles. The driver owns
       // exactly one, so keep it and finish onboarding rather than fail on the unique index.
       let vehicle = await this.vehicleService.getVehicleByDriver(driver._id);
+      const hadVehicle = Boolean(vehicle);
       const completed = { isProfileComplete: true, onboardingStep: 3 };
       let updated;
 
@@ -364,6 +386,12 @@ export class DriverController {
         );
       }
 
+      // With a vehicle already on file the files in this request were not saved, so none are listed.
+      logDriverActivity(req, driver._id, 'onboarding.vehicle', {
+        uploads: hadVehicle ? [] : uploadsFrom(req),
+        fields: fieldsSent(req.body, ['vehicleTypeId', 'vehicleNumber', 'vehicleName', 'ownerName', 'seatingCapacity', 'manufactureYear', 'insuranceExpiryMonth', 'insuranceExpiryYear']),
+        meta: { step: 3, vehicleNumber: vehicle?.vehicleNumber || '', vehicleType: vehicleType.name || '', usedExistingVehicle: hadVehicle },
+      });
       return res.status(201).json({
         message: 'Driver onboarded successfully.',
         role: 'driver',
@@ -499,6 +527,11 @@ export class DriverController {
         }
       );
 
+      logDriverActivity(req, driver._id, 'onboarding.full', {
+        uploads: uploadsFrom(req),
+        fields: fieldsSent(req.body, ['name', 'email', 'dob', 'gender', 'address', 'dlNumber', 'vehicleTypeId', 'vehicleNumber', 'vehicleName', 'seatingCapacity', 'manufactureYear']),
+        meta: { vehicleNumber: vehicle?.vehicleNumber || '' },
+      });
       return res.status(201).json({
         message: 'Driver onboarded successfully.',
         role: 'driver',
@@ -543,6 +576,7 @@ export class DriverController {
         return res.status(502).json({ error: 'KYC provider did not return a URL' });
       }
 
+      logDriverActivity(req, driver._id, 'kyc.digilocker_started');
       return res.status(200).json({ redirectUrl });
     } catch (error) {
       console.error('Unable to proceed with kyc:', error.response?.data || error.message);
@@ -567,6 +601,7 @@ export class DriverController {
       errors.push({ field: 'aadhaarBackImage', message: 'Aadhaar back image is required' });
     }
     if (errors.length) {
+      logDriverActivity(req, driver._id, 'kyc.manual_failed', { meta: { errors, received: uploadsFrom(req).map((u) => u.label) } });
       return res.status(400).json({ message: 'Both sides of the Aadhaar card are required', errors });
     }
 
@@ -585,6 +620,10 @@ export class DriverController {
         },
       });
 
+      logDriverActivity(req, driver._id, 'kyc.manual_submitted', {
+        uploads: uploadsFrom(req),
+        meta: { resubmitted: driver.kycMethod === 'manual' && driver.kycStatus === 'pending' },
+      });
       return res.status(200).json({
         message: 'Aadhaar submitted. We will verify it shortly.',
         kyc: kycProgress(updated),
@@ -647,6 +686,7 @@ export class DriverController {
       if (data.aadharDetail?.uid) updates.aadharCardNumber = data.aadharDetail.uid;
 
       driver = await this.driverService.updateDriver(driver._id, { $set: updates });
+      logDriverActivity(req, driver._id, 'kyc.digilocker_verified', { actor: SIGNZY, meta: { requestId } });
       notifyDriver(driver._id, 'kyc:verified', {});
 
       return res.status(200).json({ message: 'Driver KYC status updated successfully.' });
@@ -667,6 +707,10 @@ export class DriverController {
   // status: a failed DigiLocker try should not undo either.
   rejectDigilocker = async (driver, reason, kycDetails) => {
     const current = kycProgress(driver);
+    logDriverActivity(null, driver._id, 'kyc.digilocker_failed', {
+      actor: SIGNZY,
+      meta: { reason, requestId: kycDetails?.requestId || '', statusKept: current.isVerified || (current.status === 'pending' && current.method === 'manual') },
+    });
     if (current.isVerified) return;
 
     const updates = { kycFailedReason: reason };
@@ -738,6 +782,10 @@ export class DriverController {
         });
       }
 
+      logDriverActivity(req, driver._id, approved ? 'admin.kyc_approved' : 'admin.kyc_rejected', {
+        actor: { kind: 'admin', id: null, name: 'Admin API key' },
+        meta: approved ? null : { reason },
+      });
       if (approved) {
         notifyDriver(driver._id, 'kyc:verified', {});
       } else {

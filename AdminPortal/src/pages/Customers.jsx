@@ -1,8 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDate, fmtNumber } from '../lib/format.js';
-import { Button, Card, DateRange, ErrorNote, PageHead, Pagination, Person, Select, Table, Toolbar } from '../components/ui/index.js';
+import { Button, Card, DateRange, ErrorNote, ExportButton, PageHead, Pagination, Person, Select, Table, Toolbar } from '../components/ui/index.js';
 import { AccountStatus, SearchInput } from '../components/people/shared.jsx';
+
+const EXPORT_COLUMNS = [
+  { header: 'Customer ID', value: (r) => r._id },
+  { header: 'Name', value: (r) => r.name, width: 24 },
+  { header: 'Phone', value: (r) => r.phoneNumber },
+  { header: 'Quick rides', value: (r) => r.quickRides, type: 'number' },
+  { header: 'Outstation rides', value: (r) => r.outstationRides, type: 'number' },
+  { header: 'Last ride', value: (r) => r.lastRideAt, type: 'datetime' },
+  { header: 'Joined', value: (r) => r.createdAt, type: 'datetime' },
+  { header: 'Status', value: (r) => (r.isBlocked ? 'Blocked' : 'Active') },
+  { header: 'Blocked reason', value: (r) => (r.isBlocked ? r.blockedReason : ''), width: 30 },
+];
 
 export default function Customers() {
   const navigate = useNavigate();
@@ -22,7 +34,12 @@ export default function Customers() {
 
   return (
     <>
-      <PageHead eyebrow="People" title="Customers" description="Everyone who has signed up in the rider app. Open a customer to see their rides, saved places and reviews." />
+      <PageHead
+        eyebrow="People"
+        title="Customers"
+        description="Everyone who has signed up in the rider app. Open a customer to see their rides, saved places and reviews."
+        action={<ExportButton path="/customers" params={f} columns={EXPORT_COLUMNS} filename="customers" sheet="Customers" />}
+      />
       <Card>
         <Toolbar>
           <SearchInput value={f.q} onChange={(q) => set({ q })} placeholder="Name, phone or ID" />

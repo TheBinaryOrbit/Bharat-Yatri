@@ -1,6 +1,7 @@
 import { VehicleService } from '../services/vehicle.service.js';
 import { VehicleTypeService } from '../services/vehicleType.service.js';
 import { buildFileUrl } from '../utils/fileUrl.js';
+import { fieldsSent, logDriverActivity, uploadsFrom } from '../services/driverActivity.service.js';
 import { resolveVehicleType } from '../utils/resolveVehicleType.js';
 
 export class VehicleController {
@@ -111,6 +112,11 @@ export class VehicleController {
         rcDetails: { frontImageUrl: rcFront, backImageUrl: rcBack },
       });
 
+      logDriverActivity(req, driverId, 'vehicle.create', {
+        uploads: uploadsFrom(req),
+        fields: fieldsSent(req.body, ['vehicleTypeId', 'vehicleNumber', 'vehicleName', 'ownerName', 'seatingCapacity', 'manufactureYear', 'insuranceExpiryMonth', 'insuranceExpiryYear']),
+        meta: { vehicleId: newVehicle._id, vehicleNumber: newVehicle.vehicleNumber },
+      });
       return res.status(201).json(newVehicle);
     } catch (error) {
       console.log(error);
@@ -195,6 +201,11 @@ export class VehicleController {
       }
 
       const updated = await this.vehicleService.updateVehicle(vehicle._id, updates);
+      logDriverActivity(req, req.user._id, 'vehicle.update', {
+        uploads: uploadsFrom(req),
+        fields: fieldsSent(req.body, ['vehicleTypeId', 'vehicleNumber', 'vehicleName', 'ownerName', 'seatingCapacity', 'manufactureYear', 'insuranceExpiryMonth', 'insuranceExpiryYear']),
+        meta: { vehicleId: vehicle._id, vehicleNumber: updated?.vehicleNumber || vehicle.vehicleNumber },
+      });
       return res.status(200).json({ message: 'Vehicle updated successfully.', vehicle: updated });
     } catch (error) {
       console.log(error);

@@ -5,6 +5,7 @@ export { Field, Label, FieldError, Input, Textarea, Select, Toggle, ErrorNote, I
 export { Modal, Confirm } from './Modal.jsx';
 export { ToastProvider, useToast } from './Toast.jsx';
 export { Table, Pagination, Toolbar, EmptyState, sortRows, useListSort } from './Table.jsx';
+export { ExportButton } from './ExportButton.jsx';
 export {
   PageHead, Spinner, Avatar, Person, StatCard, StatRow, DateRange, RANGE_PRESETS, ChangeSummary, DocThumb, NotesPanel, Tabs, Stars,
 } from './Misc.jsx';

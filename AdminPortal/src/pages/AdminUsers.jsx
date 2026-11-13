@@ -5,7 +5,7 @@ import { useAuth } from '../lib/auth.jsx';
 import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDate, fmtDateTime, titleCase } from '../lib/format.js';
 import {
-  Badge, Button, Card, CardBody, CardHead, ErrorNote, Field, Input, Modal, PageHead, Pagination, Person, Select, Table, Toggle, Toolbar, useToast,
+  Badge, Button, Card, CardBody, CardHead, ErrorNote, ExportButton, Field, Input, Modal, PageHead, Pagination, Person, Select, Table, Toggle, Toolbar, useToast,
 } from '../components/ui/index.js';
 
 const strongPassword = () => {
@@ -173,9 +173,25 @@ export default function AdminUsers() {
         title="Admin users"
         description="Who can sign in to this portal and what each role may do. Every change here is recorded in the audit log."
         action={
-          <Button onClick={() => setModal('new')}>
-            <Plus size={15} /> Add admin
-          </Button>
+          <>
+            <ExportButton
+              path="/admins"
+              params={f}
+              filename="admin-users"
+              sheet="Admins"
+              columns={[
+                { header: 'Name', value: (a) => a.name, width: 22 },
+                { header: 'Email', value: (a) => a.email, width: 28 },
+                { header: 'Role', value: (a) => a.roleLabel || a.role },
+                { header: 'Status', value: (a) => (a.isActive ? 'Active' : 'Deactivated') },
+                { header: 'Last sign-in', value: (a) => a.lastLoginAt, type: 'datetime' },
+                { header: 'Added', value: (a) => a.createdAt, type: 'datetime' },
+              ]}
+            />
+            <Button onClick={() => setModal('new')}>
+              <Plus size={15} /> Add admin
+            </Button>
+          </>
         }
       />
       <Card className="mb-5">

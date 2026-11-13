@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { adminProtect, can } from '../../middlewares/adminAuth.js';
+import { exportGate } from '../../middlewares/adminExport.js';
 import { uploadAdminImage, uploadVehicleTypeIcon } from '../../middlewares/upload.js';
 import { AdminAuthController } from '../../controllers/admin/adminAuth.controller.js';
 import { AdminUsersController } from '../../controllers/admin/adminUsers.controller.js';
@@ -35,6 +36,7 @@ const referrers = new InstallReferrerController();
 // --- Session: login is public, everything after this is signed in ---
 router.post('/auth/login', auth.login);
 router.use(adminProtect);
+router.use(exportGate);
 router.get('/auth/me', auth.me);
 router.patch('/auth/password', auth.changePassword);
 
@@ -66,6 +68,7 @@ router.patch('/drivers/:id', can('people.edit'), drivers.update);
 router.get('/drivers/:id/reviews', can('people.view'), drivers.reviews);
 router.delete('/drivers/:id/reviews/:reviewId', can('reviews.moderate'), drivers.deleteReview);
 router.get('/drivers/:id/bids', can('people.view'), drivers.bids);
+router.get('/drivers/:id/activity', can('people.view'), drivers.activity);
 router.patch('/drivers/:id/block', can('people.block'), drivers.block);
 
 router.get('/kyc', can('kyc.review'), drivers.kycQueue);

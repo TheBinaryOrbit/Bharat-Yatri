@@ -4,9 +4,22 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { useApi, useDebounced, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { daysAgo, fmtDate, fmtDateTime, fmtNumber, fmtPercent, isoDay } from '../lib/format.js';
 import {
-  Badge, Card, CardBody, CardHead, DateRange, ErrorNote, Input, PageHead, Pagination, Select, StatCard, Table, Toolbar,
+  Badge, Card, CardBody, CardHead, DateRange, ErrorNote, ExportButton, Input, PageHead, Pagination, Select, StatCard, Table, Toolbar,
 } from '../components/ui/index.js';
 import { AXIS, ChartTooltip, GRID, Legend, SERIES, shortDay } from '../components/charts.jsx';
+
+const EXPORT_COLUMNS = [
+  { header: 'Installed', value: (r) => r.installTime, type: 'datetime' },
+  { header: 'App', value: (r) => (r.app === 'driver' ? 'Driver app' : r.app === 'user' ? 'Rider app' : r.app) },
+  { header: 'Source', value: (r) => r.source || 'unknown' },
+  { header: 'Medium', value: (r) => r.medium || 'unknown' },
+  { header: 'Campaign', value: (r) => r.campaign, width: 24 },
+  { header: 'Platform', value: (r) => r.platform },
+  { header: 'App version', value: (r) => r.appVersion },
+  { header: 'Signed up as', value: (r) => (r.driverId ? 'Driver' : r.userId ? 'Rider' : '') },
+  { header: 'Account name', value: (r) => r.driverId?.name || r.userId?.name, width: 22 },
+  { header: 'Account ID', value: (r) => r.driverId?._id || r.userId?._id, width: 26 },
+];
 
 export default function InstallReferrers() {
   const [f, setF] = useUrlFilters({ from: daysAgo(29), to: isoDay(), app: '', source: '', medium: '', campaign: '', linked: '', page: '1', limit: '50' });
@@ -25,9 +38,8 @@ export default function InstallReferrers() {
   const sortProps = useUrlSort(f, setF);
   const summary = useApi('/install-referrers/summary', range);
   const series = useApi('/install-referrers/timeseries', range);
-  const list = useApi('/install-referrers', {
-    ...range, source: f.source, medium: f.medium, campaign: f.campaign, linked: f.linked, sortBy: f.sortBy, order: f.order, limit, skip: (page - 1) * limit,
-  });
+  const listFilters = { ...range, source: f.source, medium: f.medium, campaign: f.campaign, linked: f.linked, sortBy: f.sortBy, order: f.order };
+  const list = useApi('/install-referrers', { ...listFilters, limit, skip: (page - 1) * limit });
 
   const s = summary.data;
   const total = list.data?.total || 0;
@@ -100,7 +112,11 @@ export default function InstallReferrers() {
         </Card>
       </div>
       <Card>
-        <CardHead eyebrow={`${fmtNumber(total)} installs`} title="Every install" />
+        <CardHead
+          eyebrow={`${fmtNumber(total)} installs`}
+          title="Every install"
+          action={<ExportButton path="/install-referrers" params={listFilters} paging="skip" columns={EXPORT_COLUMNS} filename="install-referrers" sheet="Installs" size="sm" />}
+        />
         <Toolbar>
           <Input className="w-36" placeholder="Source" value={search.source} onChange={(e) => setSearch((x) => ({ ...x, source: e.target.value }))} />
           <Input className="w-36" placeholder="Medium" value={search.medium} onChange={(e) => setSearch((x) => ({ ...x, medium: e.target.value }))} />

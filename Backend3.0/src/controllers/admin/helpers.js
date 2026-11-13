@@ -1,13 +1,16 @@
 import mongoose from 'mongoose';
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../constants/admin.constants.js';
+import { DEFAULT_PAGE_SIZE, EXPORT_PAGE_SIZE, MAX_PAGE_SIZE } from '../../constants/admin.constants.js';
 import { parseDateRange } from '../../utils/dateRange.js';
 
 // Small shared pieces for the admin controllers. Every admin list is paginated as
 // ?page=1&limit=20 and answers { data, total, page, limit, pages }.
 
+// ?export=1 raises the cap; exportGate (middlewares/adminExport.js) has already checked the
+// caller may export by the time a controller reads it.
 export const pageParams = (query) => {
   const page = Math.max(Math.trunc(Number(query.page)) || 1, 1);
-  const limit = Math.min(Math.max(Math.trunc(Number(query.limit)) || DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+  const max = query.export === '1' ? EXPORT_PAGE_SIZE : MAX_PAGE_SIZE;
+  const limit = Math.min(Math.max(Math.trunc(Number(query.limit)) || DEFAULT_PAGE_SIZE, 1), max);
   return { page, limit, skip: (page - 1) * limit };
 };
 

@@ -11,6 +11,7 @@ import {
 } from '../components/ui/index.js';
 import { ChangeKycStatus } from '../components/people/ChangeKycStatus.jsx';
 import { EditDriverProfile } from '../components/people/EditDriverProfile.jsx';
+import { DriverActivity } from '../components/people/DriverActivity.jsx';
 import { AccountStatus, BackLink, BlockAction, BlockedBanner, InsuranceBadge, RideHistory, RideLink } from '../components/people/shared.jsx';
 
 function LiveChip({ live }) {
@@ -183,6 +184,7 @@ function BidsSection({ driverId }) {
 
 const TABS = [
   { value: 'profile', label: 'Profile' },
+  { value: 'activity', label: 'Activity' },
   { value: 'kyc', label: 'Licence & KYC' },
   { value: 'vehicle', label: 'Vehicle' },
   { value: 'reviews', label: 'Reviews' },
@@ -201,7 +203,7 @@ export default function DriverDetail() {
   if (loading && !data) return <Spinner />;
   if (error) return <ErrorNote error={error} />;
   if (!data) return null;
-  const { driver: d, onboarding, kyc, vehicle: v, payment, rating, rides, bids, activeRide, live } = data;
+  const { driver: d, onboarding, kyc, vehicle: v, payment, rating, rides, bids, activeRide, live, lastLoginAt } = data;
   const activeRideLink = activeRide && `${activeRide.rideType === 'outstation' ? '/outstation-rides' : '/quick-rides'}/${activeRide._id}`;
 
   return (
@@ -306,7 +308,15 @@ export default function DriverDetail() {
             <Card>
               <CardHead eyebrow="Contact" title="Reach the driver" />
               <CardBody>
-                <KeyValues items={[['Phone', d.phoneNumber], ['Email', d.email], ['Joined', fmtDateTime(d.createdAt)], ['Last updated', fmtDateTime(d.updatedAt)]]} />
+                <KeyValues
+                  items={[
+                    ['Phone', d.phoneNumber],
+                    ['Email', d.email],
+                    ['Joined', fmtDateTime(d.createdAt)],
+                    ['Last sign-in', lastLoginAt ? `${fmtDateTime(lastLoginAt)} · ${fmtAgo(lastLoginAt)}` : 'Not recorded yet'],
+                    ['Last updated', fmtDateTime(d.updatedAt)],
+                  ]}
+                />
               </CardBody>
             </Card>
             <Card>
@@ -418,6 +428,8 @@ export default function DriverDetail() {
             <div className="py-14"><EmptyState title="No vehicle registered" hint="The driver has not finished the vehicle step of onboarding." /></div>
           </Card>
         ))}
+
+      {tab === 'activity' && <DriverActivity driverId={d._id} driverName={d.name} />}
 
       {tab === 'reviews' && <ReviewsSection driverId={d._id} rating={rating} />}
 

@@ -1,8 +1,24 @@
 import { useNavigate } from 'react-router-dom';
 import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
 import { fmtDate } from '../lib/format.js';
-import { Button, Card, ErrorNote, PageHead, Pagination, Person, Select, Table, Toolbar } from '../components/ui/index.js';
+import { Button, Card, ErrorNote, ExportButton, PageHead, Pagination, Person, Select, Table, Toolbar } from '../components/ui/index.js';
 import { InsuranceBadge, SearchInput } from '../components/people/shared.jsx';
+
+const insuranceText = (e) => (e?.month && e?.year ? `${String(e.month).padStart(2, '0')}/${e.year}` : '');
+const EXPORT_COLUMNS = [
+  { header: 'Vehicle ID', value: (r) => r._id },
+  { header: 'Number', value: (r) => r.vehicleNumber },
+  { header: 'Model', value: (r) => r.vehicleName, width: 20 },
+  { header: 'Type', value: (r) => r.vehicleTypeId?.name },
+  { header: 'Owner', value: (r) => r.ownerName, width: 22 },
+  { header: 'Driver', value: (r) => r.driverId?.name, width: 22 },
+  { header: 'Driver phone', value: (r) => r.driverId?.phoneNumber },
+  { header: 'Seats', value: (r) => r.seatingCapacity, type: 'number' },
+  { header: 'Year', value: (r) => r.manufactureYear },
+  { header: 'Insurance expiry (MM/YYYY)', value: (r) => insuranceText(r.insuranceExpiry) },
+  { header: 'Photos', value: (r) => r.vehicleImages?.length || 0, type: 'number' },
+  { header: 'Added', value: (r) => r.createdAt, type: 'datetime' },
+];
 
 export default function Vehicles() {
   const navigate = useNavigate();
@@ -30,7 +46,12 @@ export default function Vehicles() {
 
   return (
     <>
-      <PageHead eyebrow="People" title="Vehicles" description="One vehicle per driver, registered during onboarding." />
+      <PageHead
+        eyebrow="People"
+        title="Vehicles"
+        description="One vehicle per driver, registered during onboarding."
+        action={<ExportButton path="/vehicles" params={f} columns={EXPORT_COLUMNS} filename="vehicles" sheet="Vehicles" />}
+      />
       <Card>
         <Toolbar>
           <SearchInput value={f.q} onChange={(q) => set({ q })} placeholder="Number, model or owner" />

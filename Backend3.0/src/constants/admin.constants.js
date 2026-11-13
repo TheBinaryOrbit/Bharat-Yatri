@@ -75,6 +75,8 @@ export const NOTE_ENTITIES = ['user', 'driver', 'vehicle', 'quickride', 'outstat
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
+// Lists fetched with ?export=1 (Excel export) page through in bigger chunks. Needs reports.export.
+export const EXPORT_PAGE_SIZE = 500;
 
 // A live position older than this is shown as "last known", not live.
 export const LIVE_STALE_SECONDS = 30;

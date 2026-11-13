@@ -4,7 +4,7 @@ import { api, fieldMap } from '../lib/api.js';
 import { useApi } from '../lib/hooks.js';
 import { fmtMoney, fmtNumber } from '../lib/format.js';
 import {
-  Badge, Button, Card, ChangeSummary, Confirm, EmptyState, ErrorNote, Field, InfoNote, Input, Modal, PageHead, Select, Spinner,
+  Badge, Button, Card, ChangeSummary, Confirm, EmptyState, ErrorNote, ExportButton, Field, InfoNote, Input, Modal, PageHead, Select, Spinner,
   Textarea, Toggle, useListSort, useToast,
 } from '../components/ui/index.js';
 
@@ -250,9 +250,28 @@ export default function VehicleTypes() {
         title="Vehicle types & fares"
         description="The categories riders choose from and the rates behind every suggested fare."
         action={
-          <Button onClick={() => setCreating(true)}>
-            <Plus size={15} /> New vehicle type
-          </Button>
+          <>
+            <ExportButton
+              rows={types}
+              filename="vehicle-types"
+              sheet="Vehicle types"
+              columns={[
+                { header: 'Name', value: (t) => t.name, width: 18 },
+                { header: 'Slug', value: (t) => t.slug },
+                { header: 'Seats', value: (t) => t.capacity, type: 'number' },
+                { header: 'Base fare (₹)', value: (t) => t.baseFare, type: 'money' },
+                { header: 'Per km (₹)', value: (t) => t.ratePerKm, type: 'money' },
+                { header: 'Per minute (₹)', value: (t) => t.ratePerMinute, type: 'money' },
+                { header: 'Features', value: (t) => t.features, width: 30 },
+                { header: 'Description', value: (t) => t.description, width: 36 },
+                { header: 'Vehicles registered', value: (t) => t.vehicleCount, type: 'number' },
+                { header: 'Status', value: (t) => (t.isActive ? 'Live' : 'Inactive') },
+              ]}
+            />
+            <Button onClick={() => setCreating(true)}>
+              <Plus size={15} /> New vehicle type
+            </Button>
+          </>
         }
       />
       <ErrorNote error={error} className="mb-4" />

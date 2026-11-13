@@ -4,7 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useApi, useUrlFilters } from '../lib/hooks.js';
 import { fmtDateTime } from '../lib/format.js';
-import { Badge, Button, Card, Confirm, EmptyState, ErrorNote, PageHead, Table, Tabs, Toolbar, useToast } from '../components/ui/index.js';
+import { Badge, Button, Card, Confirm, EmptyState, ErrorNote, ExportButton, PageHead, Table, Tabs, Toolbar, useToast } from '../components/ui/index.js';
 
 export default function AppContent() {
   const navigate = useNavigate();
@@ -51,9 +51,25 @@ export default function AppContent() {
         title="App content"
         description="Terms, privacy policy and other pages the rider and driver apps load at runtime. Only live pages appear in the apps."
         action={
-          <Button onClick={() => navigate('/app-content/new')}>
-            <Plus size={15} /> New page
-          </Button>
+          <>
+            <ExportButton
+              rows={rows}
+              filename="app-content"
+              sheet="App content"
+              columns={[
+                { header: 'Page', value: (p) => p.name, width: 26 },
+                { header: 'Slug', value: (p) => p.slug, width: 22 },
+                { header: 'App', value: (p) => (p.type === 'driver' ? 'Driver app' : 'Rider app') },
+                { header: 'Icon', value: (p) => p.iconName },
+                { header: 'Status', value: (p) => (p.isActive ? 'Live' : 'Hidden') },
+                { header: 'Updated', value: (p) => p.updatedAt, type: 'datetime' },
+                { header: 'Created', value: (p) => p.createdAt, type: 'datetime' },
+              ]}
+            />
+            <Button onClick={() => navigate('/app-content/new')}>
+              <Plus size={15} /> New page
+            </Button>
+          </>
         }
       />
       <Card>

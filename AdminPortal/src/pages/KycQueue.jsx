@@ -1,8 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import { useApi, useUrlFilters, useUrlSort } from '../lib/hooks.js';
-import { fmtAgo, fmtDateTime } from '../lib/format.js';
-import { Badge, Card, EmptyState, ErrorNote, PageHead, Pagination, Person, Select, Table, Tabs, Toolbar } from '../components/ui/index.js';
+import { KYC_LABEL, fmtAgo, fmtDateTime } from '../lib/format.js';
+import { Badge, Card, EmptyState, ErrorNote, ExportButton, PageHead, Pagination, Person, Select, Table, Tabs, Toolbar } from '../components/ui/index.js';
 import { SearchInput } from '../components/people/shared.jsx';
+
+const EXPORT_COLUMNS = [
+  { header: 'Driver ID', value: (r) => r._id },
+  { header: 'Name', value: (r) => r.name, width: 24 },
+  { header: 'Phone', value: (r) => r.phoneNumber },
+  { header: 'KYC status', value: (r) => KYC_LABEL[r.kycStatus] || r.kycStatus },
+  { header: 'Method', value: (r) => (r.kycMethod === 'digilocker' ? 'DigiLocker' : r.kycMethod === 'manual' ? 'Manual' : '') },
+  { header: 'Submitted', value: (r) => r.manualKyc?.submittedAt, type: 'datetime' },
+  { header: 'Reviewed', value: (r) => r.manualKyc?.reviewedAt, type: 'datetime' },
+  { header: 'Rejected because', value: (r) => r.kycFailedReason, width: 36 },
+  { header: 'Last updated', value: (r) => r.updatedAt, type: 'datetime' },
+];
 
 const waitTone = (at) => {
   const h = (Date.now() - new Date(at).getTime()) / 3600000;
@@ -42,6 +54,7 @@ export default function KycQueue() {
         eyebrow="People"
         title="KYC review"
         description="Drivers who chose manual KYC upload photos of their Aadhaar. Check each one against what they typed, then approve or reject. Oldest requests are first."
+        action={<ExportButton path="/kyc" params={f} columns={EXPORT_COLUMNS} filename={`kyc-${f.status}`} sheet="KYC" />}
       />
       <Card>
         <Toolbar>

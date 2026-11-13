@@ -23,12 +23,14 @@ export class DriverService {
 
   // Called at OTP verification, so two quick verifies for the same new number can race. The
   // upsert makes the second one find the first one's account instead of failing on the index.
+  // Returns { driver, created } — created is true when this call inserted the account.
   findOrCreateByPhone = async (phoneNumber) => {
-    return Driver.findOneAndUpdate(
+    const result = await Driver.findOneAndUpdate(
       { phoneNumber },
       { $setOnInsert: { phoneNumber } },
-      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true }
+      { new: true, upsert: true, setDefaultsOnInsert: true, runValidators: true, includeResultMetadata: true }
     );
+    return { driver: result.value, created: !result.lastErrorObject?.updatedExisting };
   };
 
   // Applies an admin's decision, only if the driver still has a manual request pending.

@@ -5,6 +5,7 @@ import { generateToken } from '../utils/token.js';
 import { onboardingProgress } from '../utils/onboardingProgress.js';
 import { kycProgress } from '../utils/kycProgress.js';
 import { blockedResponse } from '../middlewares/auth.js';
+import { logDriverActivity } from '../services/driverActivity.service.js';
 
 export class AuthController {
   constructor() {
@@ -58,17 +59,24 @@ export class AuthController {
   // steps need it. userStatus says where the app goes next:
   //   404  onboarding not finished → the onboarding screens, resuming at onboarding.nextStep
   //   200  onboarding finished     → home, which shows the KYC prompt until kyc.isVerified
-  verifyDriver = async (res, phoneNumber, fcmToken) => {
-    const account = await this.driverService.findOrCreateByPhone(phoneNumber);
+  verifyDriver = async (req, res, phoneNumber, fcmToken) => {
+    const { driver: account, created } = await this.driverService.findOrCreateByPhone(phoneNumber);
+    const actor = { kind: 'driver', id: account._id, name: account.name || '' };
     if (account.isBlocked) {
+      logDriverActivity(req, account._id, 'auth.login_blocked', { actor, meta: { reason: account.blockedReason || '' } });
       return res.status(403).json(blockedResponse(account));
     }
+    if (created) logDriverActivity(req, account._id, 'account.created', { actor });
 
     const driver = fcmToken
       ? await this.driverService.updateFcmToken(phoneNumber, fcmToken)
       : account;
 
     const onboarding = onboardingProgress(driver);
+    logDriverActivity(req, driver._id, 'auth.login', {
+      actor,
+      meta: { onboardingStep: onboarding.completedStep, onboardingComplete: onboarding.isComplete, fcmTokenUpdated: Boolean(fcmToken) },
+    });
 
     return res.status(200).json({
       message: onboarding.isComplete
@@ -108,7 +116,7 @@ export class AuthController {
       }
 
       if (role === 'driver') {
-        return this.verifyDriver(res, phoneNumber, fcmToken);
+        return this.verifyDriver(req, res, phoneNumber, fcmToken);
       }
 
       const account = await resolved.findByPhone(phoneNumber);
